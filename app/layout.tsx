@@ -17,11 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={inter.className}>
+      <body className={`${inter.className} min-h-screen`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <div className="container mx-auto p-4">
-            {children}
-          </div>
+          {children}
         </ThemeProvider>
       </body>
     </html>

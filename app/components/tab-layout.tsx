@@ -7,26 +7,54 @@ import { usePathname, useRouter } from "next/navigation"
 import Login from "./login"
 import Alarm from "./alarm"
 import UserManagement from "./user-management"
+import { getUserMyself, logout } from "@/lib/api"
+import { User } from "@/types"
 
 export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [username, setUsername] = useState("")
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem("isLoggedIn")
-    setIsLoggedIn(loggedIn === "true")
-    setUsername(localStorage.getItem("username") || "User")
+    const token = localStorage.getItem('token')
+    const tokenExpiry = localStorage.getItem('tokenExpiry')
+
+    if (token) {
+      setIsLoggedIn(true)
+      getUserMyself().then(setCurrentUser).catch(console.error)
+
+      if (tokenExpiry && tokenExpiry !== 'infinite') {
+        const expiryTime = new Date(tokenExpiry).getTime()
+        const timeUntilExpiry = expiryTime - Date.now()
+        
+        if (timeUntilExpiry > 0) {
+          setTimeout(handleLogout, timeUntilExpiry)
+        } else {
+          handleLogout()
+        }
+      }
+    }
   }, [])
 
-  const handleLogin = (loggedInUsername: string) => {
+  const handleLogin = (user: User) => {
     setIsLoggedIn(true)
-    setUsername(loggedInUsername)
+    setCurrentUser(user)
+  }
+
+  const handleLogout = () => {
+    logout()
+    setIsLoggedIn(false)
+    setCurrentUser(null)
+    router.push('/')
   }
 
   const handleTabChange = (value: string) => {
     router.push(value === "alarm" ? "/" : `/${value}`)
+  }
+
+  const handleUserUpdate = (updatedUser: User) => {
+    setCurrentUser(updatedUser)
   }
 
   if (!isLoggedIn) {
@@ -36,32 +64,33 @@ export default function TabLayout() {
   const currentTab = pathname === "/" ? "alarm" : pathname.slice(1)
 
   return (
-    <div className="border border-zinc-800 rounded-md p-4 bg-zinc-950 text-zinc-50">
-      <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
-        <div className="mb-4 border-b border-zinc-800">
-          <div className="flex justify-between items-center mb-2">
-            <TabsList className="bg-transparent">
-              <TabsTrigger value="alarm" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Home alarm</TabsTrigger>
-              <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
-            </TabsList>
-            <div className="flex items-center space-x-2">
-              <span className="text-zinc-400">{username}</span>
-              <Avatar>
-                <AvatarImage src="/avatar.webp" alt={username} />
-              </Avatar>
+    <div className="min-h-screen bg-zinc-800 rounded-md p-4 bg-zinc-900 text-zinc-50">
+      <div className="container mx-auto p-4">
+        <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
+          <div className="mb-4 border-b border-zinc-800">
+            <div className="flex justify-between items-center mb-2">
+              <TabsList className="bg-transparent">
+                <TabsTrigger value="alarm" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Home alarm</TabsTrigger>
+                <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
+              </TabsList>
+              <div className="flex items-center space-x-2 pr-4">
+                <span className="text-zinc-400">{currentUser?.username}</span>
+                <Avatar>
+                  <AvatarImage src="/avatar.webp" alt={currentUser?.username} />
+                </Avatar>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="pt-4">
-          <TabsContent value="alarm">
-            <h1 className="text-3xl font-bold mb-6 text-zinc-50">Alarm Dashboard</h1>
-            <Alarm />
-          </TabsContent>
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
-        </div>
-      </Tabs>
+          <div className="pt-4 px-4">
+            <TabsContent value="alarm">
+              <Alarm />
+            </TabsContent>
+            <TabsContent value="users">
+              <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} />
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
     </div>
   )
 }
