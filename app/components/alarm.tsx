@@ -165,7 +165,7 @@ export default function Alarm() {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">Cancel</AlertDialogCancel>
+                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
                       <AlertDialogAction onClick={() => handleDelete(group.id)} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -191,7 +191,7 @@ export default function Alarm() {
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">OK</AlertDialogAction>
+            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

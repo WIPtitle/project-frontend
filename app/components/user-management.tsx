@@ -15,8 +15,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, 
 AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { getAllUsers, createUser, updateUser, deleteUser } from "@/lib/api"
+import { getAllUsers, createUser, updateUser, deleteUser, logout } from "@/lib/api"
 import { User } from "@/types"
+import { useRouter } from "next/navigation"
 
 type UserManagementProps = {
   onUserUpdate: (user: User) => void
@@ -28,6 +29,10 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [currentUserSet, setCurrentUser] = useState<User | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -51,13 +56,19 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
     setIsDialogOpen(true)
   }
 
+  const handleLogout = () => {
+    logout()
+    setIsLoggedIn(false)
+    setCurrentUser(null)
+    router.push('/')
+  }
+
   const handleDeleteUser = async (userId: number) => {
     try {
       await deleteUser(userId)
       setUsers(users.filter(user => user.id !== userId))
       if (currentUser && userId === currentUser.id) {
-        // Handle logout or redirect here
-        console.log("Current user deleted. Implement logout logic.")
+        handleLogout()
       }
     } catch (error) {
       setErrorMessage("Failed to delete user")
@@ -112,7 +123,7 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">Cancel</AlertDialogCancel>
+                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
                       <AlertDialogAction onClick={() => handleDeleteUser(currentUser.id)} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -207,13 +218,13 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
         </DialogContent>
       </Dialog>
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
-        <AlertDialogContent className="bg-zinc-900 text-zinc-50">
+        <AlertDialogContent className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>
             <AlertDialogTitle>Error</AlertDialogTitle>
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">OK</AlertDialogAction>
+            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Ok</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
