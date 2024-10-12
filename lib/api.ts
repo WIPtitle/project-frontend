@@ -117,3 +117,165 @@ export const updateUser = async (id: number, updates: Partial<User>): Promise<Us
 export const deleteUser = async (id: number): Promise<boolean> => {
   return true
 }
+
+const fakeMagneticReeds: MagneticReed[] = [
+  { id: 1, name: "Reed 1", gpio_pin_number: 17, default_value_when_closed: "HIGH" },
+  { id: 2, name: "Reed 2", gpio_pin_number: 27, default_value_when_closed: "LOW" },
+];
+
+const fakeRtspCameras: RTSPCamera[] = [
+  { id: 1, name: "Camera 1", ip: "192.168.1.1", port: "8080", username: "user1", password: "pass1", path: "/stream1", sensibility: 5 },
+  { id: 2, name: "Camera 2", ip: "192.168.1.2", port: "8081", username: "user2", password: "pass2", path: "/stream2", sensibility: 7 },
+];
+
+// API functions
+export const getAllMagneticReeds = async (): Promise<MagneticReed[]> => {
+  return fakeMagneticReeds;
+}
+
+export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
+  return fakeRtspCameras;
+}
+
+export const createMagneticReed = async (reed: Omit<MagneticReed, 'id'>): Promise<MagneticReed> => {
+  const newReed: MagneticReed = { ...reed, id: Date.now() };
+  fakeMagneticReeds.push(newReed);
+  return newReed;
+}
+
+export const updateMagneticReed = async (id: number, updates: Partial<MagneticReed>): Promise<MagneticReed> => {
+  const index = fakeMagneticReeds.findIndex(reed => reed.id === id);
+  if (index === -1) throw new Error('Reed not found');
+  const updatedReed = { ...fakeMagneticReeds[index], ...updates };
+  fakeMagneticReeds[index] = updatedReed;
+  return updatedReed;
+}
+
+export const deleteMagneticReed = async (id: number): Promise<boolean> => {
+  const index = fakeMagneticReeds.findIndex(reed => reed.id === id);
+  if (index === -1) throw new Error('Reed not found');
+  fakeMagneticReeds.splice(index, 1);
+  return true;
+}
+
+export const getReedCurrentStatus = async (id: number): Promise<boolean> => {
+  // This is a mock implementation. In a real application, this would fetch the actual status from the device.
+  return Math.random() < 0.5;
+}
+
+export const createRTSPCamera = async (camera: Omit<RTSPCamera, 'id'>): Promise<RTSPCamera> => {
+  // Simulate an error when creating a camera
+  if (Math.random() < 0.5) {
+    throw new Error("Failed to create camera. Please try again.");
+  }
+  const newCamera: RTSPCamera = { ...camera, id: Date.now() };
+  fakeRtspCameras.push(newCamera);
+  return newCamera;
+}
+
+export const updateRTSPCamera = async (id: number, updates: Partial<RTSPCamera>): Promise<RTSPCamera> => {
+  const index = fakeRtspCameras.findIndex(camera => camera.id === id);
+  if (index === -1) throw new Error('Camera not found');
+  const updatedCamera = { ...fakeRtspCameras[index], ...updates };
+  fakeRtspCameras[index] = updatedCamera;
+  return updatedCamera;
+}
+
+export const deleteRTSPCamera = async (id: number): Promise<boolean> => {
+  const index = fakeRtspCameras.findIndex(camera => camera.id === id);
+  if (index === -1) throw new Error('Camera not found');
+  fakeRtspCameras.splice(index, 1);
+  return true;
+}
+
+let emailConfig: EmailConfig | null = null
+let alarmAudioConfig: AlarmAudioConfig | null = null
+
+export const getEmailConfig = async (): Promise<EmailConfig | null> => {
+  return emailConfig
+}
+
+export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
+  return alarmAudioConfig
+}
+
+export const createEmailConfig = async (config: EmailConfig): Promise<EmailConfig> => {
+  emailConfig = { ...config }
+  return emailConfig
+}
+
+export const createAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
+  alarmAudioConfig = { ...config }
+  return  alarmAudioConfig
+}
+
+export const updateEmailConfig = async (config: EmailConfig): Promise<EmailConfig> => {
+  if (!emailConfig) throw new Error("Email configuration doesn't exist")
+  emailConfig = { ...config }
+  return emailConfig
+}
+
+export const updateAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
+  if (!alarmAudioConfig) throw new Error("Alarm audio configuration doesn't exist")
+  alarmAudioConfig = { ...config }
+  return alarmAudioConfig
+}
+
+export const deleteEmailConfig = async (): Promise<void> => {
+  emailConfig = null
+}
+
+export const deleteAlarmAudioConfig = async (): Promise<void> => {
+  alarmAudioConfig = null
+}
+
+const mockRecordings: Recording[] = [
+  { id: 1, filename: "recording1.mp4", camera_ip: "192.168.1.100", is_completed: true },
+  { id: 2, filename: "recording2.mp4", camera_ip: "192.168.1.101", is_completed: true },
+  { id: 3, filename: "recording3.mp4", camera_ip: "192.168.1.100", is_completed: false },
+  { id: 4, filename: "recording4.mp4", camera_ip: "192.168.1.102", is_completed: true },
+]
+
+const mockCameras: Camera[] = [
+  { id: 1, name: "Front Door", ip: "192.168.1.100" },
+  { id: 2, name: "Back Yard", ip: "192.168.1.101" },
+  { id: 3, name: "Garage", ip: "192.168.1.102" },
+]
+
+export const getAllRecordings = async (): Promise<Recording[]> => {
+  return mockRecordings
+}
+
+export const getCamera = async (ip: string): Promise<Camera> => {
+  const camera = mockCameras.find(cam => cam.ip === ip)
+  if (!camera) throw new Error("Camera not found")
+  return camera
+}
+
+export const deleteRecording = async (id: number): Promise<void> => {
+  const index = mockRecordings.findIndex(rec => rec.id === id)
+  if (index === -1) throw new Error("Recording not found")
+  mockRecordings.splice(index, 1)
+}
+
+export const getStorageInfo = async (): Promise<StorageInfo> => {
+  return {
+    used_space: 500 * 1024 * 1024 * 1024, // 500 GB in bytes
+    free_space: 1.5 * 1024 * 1024 * 1024 * 1024, // 1.5 TB in bytes
+    total_space: 2 * 1024 * 1024 * 1024 * 1024, // 2 TB in bytes
+  }
+}
+
+export const getUserPermissions = async (): Promise<Permission[]> => {
+  // This is a mock implementation. In a real application, this would fetch the actual permissions from the server.
+  return [
+    Permission.START_ALARM,
+    Permission.STOP_ALARM,
+    Permission.ACCESS_RECORDINGS,
+    Permission.ACCESS_STREAM_CAMERAS,
+    Permission.CHANGE_ALARM_SOUND,
+    Permission.CHANGE_MAIL_CONFIG,
+    Permission.MODIFY_DEVICES,
+    Permission.USER_MANAGER,
+  ]
+}

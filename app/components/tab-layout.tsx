@@ -6,6 +6,9 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { usePathname, useRouter } from "next/navigation"
 import Login from "./login"
 import Alarm from "./alarm"
+import Devices from "./devices"
+import Recordings from "./recordings"
+import Configuration from "./configuration"
 import UserManagement from "./user-management"
 import { getUserMyself, logout } from "@/lib/api"
 import { User } from "@/types"
@@ -27,7 +30,7 @@ export default function TabLayout() {
       if (tokenExpiry && tokenExpiry !== 'infinite') {
         const expiryTime = new Date(tokenExpiry).getTime()
         const timeUntilExpiry = expiryTime - Date.now()
-        
+
         if (timeUntilExpiry > 0) {
           setTimeout(handleLogout, timeUntilExpiry)
         } else {
@@ -71,7 +74,10 @@ export default function TabLayout() {
             <div className="flex justify-between items-center mb-2">
               <TabsList className="bg-transparent">
                 <TabsTrigger value="alarm" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Home alarm</TabsTrigger>
+                <TabsTrigger value="devices" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Devices</TabsTrigger>
+                <TabsTrigger value="recordings" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Recordings</TabsTrigger>
                 <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
+                <TabsTrigger value="configuration" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Configuration</TabsTrigger>
               </TabsList>
               <div className="flex items-center space-x-2 pr-4">
                 <span className="text-zinc-400">{currentUser?.username}</span>
@@ -85,8 +91,17 @@ export default function TabLayout() {
             <TabsContent value="alarm">
               <Alarm />
             </TabsContent>
+            <TabsContent value="devices">
+              <Devices />
+            </TabsContent>
+            <TabsContent value="recordings">
+              <Recordings />
+            </TabsContent>
             <TabsContent value="users">
               <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} />
+            </TabsContent>
+            <TabsContent value="configuration">
+              <Configuration />
             </TabsContent>
           </div>
         </Tabs>

@@ -110,7 +110,7 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
                 <span className="text-zinc-300">{currentUser.username} (You)</span>
               </div>
               <div>
-                <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(currentUser)}>Update</Button>
+                <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(currentUser)}>Edit</Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="bg-red-900 hover:bg-red-800">Delete</Button>
@@ -141,7 +141,7 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
               <span className="text-zinc-300">{user.username}</span>
             </div>
             <div>
-              <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(user)}>Update</Button>
+              <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(user)}>Edit</Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" className="bg-red-900 hover:bg-red-800">Delete</Button>

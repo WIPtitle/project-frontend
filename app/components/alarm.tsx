@@ -49,7 +49,7 @@ export default function Alarm() {
         ? await deactivateAlarm(id)
         : await activateAlarm(id)
 
-      setAlarmGroups(alarmGroups.map(group => 
+      setAlarmGroups(alarmGroups.map(group =>
         group.id === id ? updatedGroup : group
       ))
     } catch (error) {
