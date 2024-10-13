@@ -13,18 +13,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, 
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { getAllUsers, createUser, updateUser, deleteUser, logout } from "@/lib/api"
-import { User } from "@/types"
+import { User, Permission } from "@/types"
 import { useRouter } from "next/navigation"
 
 type UserManagementProps = {
   onUserUpdate: (user: User) => void
   currentUser: User | null
+  permissions: Permission[]
 }
 
-export default function UserManagement({ onUserUpdate, currentUser }: UserManagementProps) {
+export default function UserManagement({ onUserUpdate, currentUser, permissions }: UserManagementProps) {
   const [users, setUsers] = useState<User[]>([])
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -33,6 +34,8 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUserSet, setCurrentUser] = useState<User | null>(null)
   const router = useRouter()
+
+  const isUserManager = permissions.includes(Permission.USER_MANAGER)
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -97,7 +100,9 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
     <div className="text-zinc-50">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">User Management</h1>
-        <Button onClick={handleAddUser} variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Add User</Button>
+        {isUserManager && (
+          <Button onClick={handleAddUser} variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Add User</Button>
+        )}
       </div>
       <ScrollArea className="h-[400px] w-full border border-zinc-700 rounded-md p-4 bg-zinc-800">
         {currentUser && (
@@ -140,26 +145,28 @@ export default function UserManagement({ onUserUpdate, currentUser }: UserManage
               </Avatar>
               <span className="text-zinc-300">{user.username}</span>
             </div>
-            <div>
-              <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(user)}>Edit</Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="bg-red-900 hover:bg-red-800">Delete</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-zinc-900 text-zinc-50">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the user.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            {isUserManager && (
+              <div>
+                <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(user)}>Edit</Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="bg-red-900 hover:bg-red-800">Delete</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-zinc-900 text-zinc-50">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the user.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
           </div>
         ))}
       </ScrollArea>

@@ -7,10 +7,13 @@ import { Input } from "@/components/ui/input"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { getEmailConfig, getAlarmAudioConfig, createEmailConfig, createAlarmAudioConfig, updateEmailConfig, updateAlarmAudioConfig, deleteEmailConfig, deleteAlarmAudioConfig } from "@/lib/api"
-import { EmailConfig, AlarmAudioConfig } from "@/types"
+import { EmailConfig, AlarmAudioConfig, Permission } from "@/types"
 
+type ConfigurationProps = {
+  permissions: Permission[]
+}
 
-export default function Configuration() {
+export default function Configuration({ permissions }: ConfigurationProps) {
   const [emailConfig, setEmailConfig] = useState<EmailConfig | null>(null)
   const [alarmAudioConfig, setAlarmAudioConfig] = useState<AlarmAudioConfig | null>(null)
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false)
@@ -19,8 +22,8 @@ export default function Configuration() {
   const [editingAudioConfig, setEditingAudioConfig] = useState<AlarmAudioConfig | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const canChangeMailConfig = true
-  const canChangeAlarmSound = true
+  const canChangeMailConfig = permissions.includes(Permission.CHANGE_MAIL_CONFIG)
+  const canChangeAlarmSound = permissions.includes(Permission.CHANGE_ALARM_SOUND)
 
   useEffect(() => {
     const fetchConfigs = async () => {
@@ -117,11 +120,11 @@ export default function Configuration() {
       <h1 className="text-3xl font-bold mb-4 text-zinc-50">Configuration</h1>
       <div className="grid gap-4 md:grid-cols-2">
         {canChangeMailConfig && (
-          <Card className="bg-zinc-800 border-zinc-700">
+          <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
               <CardTitle className="text-zinc-50">Email Configuration</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-grow">
               {emailConfig ? (
                 <>
                   <p className="text-zinc-300">SMTP Server: {emailConfig.smtpServer}</p>
@@ -133,9 +136,9 @@ export default function Configuration() {
                 <p className="text-zinc-400">No email configuration saved</p>
               )}
             </CardContent>
-            <CardFooter className="flex justify-end space-x-2">
+            <CardFooter className="mt-auto">
               {emailConfig ? (
-                <>
+                <div className="flex justify-end space-x-2 w-full">
                   <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleEditEmailConfig}>Edit</Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -154,28 +157,28 @@ export default function Configuration() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                </>
+                </div>
               ) : (
-                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleAddEmailConfig}>Add Configuration</Button>
+                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full" onClick={handleAddEmailConfig}>Add Configuration</Button>
               )}
             </CardFooter>
           </Card>
         )}
         {canChangeAlarmSound && (
-          <Card className="bg-zinc-800 border-zinc-700">
+          <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
               <CardTitle className="text-zinc-50">Alarm Audio Configuration</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-grow">
               {alarmAudioConfig?.audio ? (
                 <p className="text-zinc-300">Audio file: {alarmAudioConfig.audio.name}</p>
               ) : (
                 <p className="text-zinc-400">No alarm audio configuration saved</p>
               )}
             </CardContent>
-            <CardFooter className="flex justify-end space-x-2">
+            <CardFooter className="mt-auto">
               {alarmAudioConfig ? (
-                <>
+                <div className="flex justify-end space-x-2 w-full">
                   <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleEditAudioConfig}>Edit</Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -190,13 +193,13 @@ export default function Configuration() {
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteAudioConfig} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                        <AlertDialogAction onClick={handleDeleteAudioConfig} className="bg-red-900 hover:bg-red-800  text-white">Delete</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                </>
+                </div>
               ) : (
-                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleAddAudioConfig}>Add Configuration</Button>
+                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full" onClick={handleAddAudioConfig}>Add Configuration</Button>
               )}
             </CardFooter>
           </Card>

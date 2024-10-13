@@ -10,12 +10,13 @@ import Devices from "./devices"
 import Recordings from "./recordings"
 import Configuration from "./configuration"
 import UserManagement from "./user-management"
-import { getUserMyself, logout } from "@/lib/api"
-import { User } from "@/types"
+import { getUserMyself, logout, getUserPermissions } from "@/lib/api"
+import { User, Permission } from "@/types"
 
 export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [permissions, setPermissions] = useState<Permission[]>([])
   const pathname = usePathname()
   const router = useRouter()
 
@@ -25,7 +26,12 @@ export default function TabLayout() {
 
     if (token) {
       setIsLoggedIn(true)
-      getUserMyself().then(setCurrentUser).catch(console.error)
+      Promise.all([getUserMyself(), getUserPermissions()])
+        .then(([user, userPermissions]) => {
+          setCurrentUser(user)
+          setPermissions(userPermissions)
+        })
+        .catch(console.error)
 
       if (tokenExpiry && tokenExpiry !== 'infinite') {
         const expiryTime = new Date(tokenExpiry).getTime()
@@ -40,15 +46,18 @@ export default function TabLayout() {
     }
   }, [])
 
-  const handleLogin = (user: User) => {
+  const handleLogin = async (user: User) => {
     setIsLoggedIn(true)
     setCurrentUser(user)
+    const userPermissions = await getUserPermissions()
+    setPermissions(userPermissions)
   }
 
   const handleLogout = () => {
     logout()
     setIsLoggedIn(false)
     setCurrentUser(null)
+    setPermissions([])
     router.push('/')
   }
 
@@ -75,8 +84,12 @@ export default function TabLayout() {
               <TabsList className="bg-transparent">
                 <TabsTrigger value="alarm" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Home alarm</TabsTrigger>
                 <TabsTrigger value="devices" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Devices</TabsTrigger>
-                <TabsTrigger value="recordings" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Recordings</TabsTrigger>
-                <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
+                {permissions.includes(Permission.ACCESS_RECORDINGS) && (
+                  <TabsTrigger value="recordings" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Recordings</TabsTrigger>
+                )}
+                {permissions.includes(Permission.USER_MANAGER) && (
+                  <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
+                )}
                 <TabsTrigger value="configuration" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Configuration</TabsTrigger>
               </TabsList>
               <div className="flex items-center space-x-2 pr-4">
@@ -89,20 +102,26 @@ export default function TabLayout() {
           </div>
           <div className="pt-4 px-4">
             <TabsContent value="alarm">
-              <Alarm />
+              <Alarm permissions={permissions} />
             </TabsContent>
             <TabsContent value="devices">
-              <Devices />
+              <Devices permissions={permissions} />
             </TabsContent>
-            <TabsContent value="recordings">
-              <Recordings />
-            </TabsContent>
-            <TabsContent value="users">
-              <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} />
-            </TabsContent>
-            <TabsContent value="configuration">
-              <Configuration />
-            </TabsContent>
+            {permissions.includes(Permission.ACCESS_RECORDINGS) && (
+              <TabsContent value="recordings">
+                <Recordings permissions={permissions} />
+              </TabsContent>
+            )}
+            {permissions.includes(Permission.USER_MANAGER) && (
+              <TabsContent value="users">
+                <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} permissions={permissions} />
+              </TabsContent>
+            )}
+            { (permissions.includes(Permission.CHANGE_ALARM_SOUND) || permissions.includes(Permission.CHANGE_MAIL_CONFIG)) && (
+              <TabsContent value="configuration">
+                <Configuration permissions={permissions} />
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </div>

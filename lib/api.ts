@@ -1,4 +1,4 @@
-import { User, AlarmGroup, Device } from '@/types'
+import { User, AlarmGroup, Device, Permission } from '@/types'
 
 let token: string | null = null
 let tokenExpiry: Date | null = null
@@ -81,7 +81,10 @@ export const deleteAlarmGroup = async (id: number): Promise<boolean> => {
 }
 
 export const activateAlarm = async (id: number): Promise<AlarmGroup> => {
-  throw new Error('Failed to activate alarm')
+  const groups = await getAlarmGroups()
+  const updatedGroup = groups.find(g => g.id === id)
+  if (!updatedGroup) throw new Error('Group not found')
+  return { ...updatedGroup, isActive: true }
 }
 
 export const deactivateAlarm = async (id: number): Promise<AlarmGroup> => {
@@ -158,9 +161,10 @@ export const deleteMagneticReed = async (id: number): Promise<boolean> => {
   return true;
 }
 
-export const getReedCurrentStatus = async (id: number): Promise<boolean> => {
+export const getReedCurrentStatus = async (id: number): Promise<string> => {
   // This is a mock implementation. In a real application, this would fetch the actual status from the device.
-  return Math.random() < 0.5;
+  const statuses = ["OPEN", "CLOSED"];
+  return statuses[Math.floor(Math.random() * statuses.length)];
 }
 
 export const createRTSPCamera = async (camera: Omit<RTSPCamera, 'id'>): Promise<RTSPCamera> => {

@@ -49,8 +49,8 @@ export default function Alarm() {
         ? await deactivateAlarm(id)
         : await activateAlarm(id)
 
-      setAlarmGroups(alarmGroups.map(group =>
-        group.id === id ? updatedGroup : group
+      setAlarmGroups(alarmGroups.map(g =>
+        g.id === id ? updatedGroup : g
       ))
     } catch (error) {
       setErrorMessage("Failed to activate/deactivate alarm")
@@ -145,7 +145,7 @@ export default function Alarm() {
             </CardHeader>
             <CardContent className="flex-grow">
               <ul className="list-disc pl-5 text-zinc-300">
-                {group.devices.map((device) => (
+                {group.devices && group.devices.map((device) => (
                   <li key={device.id}>{device.name}</li>
                 ))}
               </ul>
@@ -172,8 +172,8 @@ export default function Alarm() {
                 </AlertDialog>
               </div>
               <div className="w-full pt-4 mt-2 border-t-2 border-zinc-700">
-                <Button 
-                  onClick={() => handleActivate(group.id)} 
+                <Button
+                  onClick={() => handleActivate(group.id)}
                   variant={group.isActive ? "default" : "outline"}
                   className={`w-full ${group.isActive ? 'bg-yellow-700 hover:bg-yellow-600 text-white' : 'bg-white text-black hover:bg-zinc-200'}`}
                 >

@@ -8,10 +8,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus } from "@/lib/api"
-import { RTSPCamera, MagneticReed } from "@/types"
+import { RTSPCamera, MagneticReed, Permission } from "@/types"
 
+type DeviceProps = {
+  permissions: Permission[]
+}
 
-export default function Devices() {
+export default function Devices({ permissions }: DeviceProps) {
   const [rtspCameras, setRtspCameras] = useState<RTSPCamera[]>([])
   const [magneticReeds, setMagneticReeds] = useState<MagneticReed[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -19,8 +22,8 @@ export default function Devices() {
   const [deviceType, setDeviceType] = useState<'camera' | 'reed'>('camera')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const canModifyDevices = true
-  const canAccessStreamCameras = true
+  const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
+  const canAccessStreamCameras = permissions.includes(Permission.ACCESS_STREAM_CAMERAS)
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -91,16 +94,17 @@ export default function Devices() {
 
   return (
     <div>
+      <h1 className="text-3xl font-bold text-zinc-50 mb-4">Devices</h1>
+
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-zinc-50">Devices</h1>
+        <div>
+          <h2 className="text-2xl font-bold text-zinc-50">RTSP cameras</h2>
+        </div>
         {canModifyDevices && (
-          <div>
-            <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleAddDevice('camera')}>Add Camera</Button>
-            <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleAddDevice('reed')}>Add Reed</Button>
-          </div>
+          <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleAddDevice('camera')}>Add Camera</Button>
         )}
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
         {rtspCameras.map((camera) => (
           <Card key={camera.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
@@ -143,46 +147,52 @@ export default function Devices() {
           </Card>
         ))}
       </div>
-      <div className="mt-8 border-t-2 border-zinc-700 pt-8">
-        <h2 className="text-2xl font-bold mb-4 text-zinc-50">Magnetic Reeds</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {magneticReeds.map((reed) => (
-            <Card key={reed.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-zinc-50">{reed.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
-                <p className="text-zinc-300">Type: {reed.normally_open ? "Normally Open" : "Normally Closed"}</p>
-                <p className="text-zinc-300 mt-8">Current Status: {getReedCurrentStatus(reed.id) ? "OPEN" : "CLOSED"}</p>
-              </CardContent>
-              {canModifyDevices && (
-                <CardFooter className="flex flex-col mt-auto">
-                  <div className="flex w-full">
-                    <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(reed, 'reed')}>Edit</Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-zinc-800 text-zinc-50">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the magnetic reed.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteDevice(reed.id, 'reed')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </CardFooter>
-              )}
-            </Card>
-          ))}
+
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-2xl font-bold text-zinc-50">Magnetic reeds</h2>
         </div>
+        {canModifyDevices && (
+          <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleAddDevice('reed')}>Add Reed</Button>
+        )}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {magneticReeds.map((reed) => (
+          <Card key={reed.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
+            <CardHeader>
+              <CardTitle className="text-zinc-50">{reed.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-grow">
+              <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
+              <p className="text-zinc-300">Type: {reed.normally_open ? "Normally Open" : "Normally Closed"}</p>
+              <p className="text-zinc-300 mt-8">Current Status: {getReedCurrentStatus(reed.id) == "OPEN" ? "OPEN" : "CLOSED"}</p>
+            </CardContent>
+            {canModifyDevices && (
+              <CardFooter className="flex flex-col mt-auto">
+                <div className="flex w-full">
+                  <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(reed, 'reed')}>Edit</Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the magnetic reed.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteDevice(reed.id, 'reed')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardFooter>
+            )}
+          </Card>
+        ))}
       </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
@@ -262,7 +272,7 @@ export default function Devices() {
         </DialogContent>
       </Dialog>
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
-        <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+        <AlertDialogContent  className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>
             <AlertDialogTitle>Error</AlertDialogTitle>
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>

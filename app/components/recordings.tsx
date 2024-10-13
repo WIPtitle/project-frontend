@@ -5,10 +5,14 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { getAllRecordings, getCamera, deleteRecording, getStorageInfo } from "@/lib/api"
-import { Recording, Camera, StorageInfo } from "@/types"
+import { Recording, Camera, StorageInfo, Permission } from "@/types"
 import { FileVideo2 } from "lucide-react"
 
-export default function Recordings() {
+type RecordingsProps = {
+  permissions: Permission[]
+}
+
+export default function Recordings({ permissions }: RecordingsProps) {
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [cameras, setCameras] = useState<{[key: string]: Camera}>({})
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
