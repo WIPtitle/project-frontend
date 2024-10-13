@@ -87,10 +87,11 @@ export default function TabLayout() {
                 {permissions.includes(Permission.ACCESS_RECORDINGS) && (
                   <TabsTrigger value="recordings" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Recordings</TabsTrigger>
                 )}
-                {permissions.includes(Permission.USER_MANAGER) && (
-                  <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
-                )}
-                <TabsTrigger value="configuration" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Configuration</TabsTrigger>
+                <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
+                <TabsTrigger value="configuration" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">
+                  { (permissions.includes(Permission.CHANGE_ALARM_SOUND) || permissions.includes(Permission.CHANGE_MAIL_CONFIG)) &&
+                  "Configuration" }
+                </TabsTrigger>
               </TabsList>
               <div className="flex items-center space-x-2 pr-4">
                 <span className="text-zinc-400">{currentUser?.username}</span>
@@ -112,11 +113,9 @@ export default function TabLayout() {
                 <Recordings permissions={permissions} />
               </TabsContent>
             )}
-            {permissions.includes(Permission.USER_MANAGER) && (
-              <TabsContent value="users">
-                <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} permissions={permissions} />
-              </TabsContent>
-            )}
+            <TabsContent value="users">
+              <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} permissions={permissions} />
+            </TabsContent>
             { (permissions.includes(Permission.CHANGE_ALARM_SOUND) || permissions.includes(Permission.CHANGE_MAIL_CONFIG)) && (
               <TabsContent value="configuration">
                 <Configuration permissions={permissions} />

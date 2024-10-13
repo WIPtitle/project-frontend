@@ -116,7 +116,9 @@ export default function Devices({ permissions }: DeviceProps) {
                   Connection failed
                 </div>
               ) : (
-                <p className="text-zinc-400">No access to camera stream</p>
+                <div className="aspect-video bg-zinc-700 flex items-center justify-center text-zinc-400">
+                  No access to camera stream
+                </div>
               )}
               <p className="text-zinc-300 mt-2">IP: {camera.ip}</p>
             </CardContent>

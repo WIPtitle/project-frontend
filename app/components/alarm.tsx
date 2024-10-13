@@ -8,14 +8,21 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { getAlarmGroups, createAlarmGroup, updateAlarmGroup, deleteAlarmGroup, getAllDevices, activateAlarm, deactivateAlarm } from "@/lib/api"
-import { AlarmGroup, Device } from "@/types"
+import { AlarmGroup, Device, Permission } from "@/types"
 
-export default function Alarm() {
+type AlarmProps = {
+  permissions: Permission[]
+}
+
+export default function Alarm({ permissions }: AlarmProps) {
   const [alarmGroups, setAlarmGroups] = useState<AlarmGroup[]>([])
   const [allDevices, setAllDevices] = useState<Device[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<AlarmGroup | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const canActivateAlarm = permissions.includes(Permission.START_ALARM)
+  const canDeactivateAlarm = permissions.includes(Permission.STOP_ALARM)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,6 +51,16 @@ export default function Alarm() {
     try {
       const group = alarmGroups.find(g => g.id === id)
       if (!group) return
+
+      if (group.isActive && !canDeactivateAlarm) {
+         setErrorMessage("You do not have the required permission to deactivate an alarm")
+         return;
+      }
+
+      if (!group.isActive && !canActivateAlarm) {
+         setErrorMessage("You do not have the required permission to activate an alarm")
+         return;
+      }
 
       const updatedGroup = group.isActive
         ? await deactivateAlarm(id)

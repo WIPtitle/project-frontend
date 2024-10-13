@@ -280,6 +280,6 @@ export const getUserPermissions = async (): Promise<Permission[]> => {
     Permission.CHANGE_ALARM_SOUND,
     Permission.CHANGE_MAIL_CONFIG,
     Permission.MODIFY_DEVICES,
-    Permission.USER_MANAGER,
+    //Permission.USER_MANAGER,
   ]
 }
