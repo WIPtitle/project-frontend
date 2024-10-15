@@ -15,7 +15,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { getAllUsers, createUser, updateUser, deleteUser, logout } from "@/lib/api"
+import { getAllUsers, createUser, updateUser, deleteUser, logout, getPermissions } from "@/lib/api"
 import { User, Permission } from "@/types"
 import { useRouter } from "next/navigation"
 
@@ -25,14 +25,24 @@ type UserManagementProps = {
   permissions: Permission[]
 }
 
+const permissionDisplayMap: Record<Permission, string> = {
+  [Permission.USER_MANAGER]: "User Manager",
+  [Permission.START_ALARM]: "Start Alarm",
+  [Permission.STOP_ALARM]: "Stop Alarm",
+  [Permission.ACCESS_RECORDINGS]: "Access Recordings",
+  [Permission.ACCESS_STREAM_CAMERAS]: "Access Stream Cameras",
+  [Permission.CHANGE_ALARM_SOUND]: "Change Alarm Sound",
+  [Permission.CHANGE_MAIL_CONFIG]: "Change Mail Configuration",
+  [Permission.MODIFY_DEVICES]: "Modify Devices"
+}
+
 export default function UserManagement({ onUserUpdate, currentUser, permissions }: UserManagementProps) {
   const [users, setUsers] = useState<User[]>([])
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [availablePermissions, setAvailablePermissions] = useState<Permission[]>([])
 
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [currentUserSet, setCurrentUser] = useState<User | null>(null)
   const router = useRouter()
 
   const isUserManager = permissions.includes(Permission.USER_MANAGER)
@@ -42,8 +52,10 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
       try {
         const fetchedUsers = await getAllUsers()
         setUsers(fetchedUsers)
+        const fetchedPermissions = await getPermissions()
+        setAvailablePermissions(fetchedPermissions)
       } catch (error) {
-        setErrorMessage("Failed to fetch users")
+        setErrorMessage("Failed to fetch users or permissions")
       }
     }
     fetchUsers()
@@ -61,8 +73,6 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
 
   const handleLogout = () => {
     logout()
-    setIsLoggedIn(false)
-    setCurrentUser(null)
     router.push('/')
   }
 
@@ -173,7 +183,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
-            <DialogTitle>{editingUser?.id ? "Update" : "Add"}</DialogTitle>
+            <DialogTitle>{editingUser?.id ? "Update" : "Add"} User</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault()
@@ -197,7 +207,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
               />
               <div>
                 <h3 className="mb-2 font-semibold text-zinc-300">Permissions</h3>
-                {["read", "write", "delete"].map(permission => (
+                {availablePermissions.map(permission => (
                   <div key={permission} className="flex items-center space-x-2">
                     <Checkbox
                       id={permission}
@@ -213,12 +223,12 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
                       }}
                       className="border-zinc-500"
                     />
-                    <label htmlFor={permission} className="text-zinc-300">{permission}</label>
+                    <label htmlFor={permission} className="text-zinc-300">{permissionDisplayMap[permission]}</label>
                   </div>
                 ))}
               </div>
               <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                {editingUser?.id ? "Update" : "Create"}
+                {editingUser?.id ? "Update" : "Create"} User
               </Button>
             </div>
           </form>

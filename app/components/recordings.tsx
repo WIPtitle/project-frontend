@@ -29,7 +29,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
         const cameraPromises = completedRecordings.map(recording => getCamera(recording.camera_ip))
         const cameraResults = await Promise.all(cameraPromises)
-        const cameraMap = cameraResults.reduce((acc, camera) => {
+        const cameraMap = cameraResults.reduce((acc: {[key: string]: Camera}, camera: Camera) => {
           acc[camera.ip] = camera
           return acc
         }, {} as {[key: string]: Camera})

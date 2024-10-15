@@ -1,32 +1,124 @@
-import { User, AlarmGroup, Device, Permission } from '@/types'
+import { User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, EmailConfig, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
 
 let token: string | null = null
 let tokenExpiry: Date | null = null
 
-export const isFirstUser = async (): Promise<boolean> => {
-  // Always return true as requested
-  return true
-}
-
-export const registerUser = async (username: string, password: string): Promise<void> => {
-  // This is a mock implementation. In a real application, this would send the data to the backend.
-  console.log(`Registering user: ${username}`)
-  // No need to implement actual user saving as per the request
-}
-
-export const login = (username: string, password: string, rememberMe: boolean): User => {
-  const fakeToken = 'fake_token_' + Math.random().toString(36).substr(2, 9)
-  token = fakeToken
-  if (rememberMe) {
-    tokenExpiry = null
-  } else {
-    tokenExpiry = new Date(Date.now() + 30 * 60 * 1000) // 30 minutes from now
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return `http://${window.location.hostname}:8000`
   }
-  localStorage.setItem('token', fakeToken)
-  localStorage.setItem('tokenExpiry', tokenExpiry ? tokenExpiry.toISOString() : 'infinite')
-  
-  // Return a mock user object (always admin as requested)
-  return { id: 1, username: "admin", email: "admin@example.com", permissions: ["read", "write", "delete"] }
+  return '' // Fallback for server-side rendering
+}
+
+const API_BASE_URL = getApiBaseUrl()
+
+export const registerUser = async (email: string, password: string): Promise<void> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth-service/users/first`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        permissions: [],
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Registration failed')
+    }
+  } catch (error) {
+    console.error('Error registering user:', error)
+    throw error
+  }
+}
+
+export const login = async (email: string, password: string, rememberMe: boolean): Promise<string> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth-service/auth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
+    })
+
+    if (!response.ok) {
+      throw new Error('Login failed')
+    }
+
+    const data = await response.json()
+
+    if (data.access_token) {
+      token = data.access_token
+      if (token !== null) {
+        localStorage.setItem('token', token)
+      } else {
+        console.error('Token is null, not setting in localStorage')
+      }
+      if (rememberMe) {
+        tokenExpiry = null
+        localStorage.setItem('tokenExpiry', 'infinite')
+      } else {
+        tokenExpiry = new Date(Date.now() + 30 * 60 * 1000) // 30 minutes from now
+        localStorage.setItem('tokenExpiry', tokenExpiry.toISOString())
+      }
+      if (token !== null) {
+        return token
+      } else {
+        return ""
+      }
+    } else {
+      throw new Error('Login failed: No access token received')
+    }
+  } catch (error) {
+    console.error('Error logging in:', error)
+    throw error
+  }
+}
+
+export const getUserMyself = async (): Promise<User> => {
+  if (!token) {
+    throw new Error('Not authenticated')
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth-service/auth/user`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch user data')
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching user data:', error)
+    throw error
+  }
+}
+
+export const getPermissions = async (): Promise<Permission[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth-service/auth/permissions`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch user permissions')
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching user permissions:', error)
+    throw error
+  }
 }
 
 export const logout = () => {
@@ -35,6 +127,27 @@ export const logout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('tokenExpiry')
 }
+
+export const isFirstUser = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth-service/info/is-initialized`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch if first user');
+    }
+
+    const data = await response.json();
+    return !data.is_initialized;
+  } catch (error) {
+    console.error('Error checking if first user:', error);
+    throw new Error('Failed to fetch if first user');
+  }
+};
 
 export const getAllDevices = async (): Promise<Device[]> => {
   return [
@@ -96,14 +209,10 @@ export const deactivateAlarm = async (id: number): Promise<AlarmGroup> => {
 
 export const getAllUsers = async (): Promise<User[]> => {
   return [
-    { id: 1, username: "admin", email: "admin@example.com", permissions: ["read", "write", "delete"] },
-    { id: 2, username: "user1", email: "user1@example.com", permissions: ["read"] },
-    { id: 3, username: "user2", email: "user2@example.com", permissions: ["read", "write"] },
+    { id: 1, username: "admin", email: "admin@example.com", permissions: [Permission.USER_MANAGER] },
+    { id: 2, username: "user1", email: "user1@example.com", permissions: [Permission.USER_MANAGER] },
+    { id: 3, username: "user2", email: "user2@example.com", permissions: [Permission.USER_MANAGER] },
   ]
-}
-
-export const getUserMyself = async (): Promise<User> => {
-  return { id: 1, username: "admin", email: "admin@example.com", permissions: ["read", "write", "delete"] }
 }
 
 export const createUser = async (user: Omit<User, 'id'>): Promise<User> => {
@@ -127,8 +236,8 @@ const fakeMagneticReeds: MagneticReed[] = [
 ];
 
 const fakeRtspCameras: RTSPCamera[] = [
-  { id: 1, name: "Camera 1", ip: "192.168.1.1", port: "8080", username: "user1", password: "pass1", path: "/stream1", sensibility: 5 },
-  { id: 2, name: "Camera 2", ip: "192.168.1.2", port: "8081", username: "user2", password: "pass2", path: "/stream2", sensibility: 7 },
+  { id: 1, name: "Camera 1", ip: "192.168.1.1", port: 8080, username: "user1", password: "pass1", path: "/stream1", sensibility: 5 },
+  { id: 2, name: "Camera 2", ip: "192.168.1.2", port: 8081, username: "user2", password: "pass2", path: "/stream2", sensibility: 7 },
 ];
 
 // API functions
@@ -270,16 +379,3 @@ export const getStorageInfo = async (): Promise<StorageInfo> => {
   }
 }
 
-export const getUserPermissions = async (): Promise<Permission[]> => {
-  // This is a mock implementation. In a real application, this would fetch the actual permissions from the server.
-  return [
-    Permission.START_ALARM,
-    Permission.STOP_ALARM,
-    Permission.ACCESS_RECORDINGS,
-    Permission.ACCESS_STREAM_CAMERAS,
-    Permission.CHANGE_ALARM_SOUND,
-    Permission.CHANGE_MAIL_CONFIG,
-    Permission.MODIFY_DEVICES,
-    //Permission.USER_MANAGER,
-  ]
-}

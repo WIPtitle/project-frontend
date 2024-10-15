@@ -25,13 +25,14 @@ export interface User {
   id: number
   username: string
   email: string
+  permissions: Permission[]
 }
 
 export interface RTSPCamera {
     id: number;
     name: string;
     ip: string;
-    port: string;
+    port: number;
     username: string;
     password: string;
     path: string;
@@ -44,8 +45,6 @@ export interface MagneticReed {
     gpio_pin_number: number;
     default_value_when_closed: 'HIGH' | 'LOW';
 }
-
-export type Device = RTSPCamera | MagneticReed;
 
 export interface EmailConfig {
   smtpServer: string

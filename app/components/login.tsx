@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { login, isFirstUser, registerUser } from "@/lib/api"
-import { User } from "@/types"
 
-export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
+export default function Login({ onLogin }: { onLogin: (token: string) => void }) {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
@@ -19,17 +20,25 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    let user: User
+    setErrorMessage(null) // Clear any previous error messages
 
-    if (isFirstTimeUser) {
-      await registerUser(username, password)
-      user = await login(username, password, rememberMe)
-    } else {
-      user = await login(username, password, rememberMe)
-    }
+    try {
+      let token: string
 
-    if (user) {
-      onLogin(user)
+      if (isFirstTimeUser) {
+        await registerUser(username, password)
+        token = await login(username, password, rememberMe)
+      } else {
+        token = await login(username, password, rememberMe)
+      }
+
+      onLogin(token)
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage("An unexpected error occurred")
+      }
     }
   }
 
@@ -41,11 +50,12 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
         </h1>
         <div className="space-y-4">
           <Input
-            type="text"
-            placeholder="Username"
+            type="email"
+            placeholder="Email"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
+            required
           />
           <Input
             type="password"
@@ -53,6 +63,7 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
+            required
           />
           {!isFirstTimeUser && (
             <div className="flex items-center space-x-2">
@@ -69,6 +80,17 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
           </Button>
         </div>
       </form>
+      <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
+        <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Error</AlertDialogTitle>
+            <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Ok</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -10,26 +10,24 @@ import Devices from "./devices"
 import Recordings from "./recordings"
 import Configuration from "./configuration"
 import UserManagement from "./user-management"
-import { getUserMyself, logout, getUserPermissions } from "@/lib/api"
+import { getUserMyself, logout } from "@/lib/api"
 import { User, Permission } from "@/types"
 
 export default function TabLayout() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [token, setToken] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [permissions, setPermissions] = useState<Permission[]>([])
   const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const storedToken = localStorage.getItem('token')
     const tokenExpiry = localStorage.getItem('tokenExpiry')
 
-    if (token) {
-      setIsLoggedIn(true)
-      Promise.all([getUserMyself(), getUserPermissions()])
-        .then(([user, userPermissions]) => {
+    if (storedToken) {
+      setToken(storedToken)
+      getUserMyself()
+        .then((user) => {
           setCurrentUser(user)
-          setPermissions(userPermissions)
         })
         .catch(console.error)
 
@@ -46,18 +44,16 @@ export default function TabLayout() {
     }
   }, [])
 
-  const handleLogin = async (user: User) => {
-    setIsLoggedIn(true)
+  const handleLogin = async (newToken: string) => {
+    setToken(newToken)
+    const user = await getUserMyself()
     setCurrentUser(user)
-    const userPermissions = await getUserPermissions()
-    setPermissions(userPermissions)
   }
 
   const handleLogout = () => {
     logout()
-    setIsLoggedIn(false)
+    setToken(null)
     setCurrentUser(null)
-    setPermissions([])
     router.push('/')
   }
 
@@ -69,7 +65,7 @@ export default function TabLayout() {
     setCurrentUser(updatedUser)
   }
 
-  if (!isLoggedIn) {
+  if (!token) {
     return <Login onLogin={handleLogin} />
   }
 
@@ -84,12 +80,12 @@ export default function TabLayout() {
               <TabsList className="bg-transparent">
                 <TabsTrigger value="alarm" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Home alarm</TabsTrigger>
                 <TabsTrigger value="devices" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Devices</TabsTrigger>
-                {permissions.includes(Permission.ACCESS_RECORDINGS) && (
+                {currentUser?.permissions.includes(Permission.ACCESS_RECORDINGS) && (
                   <TabsTrigger value="recordings" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">Recordings</TabsTrigger>
                 )}
                 <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
                 <TabsTrigger value="configuration" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">
-                  { (permissions.includes(Permission.CHANGE_ALARM_SOUND) || permissions.includes(Permission.CHANGE_MAIL_CONFIG)) &&
+                  { (currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.CHANGE_MAIL_CONFIG)) &&
                   "Configuration" }
                 </TabsTrigger>
               </TabsList>
@@ -103,22 +99,22 @@ export default function TabLayout() {
           </div>
           <div className="pt-4 px-4">
             <TabsContent value="alarm">
-              <Alarm permissions={permissions} />
+              <Alarm permissions={currentUser?.permissions || []} />
             </TabsContent>
             <TabsContent value="devices">
-              <Devices permissions={permissions} />
+              <Devices permissions={currentUser?.permissions || []} />
             </TabsContent>
-            {permissions.includes(Permission.ACCESS_RECORDINGS) && (
+            {currentUser?.permissions.includes(Permission.ACCESS_RECORDINGS) && (
               <TabsContent value="recordings">
-                <Recordings permissions={permissions} />
+                <Recordings permissions={currentUser?.permissions || []} />
               </TabsContent>
             )}
             <TabsContent value="users">
-              <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} permissions={permissions} />
+              <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} permissions={currentUser?.permissions || []} />
             </TabsContent>
-            { (permissions.includes(Permission.CHANGE_ALARM_SOUND) || permissions.includes(Permission.CHANGE_MAIL_CONFIG)) && (
+            { (currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.CHANGE_MAIL_CONFIG)) && (
               <TabsContent value="configuration">
-                <Configuration permissions={permissions} />
+                <Configuration permissions={currentUser?.permissions || []} />
               </TabsContent>
             )}
           </div>

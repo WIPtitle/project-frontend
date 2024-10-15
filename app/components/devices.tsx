@@ -14,13 +14,14 @@ type DeviceProps = {
   permissions: Permission[]
 }
 
-export default function Devices({ permissions }: DeviceProps) {
+export default function Component({ permissions }: DeviceProps) {
   const [rtspCameras, setRtspCameras] = useState<RTSPCamera[]>([])
   const [magneticReeds, setMagneticReeds] = useState<MagneticReed[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDevice, setEditingDevice] = useState<RTSPCamera | MagneticReed | null>(null)
   const [deviceType, setDeviceType] = useState<'camera' | 'reed'>('camera')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [reedStatuses, setReedStatuses] = useState<Record<number, string>>({})
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const canAccessStreamCameras = permissions.includes(Permission.ACCESS_STREAM_CAMERAS)
@@ -39,9 +40,24 @@ export default function Devices({ permissions }: DeviceProps) {
     fetchDevices()
   }, [])
 
+  useEffect(() => {
+    const fetchReedStatuses = async () => {
+      const statusPromises = magneticReeds.map(async (reed) => {
+        const status = await getReedCurrentStatus(reed.id)
+        return [reed.id, status]
+      })
+      const statuses = await Promise.all(statusPromises)
+      setReedStatuses(Object.fromEntries(statuses))
+    }
+
+    fetchReedStatuses()
+  }, [magneticReeds])
+
   const handleAddDevice = (type: 'camera' | 'reed') => {
     setDeviceType(type)
-    setEditingDevice(type === 'camera' ? { id: 0, name: "", ip: "", port: 0, username: "", password: "" } : { id: 0, name: "", gpio: 0, normally_open: true })
+    setEditingDevice(type === 'camera'
+      ? { id: 0, name: "", ip: "", port: 0, username: "", password: "", path: "", sensibility: 0 }
+      : { id: 0, name: "", gpio_pin_number: 0, default_value_when_closed: "HIGH" })
     setIsDialogOpen(true)
   }
 
@@ -166,8 +182,8 @@ export default function Devices({ permissions }: DeviceProps) {
             </CardHeader>
             <CardContent className="flex-grow">
               <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
-              <p className="text-zinc-300">Type: {reed.normally_open ? "Normally Open" : "Normally Closed"}</p>
-              <p className="text-zinc-300 mt-8">Current Status: {getReedCurrentStatus(reed.id) == "OPEN" ? "OPEN" : "CLOSED"}</p>
+              <p className="text-zinc-300">Type: {reed.default_value_when_closed === "HIGH" ? "Normally Open" : "Normally Closed"}</p>
+              <p className="text-zinc-300 mt-8">Current Status: {reedStatuses[reed.id] || 'Loading...'}</p>
             </CardContent>
             {canModifyDevices && (
               <CardFooter className="flex flex-col mt-auto">
@@ -247,20 +263,20 @@ export default function Devices({ permissions }: DeviceProps) {
                 <>
                   <Input
                     type="number"
-                    placeholder="GPIO"
-                    value={(editingDevice as MagneticReed)?.gpio || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, gpio: parseInt(e.target.value)} : null)}
+                    placeholder="GPIO Pin Number"
+                    value={(editingDevice as MagneticReed)?.gpio_pin_number || ""}
+                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, gpio_pin_number: parseInt(e.target.value)} : null)}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
                   <Select
-                    value={(editingDevice as MagneticReed)?.normally_open ? "open" : "closed"}
-                    onValueChange={(value) => setEditingDevice(prev => prev ? {...prev, normally_open: value === "open"} : null)}
+                    value={(editingDevice as MagneticReed)?.default_value_when_closed === "HIGH" ? "closed" : "open"}
+                    onValueChange={(value) => setEditingDevice(prev => prev ? {...prev, default_value_when_closed: value === "closed" ? "HIGH" : "LOW"} : null)}
                   >
                     <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-800 text-zinc-50">
-                      <SelectItem value="open">Normally Open</SelectItem>
+                      <SelectItem value="open">Normally  Open</SelectItem>
                       <SelectItem value="closed">Normally Closed</SelectItem>
                     </SelectContent>
                   </Select>
