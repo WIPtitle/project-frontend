@@ -62,7 +62,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   }, [])
 
   const handleAddUser = () => {
-    setEditingUser({ id: 0, username: "", email: "", permissions: [] })
+    setEditingUser({ id: 0, email: "", password: "", permissions: [] })
     setIsDialogOpen(true)
   }
 
@@ -120,9 +120,9 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center space-x-2">
                 <Avatar>
-                  <AvatarImage src="/avatar.webp" alt={currentUser.username} />
+                  <AvatarImage src="/avatar.webp" alt={currentUser.email} />
                 </Avatar>
-                <span className="text-zinc-300">{currentUser.username} (You)</span>
+                <span className="text-zinc-300">{currentUser.email} (You)</span>
               </div>
               <div>
                 <Button variant="outline" className="mr-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(currentUser)}>Edit</Button>
@@ -151,9 +151,9 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
           <div key={user.id} className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-b-0">
             <div className="flex items-center space-x-2">
               <Avatar>
-                <AvatarImage src="/avatar.webp" alt={user.username} />
+                <AvatarImage src="/avatar.webp" alt={user.email} />
               </Avatar>
-              <span className="text-zinc-300">{user.username}</span>
+              <span className="text-zinc-300">{user.email}</span>
             </div>
             {isUserManager && (
               <div>
@@ -193,16 +193,17 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
           }}>
             <div className="space-y-4">
               <Input
-                placeholder="Username"
-                value={editingUser?.username || ""}
-                onChange={(e) => setEditingUser(prev => prev ? {...prev, username: e.target.value} : null)}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
-              <Input
                 type="email"
                 placeholder="Email"
                 value={editingUser?.email || ""}
                 onChange={(e) => setEditingUser(prev => prev ? {...prev, email: e.target.value} : null)}
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+              />
+              <Input
+                type="password"
+                placeholder="Password"
+                value={editingUser?.password || ""}
+                onChange={(e) => setEditingUser(prev => prev ? {...prev, password: e.target.value} : null)}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
               />
               <div>

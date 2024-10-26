@@ -92,7 +92,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       }
       setIsEmailDialogOpen(false)
     } catch (error) {
-      setErrorMessage("Failed to save email configuration")
+      setErrorMessage("Failed to save email configuration, check if SMTP connection with your parameters is okay")
     }
   }
 
@@ -122,7 +122,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
         {canChangeMailConfig && (
           <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-zinc-50">Email Configuration</CardTitle>
+              <CardTitle className="text-zinc-50">Email configuration</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
               {emailConfig ? (
@@ -167,7 +167,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
         {canChangeAlarmSound && (
           <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-zinc-50">Alarm Audio Configuration</CardTitle>
+              <CardTitle className="text-zinc-50">Audio configuration</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
               {alarmAudioConfig?.audio ? (

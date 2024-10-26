@@ -1,8 +1,5 @@
 import { User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, EmailConfig, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
 
-let token: string | null = null
-let tokenExpiry: Date | null = null
-
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     return `http://${window.location.hostname}:8000`
@@ -36,6 +33,8 @@ export const registerUser = async (email: string, password: string): Promise<voi
 }
 
 export const login = async (email: string, password: string, rememberMe: boolean): Promise<string> => {
+  let token: string | null = null
+  let tokenExpiry: Date | null = null
   try {
     const response = await fetch(`${API_BASE_URL}/auth-service/auth/token`, {
       method: 'POST',
@@ -79,15 +78,19 @@ export const login = async (email: string, password: string, rememberMe: boolean
   }
 }
 
-export const getUserMyself = async (): Promise<User> => {
-  if (!token) {
-    throw new Error('Not authenticated')
+export const getTokenOrThrow = (): string => {
+  const token = localStorage.getItem('token');
+  if (!token || token.trim() === "") {
+    throw new Error("Token not found in storage");
   }
+  return token;
+};
 
+export const getUserMyself = async (): Promise<User> => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth-service/auth/user`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
       },
     })
 
@@ -106,7 +109,7 @@ export const getPermissions = async (): Promise<Permission[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth-service/auth/permissions`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
       },
     })
 
@@ -122,8 +125,6 @@ export const getPermissions = async (): Promise<Permission[]> => {
 }
 
 export const logout = () => {
-  token = null
-  tokenExpiry = null
   localStorage.removeItem('token')
   localStorage.removeItem('tokenExpiry')
 }
@@ -209,9 +210,9 @@ export const deactivateAlarm = async (id: number): Promise<AlarmGroup> => {
 
 export const getAllUsers = async (): Promise<User[]> => {
   return [
-    { id: 1, username: "admin", email: "admin@example.com", permissions: [Permission.USER_MANAGER] },
-    { id: 2, username: "user1", email: "user1@example.com", permissions: [Permission.USER_MANAGER] },
-    { id: 3, username: "user2", email: "user2@example.com", permissions: [Permission.USER_MANAGER] },
+    { id: 1, email: "admin@example.com", permissions: [Permission.USER_MANAGER] },
+    { id: 2, email: "user1@example.com", permissions: [Permission.USER_MANAGER] },
+    { id: 3, email: "user2@example.com", permissions: [Permission.USER_MANAGER] },
   ]
 }
 
@@ -301,45 +302,175 @@ export const deleteRTSPCamera = async (id: number): Promise<boolean> => {
   return true;
 }
 
-let emailConfig: EmailConfig | null = null
-let alarmAudioConfig: AlarmAudioConfig | null = null
-
 export const getEmailConfig = async (): Promise<EmailConfig | null> => {
-  return emailConfig
-}
+  try {
+    const response = await fetch(`${API_BASE_URL}/mail-service/mail-config/`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    })
 
-export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
-  return alarmAudioConfig
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null
+      }
+      throw new Error('Failed to fetch email configuration')
+    }
+
+    const data = await response.json()
+    return {
+      smtpServer: data.smtp_server,
+      port: data.smtp_port,
+      username: data.smtp_user,
+      password: '', // Password is not returned for security reasons
+      sender: data.email_from,
+    }
+  } catch (error) {
+    console.error('Error fetching email configuration:', error)
+    throw error
+  }
 }
 
 export const createEmailConfig = async (config: EmailConfig): Promise<EmailConfig> => {
-  emailConfig = { ...config }
-  return emailConfig
-}
+  try {
+    const response = await fetch(`${API_BASE_URL}/mail-service/mail-config/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        smtp_server: config.smtpServer,
+        smtp_port: config.port,
+        smtp_user: config.username,
+        smtp_password: config.password,
+        email_from: config.sender,
+      }),
+    })
 
-export const createAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
-  alarmAudioConfig = { ...config }
-  return  alarmAudioConfig
+    if (!response.ok) {
+        console.log(response.status)
+      if (response.status == 400) {
+        throw new Error('Failed to create email configuration, couldn\'t connect to SMTP server: check your parameters');
+      } else {
+        throw new Error('Failed to create email configuration');
+      }
+    }
+
+    const data = await response.json()
+    return {
+      smtpServer: data.smtp_server,
+      port: data.smtp_port,
+      username: data.smtp_user,
+      password: config.password, // Use the password from the input as it's not returned
+      sender: data.email_from,
+    }
+  } catch (error) {
+    console.error('Error creating email configuration:', error)
+    throw error
+  }
 }
 
 export const updateEmailConfig = async (config: EmailConfig): Promise<EmailConfig> => {
-  if (!emailConfig) throw new Error("Email configuration doesn't exist")
-  emailConfig = { ...config }
-  return emailConfig
-}
-
-export const updateAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
-  if (!alarmAudioConfig) throw new Error("Alarm audio configuration doesn't exist")
-  alarmAudioConfig = { ...config }
-  return alarmAudioConfig
+  return createEmailConfig(config)
 }
 
 export const deleteEmailConfig = async (): Promise<void> => {
-  emailConfig = null
+  try {
+    const response = await fetch(`${API_BASE_URL}/mail-service/mail-config/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete email configuration');
+    }
+  } catch (error) {
+    console.error('Error deleting email configuration:', error);
+    throw error;
+  }
+}
+
+export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/audio-service/audio/`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error('Failed to fetch alarm audio configuration');
+    }
+
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = 'unknown';
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+
+    const blob = await response.blob();
+    return { audio: new File([blob], filename, { type: 'audio/mpeg' })}
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+export const createAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
+  try {
+    const formData = new FormData();
+    if (config.audio !== null) {
+      formData.append('audio', config.audio);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/audio-service/audio/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create alarm audio configuration')
+    }
+
+    return config // Return the original config as the API doesn't return the file
+  } catch (error) {
+    console.error('Error creating alarm audio configuration:', error)
+    throw error
+  }
+}
+
+export const updateAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
+  return createAlarmAudioConfig(config)
 }
 
 export const deleteAlarmAudioConfig = async (): Promise<void> => {
-  alarmAudioConfig = null
+  try {
+    const response = await fetch(`${API_BASE_URL}/audio-service/audio/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete alarm audio configuration');
+    }
+  } catch (error) {
+    console.error('Error deleting alarm audio configuration:', error);
+    throw error;
+  }
 }
 
 const mockRecordings: Recording[] = [

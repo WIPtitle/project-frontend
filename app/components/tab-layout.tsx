@@ -16,6 +16,7 @@ import { User, Permission } from "@/types"
 export default function TabLayout() {
   const [token, setToken] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -28,8 +29,12 @@ export default function TabLayout() {
       getUserMyself()
         .then((user) => {
           setCurrentUser(user)
+          setIsLoading(false)
         })
-        .catch(console.error)
+        .catch((error) => {
+          console.error(error)
+          setIsLoading(false)
+        })
 
       if (tokenExpiry && tokenExpiry !== 'infinite') {
         const expiryTime = new Date(tokenExpiry).getTime()
@@ -41,13 +46,19 @@ export default function TabLayout() {
           handleLogout()
         }
       }
+    } else {
+      setIsLoading(false)
     }
   }, [])
 
   const handleLogin = async (newToken: string) => {
     setToken(newToken)
-    const user = await getUserMyself()
-    setCurrentUser(user)
+    try {
+      const user = await getUserMyself()
+      setCurrentUser(user)
+    } catch (error) {
+      console.error(error)
+    }
   }
 
   const handleLogout = () => {
@@ -63,6 +74,10 @@ export default function TabLayout() {
 
   const handleUserUpdate = (updatedUser: User) => {
     setCurrentUser(updatedUser)
+  }
+
+  if (isLoading) {
+    return <div>Loading...</div>
   }
 
   if (!token) {
@@ -90,9 +105,9 @@ export default function TabLayout() {
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center space-x-2 pr-4">
-                <span className="text-zinc-400">{currentUser?.username}</span>
+                <span className="text-zinc-400">{currentUser?.email}</span>
                 <Avatar>
-                  <AvatarImage src="/avatar.webp" alt={currentUser?.username} />
+                  <AvatarImage src="/avatar.webp" alt={currentUser?.email} />
                 </Avatar>
               </div>
             </div>

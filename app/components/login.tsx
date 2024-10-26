@@ -34,11 +34,7 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
 
       onLogin(token)
     } catch (error) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message)
-      } else {
-        setErrorMessage("An unexpected error occurred")
-      }
+      setErrorMessage("Login failed")
     }
   }
 
