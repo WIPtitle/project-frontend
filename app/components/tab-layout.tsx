@@ -100,7 +100,7 @@ export default function TabLayout() {
                 )}
                 <TabsTrigger value="users" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">User management</TabsTrigger>
                 <TabsTrigger value="configuration" className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50">
-                  { (currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.CHANGE_NOTIFICATIONS_CONFIG)) &&
+                  { (currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.SEE_NOTIFICATIONS_CONFIG)) &&
                   "Configuration" }
                 </TabsTrigger>
               </TabsList>
@@ -127,7 +127,7 @@ export default function TabLayout() {
             <TabsContent value="users">
               <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} permissions={currentUser?.permissions || []} />
             </TabsContent>
-            { (currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.CHANGE_NOTIFICATIONS_CONFIG)) && (
+            { (currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.SEE_NOTIFICATIONS_CONFIG)) && (
               <TabsContent value="configuration">
                 <Configuration permissions={currentUser?.permissions || []} />
               </TabsContent>

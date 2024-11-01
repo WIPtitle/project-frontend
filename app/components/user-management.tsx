@@ -32,7 +32,7 @@ const permissionDisplayMap: Record<Permission, string> = {
   [Permission.ACCESS_RECORDINGS]: "Access Recordings",
   [Permission.ACCESS_STREAM_CAMERAS]: "Access Stream Cameras",
   [Permission.CHANGE_ALARM_SOUND]: "Change Alarm Sound",
-  [Permission.CHANGE_NOTIFICATIONS_CONFIG]: "Change Notifications Configuration",
+  [Permission.SEE_NOTIFICATIONS_CONFIG]: "See NTFY Configuration",
   [Permission.MODIFY_DEVICES]: "Modify Devices"
 }
 
