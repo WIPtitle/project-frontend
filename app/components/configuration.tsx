@@ -22,7 +22,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   const [editingAudioConfig, setEditingAudioConfig] = useState<AlarmAudioConfig | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const canChangeMailConfig = permissions.includes(Permission.SEE_NOTIFICATIONS_CONFIG)
+  const canChangeMailConfig = permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
   const canChangeAlarmSound = permissions.includes(Permission.CHANGE_ALARM_SOUND)
 
   useEffect(() => {
