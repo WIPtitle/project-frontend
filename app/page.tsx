@@ -1,5 +1,20 @@
-import TabLayout from "./components/tab-layout"
+"use client";
+
+import { useEffect } from 'react';
+import TabLayout from "./components/tab-layout";
 
 export default function Home() {
-  return <TabLayout />
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then((registration) => {
+                })
+                .catch((error) => {
+                });
+        } else {
+            console.log('Browser does not support Service Worker');
+        }
+    }, []);
+
+    return <TabLayout />;
 }

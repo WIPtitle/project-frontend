@@ -21,6 +21,7 @@ export default function TabLayout() {
   const router = useRouter()
 
   useEffect(() => {
+    console.log("tablaout")
     const storedToken = localStorage.getItem('token')
     const tokenExpiry = localStorage.getItem('tokenExpiry')
 
