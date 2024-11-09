@@ -1,24 +1,22 @@
 import { User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, EmailConfig, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
+import { getBackendUrl } from './server-side'
 
-const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    return `http://${window.location.hostname}:8000`
-  }
-  return '' // Fallback for server-side rendering
+const getApiBaseUrl = async () => {
+  return await getBackendUrl()
 }
 
-const API_BASE_URL = getApiBaseUrl()
-
-export const registerUser = async (email: string, password: string): Promise<void> => {
+export const registerUser = async (email: string, password: string, pin: number): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth-service/users/first`, {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users/first`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true'
       },
       body: JSON.stringify({
         email,
         password,
+        pin,
         permissions: [],
       }),
     })
@@ -36,10 +34,11 @@ export const login = async (email: string, password: string, rememberMe: boolean
   let token: string | null = null
   let tokenExpiry: Date | null = null
   try {
-    const response = await fetch(`${API_BASE_URL}/auth-service/auth/token`, {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Bypass-Tunnel-Reminder': 'true'
       },
       body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
     })
@@ -88,9 +87,10 @@ export const getTokenOrThrow = (): string => {
 
 export const getUserMyself = async (): Promise<User> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth-service/auth/user`, {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/user`, {
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
       },
     })
 
@@ -107,9 +107,10 @@ export const getUserMyself = async (): Promise<User> => {
 
 export const getPermissions = async (): Promise<Permission[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth-service/auth/permissions`, {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/permissions`, {
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
       },
     })
 
@@ -131,10 +132,11 @@ export const logout = () => {
 
 export const isFirstUser = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth-service/info/is-initialized`, {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/info/is-initialized`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true'
       },
     });
 
@@ -304,9 +306,10 @@ export const deleteRTSPCamera = async (id: number): Promise<boolean> => {
 
 export const getEmailConfig = async (): Promise<EmailConfig | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/mail-service/mail-config/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/mail-service/mail-config/`, {
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
       },
     })
 
@@ -333,11 +336,12 @@ export const getEmailConfig = async (): Promise<EmailConfig | null> => {
 
 export const createEmailConfig = async (config: EmailConfig): Promise<EmailConfig> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/mail-service/mail-config/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/mail-service/mail-config/`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
         'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true'
       },
       body: JSON.stringify({
         smtp_server: config.smtpServer,
@@ -377,10 +381,11 @@ export const updateEmailConfig = async (config: EmailConfig): Promise<EmailConfi
 
 export const deleteEmailConfig = async (): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/mail-service/mail-config/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/mail-service/mail-config/`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
       },
     });
 
@@ -395,9 +400,10 @@ export const deleteEmailConfig = async (): Promise<void> => {
 
 export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/audio-service/audio/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/audio-service/audio/`, {
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
       },
     });
 
@@ -432,10 +438,11 @@ export const createAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<
       formData.append('audio', config.audio);
     }
 
-    const response = await fetch(`${API_BASE_URL}/audio-service/audio/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/audio-service/audio/`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
       },
       body: formData,
     })
@@ -457,10 +464,11 @@ export const updateAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<
 
 export const deleteAlarmAudioConfig = async (): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/audio-service/audio/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/audio-service/audio/`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
       },
     });
 

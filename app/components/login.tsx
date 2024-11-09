@@ -7,10 +7,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { login, isFirstUser, registerUser } from "@/lib/api"
 
-export default function Login({ onLogin }: { onLogin: (token: string) => void }) {
+export default function Component({ onLogin }: { onLogin: (token: string) => void }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [pin, setPin] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false)
 
@@ -26,15 +27,15 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
       let token: string
 
       if (isFirstTimeUser) {
-        await registerUser(username, password)
-        token = await login(username, password, rememberMe)
+        await registerUser(email, password, parseInt(pin))
+        token = await login(email, password, rememberMe)
       } else {
-        token = await login(username, password, rememberMe)
+        token = await login(email, password, rememberMe)
       }
 
       onLogin(token)
     } catch (error) {
-      setErrorMessage("Login failed")
+      setErrorMessage(isFirstTimeUser ? "Registration failed" : "Login failed")
     }
   }
 
@@ -48,8 +49,8 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
           <Input
             type="email"
             placeholder="Email"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
             required
           />
@@ -61,6 +62,18 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
             className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
             required
           />
+          {isFirstTimeUser && (
+            <Input
+              type="number"
+              placeholder="PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
+              required
+              min="0"
+              max="9999"
+            />
+          )}
           {!isFirstTimeUser && (
             <div className="flex items-center space-x-2">
               <Checkbox
