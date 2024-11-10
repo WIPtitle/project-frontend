@@ -4,28 +4,30 @@ self.addEventListener('install', function(event) {
 
 self.addEventListener('activate', function(event) {
     console.log('Service Worker activated');
-    startEventSource();
 });
 
 self.addEventListener('message', function(event) {
-    console.log('Message received:', event.data);
+    if (event.data.type === 'SET_NTFY_CREDENTIALS') {
+        ntfyCredentials = event.data.credentials;
+        startEventSource();
+    }
 });
 
 function startEventSource() {
-    const topic = 'mytopic';
-    const username = 'username';
-    const password = 'password';
-    const url = `https://ntfy.sh/${topic}/sse`;
+    const { topic, username, password, url } = ntfyCredentials;
+    const completeUrl = `${url}/${topic}/sse`;
 
     const headers = new Headers({
-        'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+        'Authorization': 'Basic ' + btoa(`${username}:${password}`),
+        'Bypass-Tunnel-Reminder': 'true'
     });
+
 
     const eventSourceInit = {
         headers: headers
     };
 
-    const eventSource = new EventSource(url, eventSourceInit);
+    const eventSource = new EventSource(completeUrl, eventSourceInit);
 
     eventSource.onmessage = function(event) {
         console.log('EventSource message received:', event.data);

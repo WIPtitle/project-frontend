@@ -1,7 +1,7 @@
-import { User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, EmailConfig, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
+import { NtfyCredentials, User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, EmailConfig, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
 import { getBackendUrl } from './server-side'
 
-const getApiBaseUrl = async () => {
+export const getApiBaseUrl = async () => {
   return await getBackendUrl()
 }
 
@@ -24,13 +24,14 @@ export const registerUser = async (email: string, password: string, pin: number)
     if (!response.ok) {
       throw new Error('Registration failed')
     }
+
   } catch (error) {
     console.error('Error registering user:', error)
     throw error
   }
 }
 
-export const login = async (email: string, password: string, rememberMe: boolean): Promise<string> => {
+export const loginAndSetToken = async (email: string, password: string, rememberMe: boolean): Promise<string> => {
   let token: string | null = null
   let tokenExpiry: Date | null = null
   try {
@@ -55,6 +56,7 @@ export const login = async (email: string, password: string, rememberMe: boolean
         localStorage.setItem('token', token)
       } else {
         console.error('Token is null, not setting in localStorage')
+        throw new Error('Login failed: No access token received')
       }
       if (rememberMe) {
         tokenExpiry = null
@@ -63,11 +65,8 @@ export const login = async (email: string, password: string, rememberMe: boolean
         tokenExpiry = new Date(Date.now() + 30 * 60 * 1000) // 30 minutes from now
         localStorage.setItem('tokenExpiry', tokenExpiry.toISOString())
       }
-      if (token !== null) {
-        return token
-      } else {
-        return ""
-      }
+
+      return token
     } else {
       throw new Error('Login failed: No access token received')
     }
@@ -84,6 +83,29 @@ export const getTokenOrThrow = (): string => {
   }
   return token;
 };
+
+export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Bypass-Tunnel-Reminder': 'true'
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch Ntfy credentials');
+    }
+
+    const credentials: NtfyCredentials = await response.json();
+
+    return credentials;
+  } catch (error) {
+    console.error('Error fetching Ntfy credentials:', error);
+    throw error;
+  }
+}
 
 export const getUserMyself = async (): Promise<User> => {
   try {

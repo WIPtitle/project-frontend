@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { login, isFirstUser, registerUser } from "@/lib/api"
+import { loginAndSetToken, isFirstUser, registerUser, getNtfyCredentials } from "@/lib/api"
+import { NtfyCredentials } from "@/types"
 
 export default function Component({ onLogin }: { onLogin: (token: string) => void }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -28,9 +29,17 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
 
       if (isFirstTimeUser) {
         await registerUser(email, password, parseInt(pin))
-        token = await login(email, password, rememberMe)
+        token = await loginAndSetToken(email, password, rememberMe)
       } else {
-        token = await login(email, password, rememberMe)
+        token = await loginAndSetToken(email, password, rememberMe)
+      }
+
+      const ntfyCredentials: NtfyCredentials = await getNtfyCredentials()
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SET_NTFY_CREDENTIALS',
+          credentials: ntfyCredentials
+        });
       }
 
       onLogin(token)

@@ -77,3 +77,10 @@ export interface StorageInfo {
   free_space: number
   total_space: number
 }
+
+export interface NtfyCredentials {
+  user: string;
+  password: string;
+  topic: string;
+  url: string;
+}
