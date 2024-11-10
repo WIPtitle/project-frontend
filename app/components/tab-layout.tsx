@@ -10,8 +10,8 @@ import Devices from "./devices"
 import Recordings from "./recordings"
 import Configuration from "./configuration"
 import UserManagement from "./user-management"
-import { getUserMyself, logout } from "@/lib/api"
-import { User, Permission } from "@/types"
+import { getUserMyself, logout, getNtfyCredentials } from "@/lib/api"
+import { User, Permission, NtfyCredentials } from "@/types"
 
 export default function TabLayout() {
   const [token, setToken] = useState<string | null>(null)
@@ -50,6 +50,25 @@ export default function TabLayout() {
       setIsLoading(false)
     }
   }, [])
+
+    useEffect(() => {
+      if (token) {
+        const sendNtfyCredentials = async () => {
+          try {
+            const ntfyCredentials = await getNtfyCredentials();
+            if (navigator.serviceWorker?.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'SET_NTFY_CREDENTIALS',
+                credentials: ntfyCredentials
+              });
+            }
+          } catch (error) {
+            console.error('Failed to send Ntfy credentials', error);
+          }
+        };
+        sendNtfyCredentials();
+      }
+    }, [token]);
 
   const handleLogin = async (newToken: string) => {
     setToken(newToken)
