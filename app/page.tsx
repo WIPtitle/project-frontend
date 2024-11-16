@@ -10,6 +10,17 @@ export default function Home() {
         } else {
             console.log('Browser does not support Service Worker');
         }
+
+        if (Notification.permission !== 'granted') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    console.log('Notification permission granted');
+
+                } else {
+                    console.warn('Notification permission denied');
+                }
+            });
+        }
     }, []);
 
     return <TabLayout />;

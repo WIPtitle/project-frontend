@@ -1,5 +1,6 @@
 let ntfyCredentials = null;
 let eventSource = null;
+let hostname = null;
 
 self.addEventListener('install', function(event) {
     console.log('Service Worker installed');
@@ -10,10 +11,34 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(startNtfyListener());
 });
 
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    fetchWithRetry(event.request, 10)
+  );
+});
+
+function fetchWithRetry(request, retries) {
+  return fetch(request).then(response => {
+    if (!response.ok && response.status === 502 && retries > 0) {
+      console.log(`Retrying request: ${request.url}, attempts left: ${retries - 1}`);
+      return new Promise(resolve => setTimeout(resolve, 500)).then(() => fetchWithRetry(request, retries - 1));
+    }
+    return response;
+  }).catch(error => {
+    if (retries > 0) {
+      console.log(`Retrying request: ${request.url}, attempts left: ${retries - 1}`);
+      return new Promise(resolve => setTimeout(resolve, 500)).then(() => fetchWithRetry(request, retries - 1));
+    } else {
+      throw error;
+    }
+  });
+}
+
 self.addEventListener('message', function(event) {
     console.log("Received credentials");
     if (event.data.type === 'SET_NTFY_CREDENTIALS') {
         ntfyCredentials = event.data.credentials;
+        hostname = event.data.hostname;
         if (eventSource) {
             eventSource.close();
         }
@@ -22,33 +47,49 @@ self.addEventListener('message', function(event) {
 });
 
 async function startEventSource() {
-    const { topic, username, password, url } = ntfyCredentials;
-    const completeUrl = `${url}/${topic}/sse`;
+    const { topic, user, password } = ntfyCredentials;
+    const url = `http://${hostname}:8080`
+    const completeUrl = `${url}/${topic}/json`;
 
     const headers = new Headers({
-        'Authorization': 'Basic ' + btoa(`${username}:${password}`),
-        'Bypass-Tunnel-Reminder': 'true'
+        'Authorization': 'Basic ' + btoa(`${user}:${password}`)
     });
 
-    const eventSourceInit = {
-        headers: headers
-    };
+    try {
+    const response = await fetch(completeUrl, { headers });
 
-    eventSource = new EventSource(completeUrl, eventSourceInit);
-
-    eventSource.onmessage = async function(event) {
-        console.log('EventSource message received:', event.data);
-        await showNotification({ message: event.data });
-        self.clients.matchAll().then(clients => {
-            clients.forEach(client => client.postMessage(event.data));
-        });
-    };
-
-    eventSource.onerror = function(error) {
-        console.log('EventSource error:', error);
-        eventSource.close();
+    if (!response.ok) {
+        console.error('Failed to connect to ntfy');
         setTimeout(startEventSource, 5000);
-    };
+        return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const lines = decoder.decode(value, { stream: true }).split('\n');
+        for (const line of lines) {
+            if (line) {
+                console.log('Message received:', line);
+                await showNotification({ message: line });
+                self.clients.matchAll().then(clients => {
+                    clients.forEach(client => client.postMessage(line));
+                });
+            }
+        }
+    }
+
+    reader.releaseLock();
+
+    } catch (error) {
+        console.error('Error while listening to events:', error);
+    } finally {
+        setTimeout(startEventSource, 5000);
+    }
 }
 
 async function showNotification(message) {

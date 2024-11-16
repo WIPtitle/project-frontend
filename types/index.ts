@@ -82,5 +82,4 @@ export interface NtfyCredentials {
   user: string;
   password: string;
   topic: string;
-  url: string;
 }

@@ -56,12 +56,13 @@ export default function TabLayout() {
         const sendNtfyCredentials = async () => {
           try {
             const ntfyCredentials = await getNtfyCredentials();
-            if (navigator.serviceWorker?.controller) {
-              navigator.serviceWorker.controller.postMessage({
-                type: 'SET_NTFY_CREDENTIALS',
-                credentials: ntfyCredentials
-              });
-            }
+                if (navigator.serviceWorker?.controller) {
+                  navigator.serviceWorker.controller.postMessage({
+                    type: 'SET_NTFY_CREDENTIALS',
+                    credentials: ntfyCredentials,
+                    hostname: window.location.hostname,
+                  });
+                }
           } catch (error) {
             console.error('Failed to send Ntfy credentials', error);
           }
