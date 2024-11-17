@@ -56,34 +56,34 @@ async function startEventSource() {
     });
 
     try {
-    const response = await fetch(completeUrl, { headers });
+        const response = await fetch(completeUrl, { headers });
 
-    if (!response.ok) {
-        console.error('Failed to connect to ntfy');
-        setTimeout(startEventSource, 5000);
-        return;
-    }
+        if (!response.ok) {
+            console.error('Failed to connect to ntfy');
+            setTimeout(startEventSource, 5000);
+            return;
+        }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
 
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
 
-        const lines = decoder.decode(value, { stream: true }).split('\n');
-        for (const line of lines) {
-            if (line) {
-                console.log('Message received:', line);
-                await showNotification({ message: line });
-                self.clients.matchAll().then(clients => {
-                    clients.forEach(client => client.postMessage(line));
-                });
+            const lines = decoder.decode(value, { stream: true }).split('\n');
+            for (const line of lines) {
+                if (line) {
+                    console.log('Message received:', line);
+                    await showNotification({ message: line });
+                    self.clients.matchAll().then(clients => {
+                        clients.forEach(client => client.postMessage(line));
+                    });
+                }
             }
         }
-    }
 
-    reader.releaseLock();
+        reader.releaseLock();
 
     } catch (error) {
         console.error('Error while listening to events:', error);
