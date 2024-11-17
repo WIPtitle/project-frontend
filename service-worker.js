@@ -74,6 +74,10 @@ async function startEventSource() {
             const lines = decoder.decode(value, { stream: true }).split('\n');
             for (const line of lines) {
                 if (line) {
+                    const message = JSON.parse(line);
+                    if (message.event && ['open', 'keepalive', 'close'].includes(message.event)) {
+                        continue; // Ignore ntfy configuration events
+                    }
                     console.log('Message received:', line);
                     await showNotification({ message: line });
                     self.clients.matchAll().then(clients => {

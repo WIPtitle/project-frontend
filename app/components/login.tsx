@@ -13,7 +13,7 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
   const [password, setPassword] = useState("")
   const [pin, setPin] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
-  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false)
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState<boolean | null>(null)
 
   useEffect(() => {
     isFirstUser().then(setIsFirstTimeUser).catch(console.error)
@@ -37,6 +37,14 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
     } catch (error) {
       setErrorMessage(isFirstTimeUser ? "Registration failed" : "Login failed")
     }
+  }
+
+  if (isFirstTimeUser === null) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-zinc-800">
+        <div className="text-2xl font-bold text-zinc-50">Loading...</div>
+      </div>
+    )
   }
 
   return (
