@@ -41,9 +41,8 @@ export const loginAndSetToken = async (email: string, password: string, remember
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        
       },
-      body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
+      body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&rememberme=${rememberMe}`,
     })
 
     if (!response.ok) {
@@ -212,27 +211,89 @@ export const deactivateAlarm = async (id: number): Promise<AlarmGroup> => {
 }
 
 export const getAllUsers = async (): Promise<User[]> => {
-  return [
-    { id: 1, email: "admin@example.com", permissions: [Permission.USER_MANAGER] },
-    { id: 2, email: "user1@example.com", permissions: [Permission.USER_MANAGER] },
-    { id: 3, email: "user2@example.com", permissions: [Permission.USER_MANAGER] },
-  ]
-}
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    throw error;
+  }
+};
 
 export const createUser = async (user: Omit<User, 'id'>): Promise<User> => {
-  return { ...user, id: Date.now() }
-}
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(user),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create user');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+};
 
 export const updateUser = async (id: number, updates: Partial<User>): Promise<User> => {
-  const users = await getAllUsers()
-  const updatedUser = users.find(u => u.id === id)
-  if (!updatedUser) throw new Error('User not found')
-  return { ...updatedUser, ...updates }
-}
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update user');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw error;
+  }
+};
 
 export const deleteUser = async (id: number): Promise<boolean> => {
-  return true
-}
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete user');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    throw error;
+  }
+};
 
 const fakeMagneticReeds: MagneticReed[] = [
   { id: 1, name: "Reed 1", gpio_pin_number: 17, default_value_when_closed: "HIGH" },

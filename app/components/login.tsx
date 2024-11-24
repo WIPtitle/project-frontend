@@ -12,6 +12,7 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [pin, setPin] = useState("")
+  const [pinError, setPinError] = useState<string | null>(null)
   const [rememberMe, setRememberMe] = useState(false)
   const [isFirstTimeUser, setIsFirstTimeUser] = useState<boolean | null>(null)
 
@@ -21,7 +22,15 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setErrorMessage(null) // Clear any previous error messages
+    setErrorMessage(null)
+    setPinError(null)
+
+    if (isFirstTimeUser) {
+      if (pin.length < 4 || pin.length > 8) {
+        setPinError("PIN must be between 4 and 8 digits")
+        return
+      }
+    }
 
     try {
       let token: string
@@ -31,7 +40,8 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
         token = await loginAndSetToken(email, password, rememberMe)
       } else {
         token = await loginAndSetToken(email, password, rememberMe)
-      }
+
+}
 
       onLogin(token)
     } catch (error) {
@@ -72,16 +82,24 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
           />
           {isFirstTimeUser && (
             <Input
-              type="number"
-              placeholder="PIN"
+              type="text"
+              placeholder="PIN (4-8 digits)"
               value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '')
+                if (value.length > 8) return
+                if (/^\d+$/.test(value) || value === '') {
+                  setPin(value)
+                  setPinError(null)
+                } else {
+                  setPinError("PIN must contain only numbers")
+                }
+              }}
               className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
               required
-              min="0"
-              max="9999"
             />
           )}
+          {pinError && <p className="text-red-500 text-sm">{pinError}</p>}
           {!isFirstTimeUser && (
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -111,3 +129,4 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
     </div>
   )
 }
+

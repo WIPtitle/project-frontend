@@ -42,6 +42,9 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [availablePermissions, setAvailablePermissions] = useState<Permission[]>([])
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const [pinError, setPinError] = useState<string | null>(null)
 
   const router = useRouter()
 
@@ -63,11 +66,13 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
 
   const handleAddUser = () => {
     setEditingUser({ id: 0, email: "", password: "", permissions: [] })
+    setConfirmPassword("")
     setIsDialogOpen(true)
   }
 
   const handleUpdateUser = (user: User) => {
-    setEditingUser(user)
+    setEditingUser({...user, password: ""})
+    setConfirmPassword("")
     setIsDialogOpen(true)
   }
 
@@ -89,6 +94,22 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   }
 
   const handleSaveUser = async (updatedUser: User) => {
+    if (updatedUser.password !== "" && updatedUser.password !== confirmPassword) {
+      setValidationError("Passwords do not match")
+      return
+    }
+
+    if (updatedUser.pin === undefined || updatedUser.pin === null) {
+      setValidationError("PIN is required")
+      return
+    }
+
+    const pinLength = updatedUser.pin.toString().length
+    if (pinLength < 4 || pinLength > 8) {
+      setValidationError("PIN must be between 4 and 8 digits")
+      return
+    }
+
     try {
       if (updatedUser.id === 0) {
         const newUser = await createUser(updatedUser)
@@ -101,6 +122,9 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
         }
       }
       setIsDialogOpen(false)
+      setConfirmPassword("")
+      setValidationError(null)
+      setPinError(null)
     } catch (error) {
       setErrorMessage("Failed to save user")
     }
@@ -109,7 +133,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   return (
     <div className="text-zinc-50">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold">User Management</h1>
+        <h1 className="text-3xl font-bold">User management</h1>
         {isUserManager && (
           <Button onClick={handleAddUser} variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Add User</Button>
         )}
@@ -201,11 +225,43 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
               />
               <Input
                 type="password"
-                placeholder="Password"
+                placeholder="New Password"
                 value={editingUser?.password || ""}
-                onChange={(e) => setEditingUser(prev => prev ? {...prev, password: e.target.value} : null)}
+                onChange={(e) => {
+                  const newPassword = e.target.value;
+                  setEditingUser(prev => prev ? {...prev, password: newPassword} : null);
+                  if (newPassword === "") {
+                    setConfirmPassword("");
+                  }
+                }}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
               />
+              {editingUser?.password && (
+                <Input
+                  type="password"
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                />
+              )}
+              <Input
+                type="text"
+                placeholder="PIN (4-8 digits)"
+                value={editingUser?.pin?.toString() || ""}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  if (value.length > 8) return
+                  if (/^\d*$/.test(value)) {
+                    setEditingUser(prev => prev ? {...prev, pin: value ? parseInt(value) : undefined} : null)
+                    setPinError(null)
+                  } else {
+                    setPinError("PIN must contain only numbers")
+                  }
+                }}
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+              />
+              {pinError && <p className="text-red-500">{pinError}</p>}
               <div>
                 <h3 className="mb-2 font-semibold text-zinc-300">Permissions</h3>
                 {availablePermissions.map(permission => (
@@ -228,6 +284,9 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
                   </div>
                 ))}
               </div>
+              {validationError && (
+                <p className="text-red-500">{validationError}</p>
+              )}
               <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
                 {editingUser?.id ? "Update" : "Create"} User
               </Button>
@@ -249,3 +308,4 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
     </div>
   )
 }
+
