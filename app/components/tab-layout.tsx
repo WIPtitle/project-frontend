@@ -44,6 +44,8 @@ export default function TabLayout() {
         })
         .catch((error) => {
           console.error(error)
+          // Token is invalid or expired
+          handleLogout()
           setIsLoading(false)
         })
 
@@ -61,26 +63,6 @@ export default function TabLayout() {
       setIsLoading(false)
     }
   }, [])
-
-  useEffect(() => {
-    if (token) {
-      const sendNtfyCredentials = async () => {
-        try {
-          const ntfyCredentials = await getNtfyCredentials();
-          if (navigator.serviceWorker?.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'SET_NTFY_CREDENTIALS',
-              credentials: ntfyCredentials,
-              hostname: window.location.hostname,
-            });
-          }
-        } catch (error) {
-          console.error('Failed to send Ntfy credentials', error);
-        }
-      };
-      sendNtfyCredentials();
-    }
-  }, [token]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -125,6 +107,21 @@ export default function TabLayout() {
     try {
       const user = await getUserMyself()
       setCurrentUser(user)
+      const sendNtfyCredentials = async () => {
+        try {
+          const ntfyCredentials = await getNtfyCredentials();
+          if (navigator.serviceWorker?.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'SET_NTFY_CREDENTIALS',
+              credentials: ntfyCredentials,
+              hostname: window.location.hostname,
+            });
+          }
+        } catch (error) {
+          console.error('Failed to send Ntfy credentials', error);
+        }
+      };
+      sendNtfyCredentials();
     } catch (error) {
       console.error(error)
     }
@@ -134,6 +131,8 @@ export default function TabLayout() {
     logout()
     setToken(null)
     setCurrentUser(null)
+    localStorage.removeItem('token')
+    localStorage.removeItem('tokenExpiry')
     router.push('/')
   }
 
@@ -153,7 +152,7 @@ export default function TabLayout() {
     )
   }
 
-  if (!token) {
+  if (!token || !currentUser) {
     return <Login onLogin={handleLogin} />
   }
 
