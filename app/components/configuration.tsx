@@ -4,33 +4,32 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getEmailConfig, getAlarmAudioConfig, createEmailConfig, createAlarmAudioConfig, updateEmailConfig, updateAlarmAudioConfig, deleteEmailConfig, deleteAlarmAudioConfig } from "@/lib/api"
-import { EmailConfig, AlarmAudioConfig, Permission } from "@/types"
+import { getNtfyCredentials, updateNtfyCredentials, getAlarmAudioConfig, createAlarmAudioConfig, updateAlarmAudioConfig, deleteAlarmAudioConfig } from "@/lib/api"
+import { NtfyCredentials, AlarmAudioConfig, Permission } from "@/types"
 
 type ConfigurationProps = {
   permissions: Permission[]
 }
 
 export default function Configuration({ permissions }: ConfigurationProps) {
-  const [emailConfig, setEmailConfig] = useState<EmailConfig | null>(null)
+  const [ntfyCredentials, setNtfyCredentials] = useState<NtfyCredentials | null>(null)
   const [alarmAudioConfig, setAlarmAudioConfig] = useState<AlarmAudioConfig | null>(null)
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false)
   const [isAudioDialogOpen, setIsAudioDialogOpen] = useState(false)
-  const [editingEmailConfig, setEditingEmailConfig] = useState<EmailConfig | null>(null)
   const [editingAudioConfig, setEditingAudioConfig] = useState<AlarmAudioConfig | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const canChangeMailConfig = permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
+  const canChangeNotificationsConfig = permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
   const canChangeAlarmSound = permissions.includes(Permission.CHANGE_ALARM_SOUND)
 
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
-        if (canChangeMailConfig) {
-          const emailCfg = await getEmailConfig()
-          setEmailConfig(emailCfg)
+        if (canChangeNotificationsConfig) {
+          const credentials = await getNtfyCredentials()
+          setNtfyCredentials(credentials)
         }
         if (canChangeAlarmSound) {
           const audioCfg = await getAlarmAudioConfig()
@@ -41,11 +40,22 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       }
     }
     fetchConfigs()
-  }, [canChangeMailConfig, canChangeAlarmSound])
+  }, [canChangeNotificationsConfig, canChangeAlarmSound])
 
-  const handleAddEmailConfig = () => {
-    setEditingEmailConfig({ smtpServer: "", port: 0, username: "", password: "", sender: "" })
-    setIsEmailDialogOpen(true)
+  const handleRefreshNotificationsConfig = async () => {
+    try {
+      const updatedCredentials = await updateNtfyCredentials()
+      setNtfyCredentials(updatedCredentials)
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SET_NTFY_CREDENTIALS',
+          credentials: updatedCredentials,
+          hostname: window.location.hostname,
+        });
+      }
+    } catch (error) {
+      setErrorMessage("Failed to refresh notifications configuration")
+    }
   }
 
   const handleAddAudioConfig = () => {
@@ -53,23 +63,9 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     setIsAudioDialogOpen(true)
   }
 
-  const handleEditEmailConfig = () => {
-    setEditingEmailConfig(emailConfig)
-    setIsEmailDialogOpen(true)
-  }
-
   const handleEditAudioConfig = () => {
     setEditingAudioConfig(alarmAudioConfig)
     setIsAudioDialogOpen(true)
-  }
-
-  const handleDeleteEmailConfig = async () => {
-    try {
-      await deleteEmailConfig()
-      setEmailConfig(null)
-    } catch (error) {
-      setErrorMessage("Failed to delete email configuration")
-    }
   }
 
   const handleDeleteAudioConfig = async () => {
@@ -78,21 +74,6 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       setAlarmAudioConfig(null)
     } catch (error) {
       setErrorMessage("Failed to delete alarm audio configuration")
-    }
-  }
-
-  const handleSaveEmailConfig = async (config: EmailConfig) => {
-    try {
-      if (emailConfig) {
-        const updatedConfig = await updateEmailConfig(config)
-        setEmailConfig(updatedConfig)
-      } else {
-        const newConfig = await createEmailConfig(config)
-        setEmailConfig(newConfig)
-      }
-      setIsEmailDialogOpen(false)
-    } catch (error) {
-      setErrorMessage("Failed to save email configuration, check if SMTP connection with your parameters is okay")
     }
   }
 
@@ -111,7 +92,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     }
   }
 
-  if (!canChangeMailConfig && !canChangeAlarmSound) {
+  if (!canChangeNotificationsConfig && !canChangeAlarmSound) {
     return null
   }
 
@@ -119,55 +100,61 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     <div>
       <h1 className="text-3xl font-bold mb-4 text-zinc-50">Configuration</h1>
       <div className="grid gap-4 md:grid-cols-2">
-        {canChangeMailConfig && (
+        {canChangeNotificationsConfig && (
           <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-zinc-50">Email configuration</CardTitle>
+              <CardTitle className="text-zinc-50">Ntfy</CardTitle>
             </CardHeader>
-            <CardContent className="flex-grow">
-              {emailConfig ? (
+            <CardContent className="flex-grow space-y-4">
+              {ntfyCredentials ? (
                 <>
-                  <p className="text-zinc-300">SMTP Server: {emailConfig.smtpServer}</p>
-                  <p className="text-zinc-300">Port: {emailConfig.port}</p>
-                  <p className="text-zinc-300">Username: {emailConfig.username}</p>
-                  <p className="text-zinc-300">Sender: {emailConfig.sender}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="user" className="text-sm font-medium text-zinc-300">User</Label>
+                    <Input
+                      id="user"
+                      value={ntfyCredentials.user}
+                      readOnly
+                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-medium text-zinc-300">Password</Label>
+                    <Input
+                      id="password"
+                      value={ntfyCredentials.password}
+                      readOnly
+                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="topic" className="text-sm font-medium text-zinc-300">Topic</Label>
+                    <Input
+                      id="topic"
+                      value={ntfyCredentials.topic}
+                      readOnly
+                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                    />
+                  </div>
                 </>
               ) : (
-                <p className="text-zinc-400">No email configuration saved</p>
+                <p className="text-zinc-400">No Ntfy configuration saved</p>
               )}
             </CardContent>
             <CardFooter className="mt-auto">
-              {emailConfig ? (
-                <div className="flex justify-end space-x-2 w-full">
-                  <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleEditEmailConfig}>Edit</Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="bg-red-900 hover:bg-red-800">Delete</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-zinc-800 text-zinc-50">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the email configuration.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteEmailConfig} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              ) : (
-                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full" onClick={handleAddEmailConfig}>Add Configuration</Button>
-              )}
+              <Button
+                variant="outline"
+                className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full"
+                onClick={handleRefreshNotificationsConfig}
+              >
+                Refresh Configuration
+              </Button>
             </CardFooter>
           </Card>
         )}
         {canChangeAlarmSound && (
           <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-zinc-50">Audio configuration</CardTitle>
+              <CardTitle className="text-zinc-50">Alarm audio</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
               {alarmAudioConfig?.audio ? (
@@ -199,67 +186,16 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                   </AlertDialog>
                 </div>
               ) : (
-                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full" onClick={handleAddAudioConfig}>Add Configuration</Button>
+                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full" onClick={handleAddAudioConfig}>Add audio</Button>
               )}
             </CardFooter>
           </Card>
         )}
       </div>
-      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-        <DialogContent className="bg-zinc-800 text-zinc-50">
-          <DialogHeader>
-            <DialogTitle>{editingEmailConfig?.smtpServer ? "Edit" : "Add"} Email Configuration</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault()
-            if (editingEmailConfig) {
-              handleSaveEmailConfig(editingEmailConfig)
-            }
-          }}>
-            <div className="space-y-4">
-              <Input
-                placeholder="SMTP Server"
-                value={editingEmailConfig?.smtpServer || ""}
-                onChange={(e) => setEditingEmailConfig(prev => prev ? {...prev, smtpServer: e.target.value} : null)}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
-              <Input
-                type="number"
-                placeholder="Port"
-                value={editingEmailConfig?.port || ""}
-                onChange={(e) => setEditingEmailConfig(prev => prev ? {...prev, port: parseInt(e.target.value)} : null)}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
-              <Input
-                placeholder="Username"
-                value={editingEmailConfig?.username || ""}
-                onChange={(e) => setEditingEmailConfig(prev => prev ? {...prev, username: e.target.value} : null)}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={editingEmailConfig?.password || ""}
-                onChange={(e) => setEditingEmailConfig(prev => prev ? {...prev, password: e.target.value} : null)}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
-              <Input
-                placeholder="Sender"
-                value={editingEmailConfig?.sender || ""}
-                onChange={(e) => setEditingEmailConfig(prev => prev ? {...prev, sender: e.target.value} : null)}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
-              <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                {editingEmailConfig?.smtpServer ? "Update" : "Create"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
       <Dialog open={isAudioDialogOpen} onOpenChange={setIsAudioDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
-            <DialogTitle>{editingAudioConfig?.audio ? "Edit" : "Add"} Alarm Audio Configuration</DialogTitle>
+            <DialogTitle>{editingAudioConfig?.audio ? "Edit" : "Add"} Alarm audio</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault()

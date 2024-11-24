@@ -47,14 +47,6 @@ export interface MagneticReed {
     default_value_when_closed: 'HIGH' | 'LOW';
 }
 
-export interface EmailConfig {
-  smtpServer: string
-  port: number
-  username: string
-  password: string
-  sender: string
-}
-
 export interface AlarmAudioConfig {
   audio: File | null
 }

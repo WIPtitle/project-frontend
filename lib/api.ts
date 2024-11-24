@@ -1,4 +1,4 @@
-import { NtfyCredentials, User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, EmailConfig, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
+import { NtfyCredentials, User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
 
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
@@ -85,29 +85,6 @@ export const getTokenOrThrow = (): string => {
   }
   return token;
 };
-
-export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${getTokenOrThrow()}`,
-        
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch Ntfy credentials');
-    }
-
-    const credentials: NtfyCredentials = await response.json();
-
-    return credentials;
-  } catch (error) {
-    console.error('Error fetching Ntfy credentials:', error);
-    throw error;
-  }
-}
 
 export const getUserMyself = async (): Promise<User> => {
   try {
@@ -328,96 +305,44 @@ export const deleteRTSPCamera = async (id: number): Promise<boolean> => {
   return true;
 }
 
-export const getEmailConfig = async (): Promise<EmailConfig | null> => {
+export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/mail-service/mail-config/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
-        
-      },
-    })
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null
-      }
-      throw new Error('Failed to fetch email configuration')
-    }
-
-    const data = await response.json()
-    return {
-      smtpServer: data.smtp_server,
-      port: data.smtp_port,
-      username: data.smtp_user,
-      password: '', // Password is not returned for security reasons
-      sender: data.email_from,
-    }
-  } catch (error) {
-    console.error('Error fetching email configuration:', error)
-    throw error
-  }
-}
-
-export const createEmailConfig = async (config: EmailConfig): Promise<EmailConfig> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/mail-service/mail-config/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getTokenOrThrow()}`,
-        'Content-Type': 'application/json',
-        
-      },
-      body: JSON.stringify({
-        smtp_server: config.smtpServer,
-        smtp_port: config.port,
-        smtp_user: config.username,
-        smtp_password: config.password,
-        email_from: config.sender,
-      }),
-    })
-
-    if (!response.ok) {
-        console.log(response.status)
-      if (response.status == 400) {
-        throw new Error('Failed to create email configuration, couldn\'t connect to SMTP server: check your parameters');
-      } else {
-        throw new Error('Failed to create email configuration');
-      }
-    }
-
-    const data = await response.json()
-    return {
-      smtpServer: data.smtp_server,
-      port: data.smtp_port,
-      username: data.smtp_user,
-      password: config.password, // Use the password from the input as it's not returned
-      sender: data.email_from,
-    }
-  } catch (error) {
-    console.error('Error creating email configuration:', error)
-    throw error
-  }
-}
-
-export const updateEmailConfig = async (config: EmailConfig): Promise<EmailConfig> => {
-  return createEmailConfig(config)
-}
-
-export const deleteEmailConfig = async (): Promise<void> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/mail-service/mail-config/`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${getTokenOrThrow()}`,
-        
       },
     });
 
     if (!response.ok) {
-      throw new Error('Failed to delete email configuration');
+      throw new Error('Failed to fetch Ntfy credentials');
     }
+
+    const credentials: NtfyCredentials = await response.json();
+    return credentials;
   } catch (error) {
-    console.error('Error deleting email configuration:', error);
+    console.error('Error fetching Ntfy credentials:', error);
+    throw error;
+  }
+}
+
+export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update Ntfy credentials');
+    }
+
+    const credentials: NtfyCredentials = await response.json();
+    return credentials;
+  } catch (error) {
+    console.error('Error updating Ntfy credentials:', error);
     throw error;
   }
 }
