@@ -20,6 +20,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   const [isAudioDialogOpen, setIsAudioDialogOpen] = useState(false)
   const [editingAudioConfig, setEditingAudioConfig] = useState<AlarmAudioConfig | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   const canChangeNotificationsConfig = permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
   const canChangeAlarmSound = permissions.includes(Permission.CHANGE_ALARM_SOUND)
@@ -27,16 +28,18 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
+        const promises = []
         if (canChangeNotificationsConfig) {
-          const credentials = await getNtfyCredentials()
-          setNtfyCredentials(credentials)
+          promises.push(getNtfyCredentials().then(setNtfyCredentials))
         }
         if (canChangeAlarmSound) {
-          const audioCfg = await getAlarmAudioConfig()
-          setAlarmAudioConfig(audioCfg)
+          promises.push(getAlarmAudioConfig().then(setAlarmAudioConfig))
         }
+        await Promise.all(promises)
       } catch (error) {
         setErrorMessage("Failed to fetch configurations")
+      } finally {
+        setIsLoading(false)
       }
     }
     fetchConfigs()
@@ -90,6 +93,14 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     } catch (error) {
       setErrorMessage("Failed to save alarm audio configuration")
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-zinc-800">
+        <div className="text-2xl font-bold text-zinc-50">Loading...</div>
+      </div>
+    )
   }
 
   if (!canChangeNotificationsConfig && !canChangeAlarmSound) {
@@ -195,7 +206,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       <Dialog open={isAudioDialogOpen} onOpenChange={setIsAudioDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
-            <DialogTitle>{editingAudioConfig?.audio ? "Edit" : "Add"} Alarm audio</DialogTitle>
+            <DialogTitle>{alarmAudioConfig ? "Edit" : "Add"} Alarm audio</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault()
@@ -209,9 +220,10 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                 accept="audio/*"
                 onChange={(e) => setEditingAudioConfig(prev => prev ? {...prev, audio: e.target.files?.[0] || null} : null)}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                required
               />
               <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                {editingAudioConfig?.audio ? "Update" : "Create"}
+                {alarmAudioConfig ? "Update" : "Create"}
               </Button>
             </div>
           </form>
