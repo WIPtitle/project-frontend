@@ -143,7 +143,7 @@ export default function TabLayout() {
   const currentTab = pathname === "/" ? "alarm" : pathname?.slice(1) || "alarm"
 
   const tabItems = [
-    { value: "alarm", label: "Home alarm" },
+    { value: "alarm", label: "Alarm dashboard" },
     { value: "devices", label: "Devices" },
     ...(currentUser?.permissions.includes(Permission.ACCESS_RECORDINGS) ? [{ value: "recordings", label: "Recordings" }] : []),
     { value: "users", label: "User management" },

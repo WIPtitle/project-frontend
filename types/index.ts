@@ -11,8 +11,6 @@ export type DeviceGroup = {
     wait_to_start_alarm: number;
     wait_to_fire_alarm: number;
     status: DeviceGroupStatus;
-    cameras: RTSPCamera[];
-    reeds: MagneticReed[];
 };
 
 export enum Permission {

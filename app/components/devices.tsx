@@ -40,6 +40,8 @@ export default function Component({ permissions }: DeviceProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [reedStatuses, setReedStatuses] = useState<Record<number, string>>({})
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoadingCameras, setIsLoadingCameras] = useState(true)
+  const [isLoadingReeds, setIsLoadingReeds] = useState(true)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const canAccessStreamCameras = permissions.includes(Permission.ACCESS_STREAM_CAMERAS)
@@ -47,12 +49,17 @@ export default function Component({ permissions }: DeviceProps) {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
+        setIsLoadingCameras(true)
+        setIsLoadingReeds(true)
         const cameras = await getAllRtspCameras()
         const reeds = await getAllMagneticReeds()
         setRtspCameras(cameras)
         setMagneticReeds(reeds)
       } catch (error) {
         setErrorMessage("Failed to fetch devices")
+      } finally {
+        setIsLoadingCameras(false)
+        setIsLoadingReeds(false)
       }
     }
     fetchDevices()
@@ -147,51 +154,57 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
-        {rtspCameras.map((camera) => (
-          <Card key={camera.ip} className="bg-zinc-800 border-zinc-700 flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-zinc-50">{camera.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              {canAccessStreamCameras ? (
-                <img
-                    src={`${getRTSPCameraStreamUrl(camera.ip)}?auth_token=${getTokenOrThrow()}`}
-                    className="w-full h-auto object-cover"
-                    alt="Camera Stream"
-                />
-              ) : (
-                <div className="aspect-video bg-zinc-700 flex items-center justify-center text-zinc-400">
-                  No access to camera stream
-                </div>
+        {isLoadingCameras ? (
+          <p className="text-zinc-300">Loading RTSP cameras...</p>
+        ) : rtspCameras.length === 0 ? (
+          <p className="text-zinc-300">No RTSP cameras found.</p>
+        ) : (
+          rtspCameras.map((camera) => (
+            <Card key={camera.ip} className="bg-zinc-800 border-zinc-700 flex flex-col">
+              <CardHeader>
+                <CardTitle className="text-zinc-50">{camera.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                {canAccessStreamCameras ? (
+                  <img
+                      src={`${getRTSPCameraStreamUrl(camera.ip)}?auth_token=${getTokenOrThrow()}`}
+                      className="w-full h-auto object-cover"
+                      alt="Camera Stream"
+                  />
+                ) : (
+                  <div className="aspect-video bg-zinc-700 flex items-center justify-center text-zinc-400">
+                    No access to camera stream
+                  </div>
+                )}
+                <p className="text-zinc-300 mt-2">IP: {camera.ip}</p>
+              </CardContent>
+              {canModifyDevices && (
+                <CardFooter className="flex flex-col mt-auto">
+                  <div className="flex w-full">
+                    <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(camera, 'camera')}>Edit</Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the camera.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteDevice(camera.ip, 'camera')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </CardFooter>
               )}
-              <p className="text-zinc-300 mt-2">IP: {camera.ip}</p>
-            </CardContent>
-            {canModifyDevices && (
-              <CardFooter className="flex flex-col mt-auto">
-                <div className="flex w-full">
-                  <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(camera, 'camera')}>Edit</Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-zinc-800 text-zinc-50">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the camera.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDeleteDevice(camera.ip, 'camera')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </CardFooter>
-            )}
-          </Card>
-        ))}
+            </Card>
+          ))
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
@@ -207,42 +220,48 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {magneticReeds.map((reed) => (
-          <Card key={reed.gpio_pin_number} className="bg-zinc-800 border-zinc-700 flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-zinc-50">{reed.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
-              <p className="text-zinc-300">Type: {reed.default_value_when_closed === "HIGH" ? "Normally Open" : "Normally Closed"}</p>
-              <p className="text-zinc-300 mt-8">Current Status: {reedStatuses[reed.gpio_pin_number] || 'Loading...'}</p>
-            </CardContent>
-            {canModifyDevices && (
-              <CardFooter className="flex flex-col mt-auto">
-                <div className="flex w-full">
-                  <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(reed, 'reed')}>Edit</Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-zinc-800 text-zinc-50">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the magnetic reed.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDeleteDevice(reed.gpio_pin_number, 'reed')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </CardFooter>
-            )}
-          </Card>
-        ))}
+        {isLoadingReeds ? (
+          <p className="text-zinc-300">Loading magnetic reeds...</p>
+        ) : magneticReeds.length === 0 ? (
+          <p className="text-zinc-300">No magnetic reeds found.</p>
+        ) : (
+          magneticReeds.map((reed) => (
+            <Card key={reed.gpio_pin_number} className="bg-zinc-800 border-zinc-700 flex flex-col">
+              <CardHeader>
+                <CardTitle className="text-zinc-50">{reed.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
+                <p className="text-zinc-300">Type: {reed.default_value_when_closed === "HIGH" ? "Normally Open" : "Normally Closed"}</p>
+                <p className="text-zinc-300 mt-8">Current Status: {reedStatuses[reed.gpio_pin_number] || 'Loading...'}</p>
+              </CardContent>
+              {canModifyDevices && (
+                <CardFooter className="flex flex-col mt-auto">
+                  <div className="flex w-full">
+                    <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(reed, 'reed')}>Edit</Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the magnetic reed.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteDevice(reed.gpio_pin_number, 'reed')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </CardFooter>
+              )}
+            </Card>
+          ))
+        )}
       </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">

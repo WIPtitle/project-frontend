@@ -185,26 +185,6 @@ export const createDeviceGroup = async (group: Omit<DeviceGroup, 'id' | 'status'
   }
 }
 
-export const updateDeviceGroup = async (id: number, updates: Partial<DeviceGroup>): Promise<DeviceGroup> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${getTokenOrThrow()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(updates),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to update device group');
-    }
-
-    return await response.json();
-  } catch (error) {
-    throw error;
-  }
-}
 
 export const deleteDeviceGroup = async (id: number): Promise<boolean> => {
   try {
@@ -220,6 +200,106 @@ export const deleteDeviceGroup = async (id: number): Promise<boolean> => {
     }
 
     return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+export const getDeviceGroupCameras = async (groupId: number): Promise<RTSPCamera[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch device group cameras');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const updateDeviceGroupCameras = async (groupId: number, cameraIps: string[]): Promise<RTSPCamera[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(cameraIps),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update device group cameras');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getDeviceGroupReeds = async (groupId: number): Promise<MagneticReed[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/reeds`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch device group reeds');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const updateDeviceGroupReeds = async (groupId: number, reedPins: number[]): Promise<MagneticReed[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/reeds`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(reedPins),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update device group reeds');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const updateDeviceGroup = async (id: number, group: DeviceGroup): Promise<DeviceGroup> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(group),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update device group');
+    }
+
+    return await response.json();
   } catch (error) {
     throw error;
   }
