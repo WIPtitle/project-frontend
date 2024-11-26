@@ -7,7 +7,7 @@ const getApiBaseUrl = () => {
   return '' // Fallback for server-side rendering
 }
 
-export const registerUser = async (email: string, password: string, pin: number): Promise<void> => {
+export const registerUser = async (email: string, password: string, pin: string): Promise<void> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/auth-service/users/first`, {
       method: 'POST',

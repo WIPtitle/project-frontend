@@ -36,7 +36,7 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
       let token: string
 
       if (isFirstTimeUser) {
-        await registerUser(email, password, parseInt(pin))
+        await registerUser(email, password, pin)
         token = await loginAndSetToken(email, password, rememberMe)
       } else {
         token = await loginAndSetToken(email, password, rememberMe)

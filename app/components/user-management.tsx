@@ -94,53 +94,61 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   }
 
   const handleSaveUser = async (updatedUser: User) => {
-    setValidationError(null)
-    setPinError(null)
+    setValidationError(null);
+    setPinError(null);
 
-    const isNewUser = updatedUser.id === 0
+    const isNewUser = updatedUser.id === 0;
 
-    if (isNewUser && !updatedUser.password) {
-      setValidationError("Password is required for new users")
-      return
+    if (isNewUser) {
+      if (!updatedUser.password) {
+        setValidationError("Password is required for new users");
+        return;
+      }
+      if (!updatedUser.pin) {
+        setValidationError("PIN is required for new users");
+        return;
+      }
     }
 
     if (updatedUser.password && updatedUser.password.length < 5) {
-      setValidationError("Password must be at least 5 characters long")
-      return
+      setValidationError("Password must be at least 5 characters long");
+      return;
     }
 
-    if (isNewUser && updatedUser.password !== confirmPassword) {
-      setValidationError("Passwords do not match")
-      return
-    }
-
-    if (isNewUser && !updatedUser.pin) {
-      setValidationError("PIN is required for new users")
-      return
+    // Add this check for both new users and password updates
+    if (updatedUser.password && updatedUser.password !== confirmPassword) {
+      setValidationError("Passwords do not match");
+      return;
     }
 
     if (updatedUser.pin && (updatedUser.pin.length < 4 || updatedUser.pin.length > 8)) {
-      setValidationError("PIN must be between 4 and 8 digits")
-      return
+      setValidationError("PIN must be between 4 and 8 digits");
+      return;
     }
 
     try {
+      const userToSave = {
+        ...updatedUser,
+        password: updatedUser.password || "", // Send empty string if password is not provided
+        pin: updatedUser.pin || "", // Send empty string if PIN is not provided
+      };
+
       if (isNewUser) {
-        const newUser = await createUser(updatedUser)
-        setUsers([...users, newUser])
+        const newUser = await createUser(userToSave);
+        setUsers([...users, newUser]);
       } else {
-        const updatedUserResponse = await updateUser(updatedUser.id, updatedUser)
-        setUsers(users.map(user => user.id === updatedUserResponse.id ? updatedUserResponse : user))
+        const updatedUserResponse = await updateUser(updatedUser.id, userToSave);
+        setUsers(users.map(user => user.id === updatedUserResponse.id ? updatedUserResponse : user));
         if (currentUser && updatedUser.id === currentUser.id) {
-          onUserUpdate(updatedUserResponse)
+          onUserUpdate(updatedUserResponse);
         }
       }
-      setIsDialogOpen(false)
-      setConfirmPassword("")
-      setValidationError(null)
-      setPinError(null)
+      setIsDialogOpen(false);
+      setConfirmPassword("");
+      setValidationError(null);
+      setPinError(null);
     } catch (error) {
-      setErrorMessage("Failed to save user")
+      setErrorMessage("Failed to save user");
     }
   }
 
@@ -238,15 +246,16 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
               />
               <Input
-                type="password"
-                placeholder={editingUser?.id ? "New Password (optional)" : "Password"}
-                value={editingUser?.password || ""}
-                onChange={(e) => {
-                  const newPassword = e.target.value;
-                  setEditingUser(prev => prev ? {...prev, password: newPassword} : null);
-                }}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
+                  type="password"
+                  placeholder={editingUser?.id ? "New Password (optional)" : "Password"}
+                  value={editingUser?.password || ""}
+                  onChange={(e) => {
+                    const newPassword = e.target.value;
+                    setEditingUser(prev => prev ? {...prev, password: newPassword} : null);
+                  }}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  required={!editingUser?.id}
+                />
               {(!editingUser?.id || editingUser?.password) && (
                 <Input
                   type="password"
@@ -257,17 +266,18 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
                 />
               )}
               <Input
-                type="text"
-                placeholder={editingUser?.id ? "PIN (4-8 digits, optional)" : "PIN (4-8 digits)"}
-                value={editingUser?.pin || ""}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '')
-                  if (value.length > 8) return
-                  setEditingUser(prev => prev ? {...prev, pin: value} : null)
-                  setPinError(null)
-                }}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              />
+                  type="text"
+                  placeholder={editingUser?.id ? "PIN (4-8 digits, optional)" : "PIN (4-8 digits)"}
+                  value={editingUser?.pin || ""}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '')
+                    if (value.length > 8) return
+                    setEditingUser(prev => prev ? {...prev, pin: value} : null)
+                    setPinError(null)
+                  }}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  required={!editingUser?.id}
+                />
               {pinError && <p className="text-red-500">{pinError}</p>}
               <div>
                 <h3 className="mb-2 font-semibold text-zinc-300">Permissions</h3>
