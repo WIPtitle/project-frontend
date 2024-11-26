@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getAlarmGroups, createAlarmGroup, updateAlarmGroup, deleteAlarmGroup, getAllDevices, activateAlarm, deactivateAlarm } from "@/lib/api"
-import { AlarmGroup, Device, Permission } from "@/types"
+import { getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds } from "@/lib/api"
+import { DeviceGroup, RTSPCamera, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
 
 type AlarmProps = {
   permissions: Permission[]
@@ -18,28 +18,35 @@ type DeviceGroupInputDto = {
   name: string;
   wait_to_start_alarm: number;
   wait_to_fire_alarm: number;
-  devices: number[];
+  cameras: RTSPCamera[];
+  reeds: MagneticReed[];
 }
 
 export default function Alarm({ permissions }: AlarmProps) {
-  const [alarmGroups, setAlarmGroups] = useState<AlarmGroup[]>([])
-  const [allDevices, setAllDevices] = useState<Device[]>([])
+  const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[] | null>(null)
+  const [allCameras, setAllCameras] = useState<RTSPCamera[]>([])
+  const [allReeds, setAllReeds] = useState<MagneticReed[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingGroup, setEditingGroup] = useState<AlarmGroup | null>(null)
+  const [editingGroup, setEditingGroup] = useState<DeviceGroupInputDto | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  const canActivateAlarm = permissions.includes(Permission.START_ALARM)
-  const canDeactivateAlarm = permissions.includes(Permission.STOP_ALARM)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
-        const groups = await getAlarmGroups()
-        setAlarmGroups(groups)
-        const devices = await getAllDevices()
-        setAllDevices(devices)
+        const groups = await getDeviceGroups()
+        setDeviceGroups(groups)
+        const cameras = await getAllRtspCameras()
+        setAllCameras(cameras)
+        const reeds = await getAllMagneticReeds()
+        setAllReeds(reeds)
       } catch (error) {
-        setErrorMessage("Failed to fetch alarm groups and devices")
+        console.error("Failed to fetch data:", error);
+        setErrorMessage("Failed to fetch device groups, cameras, and reeds. Please try again later.");
+        setDeviceGroups([]);
+      } finally {
+        setIsLoading(false);
       }
     }
     fetchData()
@@ -47,64 +54,61 @@ export default function Alarm({ permissions }: AlarmProps) {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteAlarmGroup(id)
-      setAlarmGroups(alarmGroups.filter(group => group.id !== id))
+      await deleteDeviceGroup(id)
+      setDeviceGroups(prevGroups => prevGroups?.filter(group => group.id !== id) || [])
     } catch (error) {
-      setErrorMessage("Failed to delete alarm group")
-    }
-  }
-
-  const handleActivate = async (id: number) => {
-    try {
-      const group = alarmGroups.find(g => g.id === id)
-      if (!group) return
-
-      if (group.isActive && !canDeactivateAlarm) {
-         setErrorMessage("You do not have the required permission to deactivate an alarm")
-         return;
-      }
-
-      if (!group.isActive && !canActivateAlarm) {
-         setErrorMessage("You do not have the required permission to activate an alarm")
-         return;
-      }
-
-      const updatedGroup = group.isActive
-        ? await deactivateAlarm(id)
-        : await activateAlarm(id)
-
-      setAlarmGroups(alarmGroups.map(g =>
-        g.id === id ? updatedGroup : g
-      ))
-    } catch (error) {
-      setErrorMessage("Failed to activate/deactivate alarm")
+      setErrorMessage("Failed to delete device group")
     }
   }
 
   const handleAddGroup = () => {
-    setEditingGroup({ id: 0, name: "", devices: [], isActive: false })
+    setEditingGroup({ name: "", wait_to_start_alarm: 0, wait_to_fire_alarm: 0, cameras: [], reeds: [] })
     setIsDialogOpen(true)
   }
 
-  const handleEditGroup = (group: AlarmGroup) => {
-    setEditingGroup(group)
+  const handleEditGroup = (group: DeviceGroup) => {
+    setEditingGroup({
+      name: group.name,
+      wait_to_start_alarm: group.wait_to_start_alarm,
+      wait_to_fire_alarm: group.wait_to_fire_alarm,
+      cameras: group.cameras,
+      reeds: group.reeds
+    })
     setIsDialogOpen(true)
   }
 
-  const handleSaveGroup = async (updatedGroup: AlarmGroup) => {
+  const handleSaveGroup = async (updatedGroup: DeviceGroupInputDto) => {
     try {
-      if (updatedGroup.id === 0) {
-        const newGroup = await createAlarmGroup(updatedGroup)
-        setAlarmGroups([...alarmGroups, newGroup])
-      } else {
-        const updatedGroupResponse = await updateAlarmGroup(updatedGroup.id, updatedGroup)
-        setAlarmGroups(alarmGroups.map(group => group.id === updatedGroupResponse.id ? updatedGroupResponse : group))
+      if (editingGroup) {
+        const groupId = deviceGroups?.find(g => g.name === editingGroup.name)?.id
+        if (groupId) {
+          const updatedGroupResponse = await updateDeviceGroup(groupId, updatedGroup)
+          setDeviceGroups(prevGroups => prevGroups?.map(group => group.id === updatedGroupResponse.id ? updatedGroupResponse : group) || [])
+        } else {
+          const newGroup = await createDeviceGroup(updatedGroup)
+          setDeviceGroups(prevGroups => [...(prevGroups || []), newGroup])
+        }
       }
       setIsDialogOpen(false)
     } catch (error) {
-      setErrorMessage("Failed to save alarm group")
+      setErrorMessage("Failed to save device group")
     }
   }
+
+  const getStatusColor = (status: DeviceGroupStatus) => {
+    switch (status) {
+      case DeviceGroupStatus.LISTENING:
+        return "text-green-500";
+      case DeviceGroupStatus.IDLE:
+        return "text-yellow-500";
+      case DeviceGroupStatus.ALARM:
+        return "text-red-500";
+      case DeviceGroupStatus.WAITING_TO_START_LISTENING:
+        return "text-blue-500";
+      default:
+        return "text-zinc-300";
+    }
+  };
 
   return (
     <div>
@@ -118,11 +122,11 @@ export default function Alarm({ permissions }: AlarmProps) {
                 onClick={() => handleAddGroup()}
               >
                 Add group
-          </Button>
+            </Button>
           </DialogTrigger>
           <DialogContent className="bg-zinc-800 text-zinc-50">
             <DialogHeader>
-              <DialogTitle>{editingGroup?.id ? "Edit group" : "Add group"}</DialogTitle>
+              <DialogTitle>{editingGroup?.name ? "Edit group" : "Add group"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={(e) => {
               e.preventDefault()
@@ -137,46 +141,97 @@ export default function Alarm({ permissions }: AlarmProps) {
                   onChange={(e) => setEditingGroup(prev => prev ? {...prev, name: e.target.value} : null)}
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
+                <Input
+                  type="number"
+                  placeholder="Wait to start alarm (seconds)"
+                  value={editingGroup?.wait_to_start_alarm || ""}
+                  onChange={(e) => setEditingGroup(prev => prev ? {...prev, wait_to_start_alarm: parseInt(e.target.value)} : null)}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                />
+                <Input
+                  type="number"
+                  placeholder="Wait to fire alarm (seconds)"
+                  value={editingGroup?.wait_to_fire_alarm || ""}
+                  onChange={(e) => setEditingGroup(prev => prev ? {...prev, wait_to_fire_alarm: parseInt(e.target.value)} : null)}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                />
                 <div>
-                  <h3 className="mb-2 font-semibold text-zinc-300">Devices</h3>
-                  {allDevices.map(device => (
-                    <div key={device.id} className="flex items-center space-x-2">
+                  <h3 className="mb-2 font-semibold text-zinc-300">Cameras</h3>
+                  {allCameras.map(camera => (
+                    <div key={camera.id} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`device-${device.id}`}
-                        checked={editingGroup?.devices.some(d => d.id === device.id)}
+                        id={`camera-${camera.id}`}
+                        checked={editingGroup?.cameras.some(c => c.id === camera.id)}
                         onCheckedChange={(checked) => {
                           setEditingGroup(prev => {
                             if (!prev) return null
-                            const newDevices = checked
-                              ? [...prev.devices, device]
-                              : prev.devices.filter(d => d.id !== device.id)
-                            return {...prev, devices: newDevices}
+                            const newCameras = checked
+                              ? [...prev.cameras, camera]
+                              : prev.cameras.filter(c => c.id !== camera.id)
+                            return {...prev, cameras: newCameras}
                           })
                         }}
                         className="border-zinc-500"
                       />
-                      <label htmlFor={`device-${device.id}`} className="text-zinc-300">{device.name}</label>
+                      <label htmlFor={`camera-${camera.id}`} className="text-zinc-300">{camera.name}</label>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <h3 className="mb-2 font-semibold text-zinc-300">Reeds</h3>
+                  {allReeds.map(reed => (
+                    <div key={reed.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`reed-${reed.id}`}
+                        checked={editingGroup?.reeds.some(r => r.id === reed.id)}
+                        onCheckedChange={(checked) => {
+                          setEditingGroup(prev => {
+                            if (!prev) return null
+                            const newReeds = checked
+                              ? [...prev.reeds, reed]
+                              : prev.reeds.filter(r => r.id !== reed.id)
+                            return {...prev, reeds: newReeds}
+                          })
+                        }}
+                        className="border-zinc-500"
+                      />
+                      <label htmlFor={`reed-${reed.id}`} className="text-zinc-300">{reed.name}</label>
                     </div>
                   ))}
                 </div>
                 <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                  {editingGroup?.id ? "Update" : "Create"}
+                  {editingGroup?.name ? "Update" : "Create"}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {alarmGroups.map((group) => (
+      {isLoading ? (
+  <p>Loading device groups...</p>
+) : deviceGroups === null || deviceGroups.length === 0 ? (
+  <p>No device groups found.</p>
+) : (
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {deviceGroups.map((group) => (
           <Card key={group.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardHeader>
               <CardTitle className="text-zinc-50">{group.name}</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
+              <p className={`${getStatusColor(group.status)} font-semibold`}>Status: {group.status}</p>
+              <p className="text-zinc-300">Wait to start alarm: {group.wait_to_start_alarm}s</p>
+              <p className="text-zinc-300">Wait to fire alarm: {group.wait_to_fire_alarm}s</p>
+              <h3 className="mt-2 font-semibold text-zinc-300">Cameras:</h3>
               <ul className="list-disc pl-5 text-zinc-300">
-                {group.devices && group.devices.map((device) => (
-                  <li key={device.id}>{device.name}</li>
+                {group.cameras.map((camera) => (
+                  <li key={camera.id}>{camera.name}</li>
+                ))}
+              </ul>
+              <h3 className="mt-2 font-semibold text-zinc-300">Reeds:</h3>
+              <ul className="list-disc pl-5 text-zinc-300">
+                {group.reeds.map((reed) => (
+                  <li key={reed.id}>{reed.name}</li>
                 ))}
               </ul>
             </CardContent>
@@ -191,7 +246,7 @@ export default function Alarm({ permissions }: AlarmProps) {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the alarm group.
+                        This action cannot be undone. This will permanently delete the device group.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -201,19 +256,11 @@ export default function Alarm({ permissions }: AlarmProps) {
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-              <div className="w-full pt-4 mt-2 border-t-2 border-zinc-700">
-                <Button
-                  onClick={() => handleActivate(group.id)}
-                  variant={group.isActive ? "default" : "outline"}
-                  className={`w-full ${group.isActive ? 'bg-yellow-700 hover:bg-yellow-600 text-white' : 'bg-white text-black hover:bg-zinc-200'}`}
-                >
-                  {group.isActive ? "Deactivate alarm" : "Activate alarm"}
-                </Button>
-              </div>
             </CardFooter>
           </Card>
         ))}
-      </div>
+  </div>
+)}
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
         <AlertDialogContent className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>
@@ -228,3 +275,4 @@ export default function Alarm({ permissions }: AlarmProps) {
     </div>
   )
 }
+

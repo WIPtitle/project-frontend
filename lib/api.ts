@@ -1,4 +1,4 @@
-import { NtfyCredentials, User, AlarmGroup, Device, Permission, MagneticReed, RTSPCamera, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
+import { NtfyCredentials, User, DeviceGroup, Permission, MagneticReed, RTSPCamera, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
 
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
@@ -13,7 +13,7 @@ export const registerUser = async (email: string, password: string, pin: string)
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        
+
       },
       body: JSON.stringify({
         email,
@@ -87,7 +87,7 @@ export const getUserMyself = async (): Promise<User> => {
     const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/user`, {
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
-        
+
       },
     })
 
@@ -106,7 +106,7 @@ export const getPermissions = async (): Promise<Permission[]> => {
     const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/permissions`, {
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
-        
+
       },
     })
 
@@ -131,7 +131,7 @@ export const isFirstUser = async (): Promise<boolean> => {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        
+
       },
     });
 
@@ -146,63 +146,85 @@ export const isFirstUser = async (): Promise<boolean> => {
   }
 };
 
-export const getAllDevices = async (): Promise<Device[]> => {
-  return [
-    { id: 1, name: "Front Door Sensor" },
-    { id: 2, name: "Living Room Motion Detector" },
-    { id: 3, name: "Main Entrance Sensor" },
-    { id: 4, name: "Server Room Sensor" },
-    { id: 5, name: "Window Sensor" },
-    { id: 6, name: "Garage Door Sensor" },
-  ]
+export const getDeviceGroups = async (): Promise<DeviceGroup[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch device groups');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const getAlarmGroups = async (): Promise<AlarmGroup[]> => {
-  const devices = await getAllDevices()
-  return [
-    { 
-      id: 1, 
-      name: "Home Alarm", 
-      devices: [devices[0], devices[1], devices[4]], 
-      isActive: false 
-    },
-    { 
-      id: 2, 
-      name: "Office Alarm", 
-      devices: [devices[2], devices[3]], 
-      isActive: false 
-    },
-  ]
+export const createDeviceGroup = async (group: Omit<DeviceGroup, 'id' | 'status'>): Promise<DeviceGroup> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(group),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create device group');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const createAlarmGroup = async (group: Omit<AlarmGroup, 'id'>): Promise<AlarmGroup> => {
-  return { ...group, id: Date.now() }
+export const updateDeviceGroup = async (id: number, updates: Partial<DeviceGroup>): Promise<DeviceGroup> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update device group');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const updateAlarmGroup = async (id: number, updates: Partial<AlarmGroup>): Promise<AlarmGroup> => {
-  const groups = await getAlarmGroups()
-  const updatedGroup = groups.find(g => g.id === id)
-  if (!updatedGroup) throw new Error('Group not found')
-  return { ...updatedGroup, ...updates }
+export const deleteDeviceGroup = async (id: number): Promise<boolean> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete device group');
+    }
+
+    return true;
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const deleteAlarmGroup = async (id: number): Promise<boolean> => {
-  return true
-}
-
-export const activateAlarm = async (id: number): Promise<AlarmGroup> => {
-  const groups = await getAlarmGroups()
-  const updatedGroup = groups.find(g => g.id === id)
-  if (!updatedGroup) throw new Error('Group not found')
-  return { ...updatedGroup, isActive: true }
-}
-
-export const deactivateAlarm = async (id: number): Promise<AlarmGroup> => {
-  const groups = await getAlarmGroups()
-  const updatedGroup = groups.find(g => g.id === id)
-  if (!updatedGroup) throw new Error('Group not found')
-  return { ...updatedGroup, isActive: false }
-}
 
 export const getAllUsers = async (): Promise<User[]> => {
   try {

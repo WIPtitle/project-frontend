@@ -1,13 +1,18 @@
-export type Device = {
-    id: number;
-    name: string;
-};
+export enum DeviceGroupStatus {
+    LISTENING = "LISTENING",
+    IDLE = "IDLE",
+    ALARM = "ALARM",
+    WAITING_TO_START_LISTENING = "WAITING_TO_START_LISTENING"
+}
 
-export type AlarmGroup = {
+export type DeviceGroup = {
     id: number;
     name: string;
-    devices: Device[];
-    isActive: boolean;
+    wait_to_start_alarm: number;
+    wait_to_fire_alarm: number;
+    status: DeviceGroupStatus;
+    cameras: RTSPCamera[];
+    reeds: MagneticReed[];
 };
 
 export enum Permission {
@@ -27,17 +32,6 @@ export interface User {
   password?: string
   pin?: string
   permissions: Permission[]
-}
-
-export interface RTSPCamera {
-    id: number;
-    name: string;
-    ip: string;
-    port: number;
-    username: string;
-    password: string;
-    path: string;
-    sensibility: number;
 }
 
 export interface MagneticReed {
@@ -75,3 +69,15 @@ export interface NtfyCredentials {
   password: string;
   topic: string;
 }
+
+export interface RTSPCamera {
+    id: number;
+    name: string;
+    ip: string;
+    port: number;
+    username: string;
+    password: string;
+    path: string;
+    sensibility: number;
+}
+
