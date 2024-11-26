@@ -57,10 +57,9 @@ async function startEventSource() {
 
     try {
         const response = await fetch(completeUrl, { headers });
-
-        if (!response.ok) {
-            console.error('Failed to connect to ntfy');
-            setTimeout(startEventSource, 5000);
+        if (response.status !== 200) {
+            console.error('Failed to connect to ntfy, status code:', response.status);
+            setTimeout(startEventSource, 30000);
             return;
         }
 
@@ -92,7 +91,7 @@ async function startEventSource() {
     } catch (error) {
         console.error('Error while listening to events:', error);
     } finally {
-        setTimeout(startEventSource, 5000);
+        setTimeout(startEventSource, 30000);
     }
 }
 

@@ -94,24 +94,38 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   }
 
   const handleSaveUser = async (updatedUser: User) => {
-    if (updatedUser.password !== "" && updatedUser.password !== confirmPassword) {
+    setValidationError(null)
+    setPinError(null)
+
+    const isNewUser = updatedUser.id === 0
+
+    if (isNewUser && !updatedUser.password) {
+      setValidationError("Password is required for new users")
+      return
+    }
+
+    if (updatedUser.password && updatedUser.password.length < 5) {
+      setValidationError("Password must be at least 5 characters long")
+      return
+    }
+
+    if (isNewUser && updatedUser.password !== confirmPassword) {
       setValidationError("Passwords do not match")
       return
     }
 
-    if (updatedUser.pin === undefined || updatedUser.pin === null) {
-      setValidationError("PIN is required")
+    if (isNewUser && !updatedUser.pin) {
+      setValidationError("PIN is required for new users")
       return
     }
 
-    const pinLength = updatedUser.pin.toString().length
-    if (pinLength < 4 || pinLength > 8) {
+    if (updatedUser.pin && (updatedUser.pin.length < 4 || updatedUser.pin.length > 8)) {
       setValidationError("PIN must be between 4 and 8 digits")
       return
     }
 
     try {
-      if (updatedUser.id === 0) {
+      if (isNewUser) {
         const newUser = await createUser(updatedUser)
         setUsers([...users, newUser])
       } else {
@@ -225,18 +239,15 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
               />
               <Input
                 type="password"
-                placeholder="New Password"
+                placeholder={editingUser?.id ? "New Password (optional)" : "Password"}
                 value={editingUser?.password || ""}
                 onChange={(e) => {
                   const newPassword = e.target.value;
                   setEditingUser(prev => prev ? {...prev, password: newPassword} : null);
-                  if (newPassword === "") {
-                    setConfirmPassword("");
-                  }
                 }}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
               />
-              {editingUser?.password && (
+              {(!editingUser?.id || editingUser?.password) && (
                 <Input
                   type="password"
                   placeholder="Confirm Password"
@@ -247,17 +258,13 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
               )}
               <Input
                 type="text"
-                placeholder="PIN (4-8 digits)"
-                value={editingUser?.pin?.toString() || ""}
+                placeholder={editingUser?.id ? "PIN (4-8 digits, optional)" : "PIN (4-8 digits)"}
+                value={editingUser?.pin || ""}
                 onChange={(e) => {
                   const value = e.target.value.replace(/\D/g, '')
                   if (value.length > 8) return
-                  if (/^\d*$/.test(value)) {
-                    setEditingUser(prev => prev ? {...prev, pin: value ? parseInt(value) : undefined} : null)
-                    setPinError(null)
-                  } else {
-                    setPinError("PIN must contain only numbers")
-                  }
+                  setEditingUser(prev => prev ? {...prev, pin: value} : null)
+                  setPinError(null)
                 }}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
               />
