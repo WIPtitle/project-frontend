@@ -43,7 +43,6 @@ export default function TabLayout() {
           setIsLoading(false)
         })
         .catch((error) => {
-          console.error(error)
           // Token is invalid or expired
           handleLogout()
           setIsLoading(false)
@@ -107,23 +106,8 @@ export default function TabLayout() {
     try {
       const user = await getUserMyself()
       setCurrentUser(user)
-      const sendNtfyCredentials = async () => {
-        try {
-          const ntfyCredentials = await getNtfyCredentials();
-          if (navigator.serviceWorker?.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'SET_NTFY_CREDENTIALS',
-              credentials: ntfyCredentials,
-              hostname: window.location.hostname,
-            });
-          }
-        } catch (error) {
-          console.error('Failed to send Ntfy credentials', error);
-        }
-      };
-      sendNtfyCredentials();
     } catch (error) {
-      console.error(error)
+      throw error
     }
   }
 
@@ -173,6 +157,7 @@ export default function TabLayout() {
           <div className="mb-4 border-b border-zinc-800">
             <div className="flex justify-between items-center mb-2">
               {isMenuCollapsed ? (
+              <div className="pl-4">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon">
@@ -188,19 +173,21 @@ export default function TabLayout() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
               ) : (
-                <TabsList ref={tabsRef} className="bg-transparent">
-                  {tabItems.map((item) => (
-                    <TabsTrigger
-                      key={item.value}
-                      value={item.value}
-                      className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50"
-                    >
-                      {item.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              )}
+              <TabsList ref={tabsRef} className="bg-transparent">
+                {tabItems.map((item) => (
+                  <TabsTrigger
+                    key={item.value}
+                    value={item.value}
+                    className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50"
+                  >
+                    {item.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            )}
+
               <div ref={userInfoRef} className="flex items-center space-x-2 pr-4">
                 <span className="text-zinc-400">{currentUser?.email}</span>
                 <Avatar>

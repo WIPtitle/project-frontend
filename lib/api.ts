@@ -28,7 +28,6 @@ export const registerUser = async (email: string, password: string, pin: string)
     }
 
   } catch (error) {
-    console.error('Error registering user:', error)
     throw error
   }
 }
@@ -56,7 +55,6 @@ export const loginAndSetToken = async (email: string, password: string, remember
       if (token !== null) {
         localStorage.setItem('token', token)
       } else {
-        console.error('Token is null, not setting in localStorage')
         throw new Error('Login failed: No access token received')
       }
       if (rememberMe) {
@@ -72,7 +70,6 @@ export const loginAndSetToken = async (email: string, password: string, remember
       throw new Error('Login failed: No access token received')
     }
   } catch (error) {
-    console.error('Error logging in:', error)
     throw error
   }
 }
@@ -100,7 +97,6 @@ export const getUserMyself = async (): Promise<User> => {
 
     return await response.json()
   } catch (error) {
-    console.error('Error fetching user data:', error)
     throw error
   }
 }
@@ -120,7 +116,6 @@ export const getPermissions = async (): Promise<Permission[]> => {
 
     return await response.json()
   } catch (error) {
-    console.error('Error fetching user permissions:', error)
     throw error
   }
 }
@@ -147,7 +142,6 @@ export const isFirstUser = async (): Promise<boolean> => {
     const data = await response.json();
     return !data.is_initialized;
   } catch (error) {
-    console.error('Error checking if first user:', error);
     throw new Error('Failed to fetch if first user');
   }
 };
@@ -226,7 +220,6 @@ export const getAllUsers = async (): Promise<User[]> => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error fetching users:', error);
     throw error;
   }
 };
@@ -248,7 +241,6 @@ export const createUser = async (user: Omit<User, 'id'>): Promise<User> => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error creating user:', error);
     throw error;
   }
 };
@@ -270,7 +262,6 @@ export const updateUser = async (id: number, updates: Partial<User>): Promise<Us
 
     return await response.json();
   } catch (error) {
-    console.error('Error updating user:', error);
     throw error;
   }
 };
@@ -290,7 +281,6 @@ export const deleteUser = async (id: number): Promise<boolean> => {
 
     return true;
   } catch (error) {
-    console.error('Error deleting user:', error);
     throw error;
   }
 };
@@ -382,7 +372,6 @@ export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
     const credentials: NtfyCredentials = await response.json();
     return credentials;
   } catch (error) {
-    console.error('Error fetching Ntfy credentials:', error);
     throw error;
   }
 }
@@ -403,7 +392,6 @@ export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
     const credentials: NtfyCredentials = await response.json();
     return credentials;
   } catch (error) {
-    console.error('Error updating Ntfy credentials:', error);
     throw error;
   }
 }
@@ -436,7 +424,6 @@ export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> =>
     const blob = await response.blob();
     return { audio: new File([blob], filename, { type: 'audio/mpeg' })}
   } catch (error) {
-    console.error(error);
     throw error;
   }
 }
@@ -463,7 +450,6 @@ export const createAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<
 
     return config // Return the original config as the API doesn't return the file
   } catch (error) {
-    console.error('Error creating alarm audio configuration:', error)
     throw error
   }
 }
@@ -486,7 +472,6 @@ export const deleteAlarmAudioConfig = async (): Promise<void> => {
       throw new Error('Failed to delete alarm audio configuration');
     }
   } catch (error) {
-    console.error('Error deleting alarm audio configuration:', error);
     throw error;
   }
 }

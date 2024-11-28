@@ -11,8 +11,10 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [pin, setPin] = useState("")
   const [pinError, setPinError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [rememberMe, setRememberMe] = useState(false)
   const [isFirstTimeUser, setIsFirstTimeUser] = useState<boolean | null>(null)
 
@@ -24,8 +26,17 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
     e.preventDefault()
     setErrorMessage(null)
     setPinError(null)
+    setPasswordError(null)
 
     if (isFirstTimeUser) {
+      if (password.length < 5) {
+        setPasswordError("Password must be at least 5 characters long")
+        return
+      }
+      if (password !== confirmPassword) {
+        setPasswordError("Passwords do not match")
+        return
+      }
       if (pin.length < 4 || pin.length > 8) {
         setPinError("PIN must be between 4 and 8 digits")
         return
@@ -40,8 +51,7 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
         token = await loginAndSetToken(email, password, rememberMe)
       } else {
         token = await loginAndSetToken(email, password, rememberMe)
-
-}
+      }
 
       onLogin(token)
     } catch (error) {
@@ -81,24 +91,35 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
             required
           />
           {isFirstTimeUser && (
-            <Input
-              type="text"
-              placeholder="PIN (4-8 digits)"
-              value={pin}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '')
-                if (value.length > 8) return
-                if (/^\d+$/.test(value) || value === '') {
-                  setPin(value)
-                  setPinError(null)
-                } else {
-                  setPinError("PIN must contain only numbers")
-                }
-              }}
-              className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
-              required
-            />
+            <>
+              <Input
+                type="password"
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
+                required
+              />
+              <Input
+                type="text"
+                placeholder="PIN"
+                value={pin}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  if (value.length > 8) return
+                  if (/^\d+$/.test(value) || value === '') {
+                    setPin(value)
+                    setPinError(null)
+                  } else {
+                    setPinError("PIN must contain only numbers")
+                  }
+                }}
+                className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
+                required
+              />
+            </>
           )}
+          {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
           {pinError && <p className="text-red-500 text-sm">{pinError}</p>}
           {!isFirstTimeUser && (
             <div className="flex items-center space-x-2">

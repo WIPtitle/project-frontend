@@ -49,13 +49,6 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     try {
       const updatedCredentials = await updateNtfyCredentials()
       setNtfyCredentials(updatedCredentials)
-      if (navigator.serviceWorker?.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'SET_NTFY_CREDENTIALS',
-          credentials: updatedCredentials,
-          hostname: window.location.hostname,
-        });
-      }
     } catch (error) {
       setErrorMessage("Failed to refresh notifications configuration")
     }
@@ -119,6 +112,15 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             <CardContent className="flex-grow space-y-4">
               {ntfyCredentials ? (
                 <>
+                  <div className="space-y-2">
+                    <Label htmlFor="url" className="text-sm font-medium text-zinc-300">URL</Label>
+                    <Input
+                      id="url"
+                      value={`http://${window.location.hostname}:8080`}
+                      readOnly
+                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="user" className="text-sm font-medium text-zinc-300">User</Label>
                     <Input

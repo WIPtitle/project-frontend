@@ -247,7 +247,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
               />
               <Input
                   type="password"
-                  placeholder={editingUser?.id ? "New Password (optional)" : "Password"}
+                  placeholder={editingUser?.id ? "New password" : "Password"}
                   value={editingUser?.password || ""}
                   onChange={(e) => {
                     const newPassword = e.target.value;
@@ -267,7 +267,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
               )}
               <Input
                   type="text"
-                  placeholder={editingUser?.id ? "PIN (4-8 digits, optional)" : "PIN (4-8 digits)"}
+                  placeholder={editingUser?.id ? "New PIN" : "PIN"}
                   value={editingUser?.pin || ""}
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, '')
