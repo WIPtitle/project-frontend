@@ -120,7 +120,7 @@ export default function Component({ permissions }: DeviceProps) {
             className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
             onClick={() => handleAddDevice('camera')}
           >
-            Add Camera
+            Add camera
           </Button>
         )}
       </div>
@@ -178,7 +178,7 @@ export default function Component({ permissions }: DeviceProps) {
             className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
             onClick={() => handleAddDevice('reed')}
           >
-            Add Reed
+            Add reed
           </Button>
         )}
       </div>

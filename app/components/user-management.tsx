@@ -26,14 +26,14 @@ type UserManagementProps = {
 }
 
 const permissionDisplayMap: Record<Permission, string> = {
-  [Permission.USER_MANAGER]: "User Manager",
-  [Permission.START_ALARM]: "Start Alarm",
-  [Permission.STOP_ALARM]: "Stop Alarm",
-  [Permission.ACCESS_RECORDINGS]: "Access Recordings",
-  [Permission.ACCESS_STREAM_CAMERAS]: "Access Stream Cameras",
-  [Permission.CHANGE_ALARM_SOUND]: "Change Alarm Sound",
-  [Permission.UPDATE_NOTIFICATIONS_CONFIG]: "Update NTFY Configuration",
-  [Permission.MODIFY_DEVICES]: "Modify Devices"
+  [Permission.USER_MANAGER]: "User manager",
+  [Permission.START_ALARM]: "Start alarm",
+  [Permission.STOP_ALARM]: "Stop alarm",
+  [Permission.ACCESS_RECORDINGS]: "Access recordings",
+  [Permission.ACCESS_STREAM_CAMERAS]: "Access stream cameras",
+  [Permission.CHANGE_ALARM_SOUND]: "Change alarm sound",
+  [Permission.UPDATE_NOTIFICATIONS_CONFIG]: "Update NTFY configuration",
+  [Permission.MODIFY_DEVICES]: "Modify devices"
 }
 
 export default function UserManagement({ onUserUpdate, currentUser, permissions }: UserManagementProps) {
@@ -246,7 +246,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
-            <DialogTitle>{editingUser?.id ? "Update" : "Add"} User</DialogTitle>
+            <DialogTitle>{editingUser?.id ? "Update" : "Add"} user</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault()

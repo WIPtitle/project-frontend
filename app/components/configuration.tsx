@@ -159,7 +159,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                 className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full"
                 onClick={handleRefreshNotificationsConfig}
               >
-                Refresh Configuration
+                Refresh configuration
               </Button>
             </CardFooter>
           </Card>

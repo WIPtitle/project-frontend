@@ -102,7 +102,7 @@ export default function Alarm({ permissions }: AlarmProps) {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
-        <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Alarm Dashboard</h1>
+        <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Alarm dashboard</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
@@ -115,7 +115,7 @@ export default function Alarm({ permissions }: AlarmProps) {
           </DialogTrigger>
           <DialogContent className="bg-zinc-800 text-zinc-50">
             <DialogHeader>
-              <DialogTitle>{editingGroup?.id ? "Edit Group" : "Add Group"}</DialogTitle>
+              <DialogTitle>{editingGroup?.id ? "Edit group" : "Add group"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={(e) => {
               e.preventDefault()
@@ -125,7 +125,7 @@ export default function Alarm({ permissions }: AlarmProps) {
             }}>
               <div className="space-y-4">
                 <Input
-                  placeholder="Group Name"
+                  placeholder="Group name"
                   value={editingGroup?.name || ""}
                   onChange={(e) => setEditingGroup(prev => prev ? {...prev, name: e.target.value} : null)}
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
@@ -200,7 +200,7 @@ export default function Alarm({ permissions }: AlarmProps) {
                   variant={group.isActive ? "default" : "outline"}
                   className={`w-full ${group.isActive ? 'bg-yellow-700 hover:bg-yellow-600 text-white' : 'bg-white text-black hover:bg-zinc-200'}`}
                 >
-                  {group.isActive ? "Deactivate Alarm" : "Activate Alarm"}
+                  {group.isActive ? "Deactivate alarm" : "Activate alarm"}
                 </Button>
               </div>
             </CardFooter>
