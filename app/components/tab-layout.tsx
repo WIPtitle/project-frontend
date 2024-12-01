@@ -152,7 +152,7 @@ export default function TabLayout() {
 
   return (
     <div className="min-h-screen bg-zinc-800 rounded-md p-4 bg-zinc-900 text-zinc-50">
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto py-4 px-0 sm:px-4">
         <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
           <div className="mb-4 border-b border-zinc-800">
             <div className="flex justify-between items-center mb-2">

@@ -101,11 +101,17 @@ export default function Alarm({ permissions }: AlarmProps) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-zinc-50">Alarm Dashboard</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+        <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Alarm Dashboard</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleAddGroup}>Add Group</Button>
+            <Button
+                variant="outline"
+                className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                onClick={() => handleAddGroup()}
+              >
+                Add group
+          </Button>
           </DialogTrigger>
           <DialogContent className="bg-zinc-800 text-zinc-50">
             <DialogHeader>

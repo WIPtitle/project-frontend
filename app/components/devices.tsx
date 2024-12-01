@@ -112,12 +112,16 @@ export default function Component({ permissions }: DeviceProps) {
     <div>
       <h1 className="text-3xl font-bold text-zinc-50 mb-4">Devices</h1>
 
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-2xl font-bold text-zinc-50">RTSP cameras</h2>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+        <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">RTSP cameras</h2>
         {canModifyDevices && (
-          <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleAddDevice('camera')}>Add Camera</Button>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            onClick={() => handleAddDevice('camera')}
+          >
+            Add Camera
+          </Button>
         )}
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
@@ -166,12 +170,16 @@ export default function Component({ permissions }: DeviceProps) {
         ))}
       </div>
 
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-2xl font-bold text-zinc-50">Magnetic reeds</h2>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+        <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">Magnetic reeds</h2>
         {canModifyDevices && (
-          <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleAddDevice('reed')}>Add Reed</Button>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            onClick={() => handleAddDevice('reed')}
+          >
+            Add Reed
+          </Button>
         )}
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

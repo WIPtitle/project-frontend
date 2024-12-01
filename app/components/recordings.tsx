@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { getAllRecordings, getCamera, deleteRecording, getStorageInfo } from "@/lib/api"
 import { Recording, Camera, StorageInfo, Permission } from "@/types"
-import { FileVideo2 } from "lucide-react"
+import { FileVideo2 } from 'lucide-react'
 
 type RecordingsProps = {
   permissions: Permission[]
@@ -64,8 +64,8 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-zinc-50">Recordings</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+        <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Recordings</h1>
         {storageInfo && (
           <p className="text-zinc-300">
             Space left: {formatBytes(storageInfo.free_space, 2)} / {formatBytes(storageInfo.total_space, 0)}
@@ -136,3 +136,4 @@ export default function Recordings({ permissions }: RecordingsProps) {
     </div>
   )
 }
+
