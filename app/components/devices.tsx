@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStreamUrl } from "@/lib/api"
+import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStreamUrl, getTokenOrThrow } from "@/lib/api"
 import { RTSPCamera, MagneticReed, Permission } from "@/types"
 
 type DeviceProps = {
@@ -155,7 +155,7 @@ export default function Component({ permissions }: DeviceProps) {
             <CardContent className="flex-grow">
               {canAccessStreamCameras ? (
                 <img
-                    src={getRTSPCameraStreamUrl(camera.ip)}
+                    src={`${getRTSPCameraStreamUrl(camera.ip)}?auth_token=${getTokenOrThrow()}`}
                     className="w-full h-auto object-cover"
                     alt="Camera Stream"
                 />

@@ -493,7 +493,7 @@ export const getRTSPCameraStatus = async (ip: string): Promise<string> => {
 }
 
 export const getRTSPCameraStreamUrl = (ip: string): string => {
-  return `http://localhost:8001/camera/${ip}/stream`;
+  return `${getApiBaseUrl()}/devices-manager-service/camera/${ip}/stream`;
 }
 
 export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
