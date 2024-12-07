@@ -297,63 +297,217 @@ const fakeRtspCameras: RTSPCamera[] = [
 
 // API functions
 export const getAllMagneticReeds = async (): Promise<MagneticReed[]> => {
-  return fakeMagneticReeds;
-}
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
 
-export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
-  return fakeRtspCameras;
+    if (!response.ok) {
+      throw new Error('Failed to fetch magnetic reeds');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
 export const createMagneticReed = async (reed: Omit<MagneticReed, 'id'>): Promise<MagneticReed> => {
-  const newReed: MagneticReed = { ...reed, id: Date.now() };
-  fakeMagneticReeds.push(newReed);
-  return newReed;
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(reed),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create magnetic reed');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const updateMagneticReed = async (id: number, updates: Partial<MagneticReed>): Promise<MagneticReed> => {
-  const index = fakeMagneticReeds.findIndex(reed => reed.id === id);
-  if (index === -1) throw new Error('Reed not found');
-  const updatedReed = { ...fakeMagneticReeds[index], ...updates };
-  fakeMagneticReeds[index] = updatedReed;
-  return updatedReed;
+export const updateMagneticReed = async (gpioNumber: number, updates: Partial<MagneticReed>): Promise<MagneticReed> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/${gpioNumber}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update magnetic reed');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const deleteMagneticReed = async (id: number): Promise<boolean> => {
-  const index = fakeMagneticReeds.findIndex(reed => reed.id === id);
-  if (index === -1) throw new Error('Reed not found');
-  fakeMagneticReeds.splice(index, 1);
-  return true;
+export const deleteMagneticReed = async (gpioNumber: number): Promise<boolean> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/${gpioNumber}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete magnetic reed');
+    }
+
+    return true;
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const getReedCurrentStatus = async (id: number): Promise<string> => {
-  // This is a mock implementation. In a real application, this would fetch the actual status from the device.
-  const statuses = ["OPEN", "CLOSED"];
-  return statuses[Math.floor(Math.random() * statuses.length)];
+export const getReedCurrentStatus = async (gpioNumber: number): Promise<string> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/${gpioNumber}/status`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get magnetic reed status');
+    }
+
+    const data = await response.json();
+    return data.status;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch RTSP cameras');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
 export const createRTSPCamera = async (camera: Omit<RTSPCamera, 'id'>): Promise<RTSPCamera> => {
-  // Simulate an error when creating a camera
-  if (Math.random() < 0.5) {
-    throw new Error("Failed to create camera. Please try again.");
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(camera),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create RTSP camera');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
   }
-  const newCamera: RTSPCamera = { ...camera, id: Date.now() };
-  fakeRtspCameras.push(newCamera);
-  return newCamera;
 }
 
-export const updateRTSPCamera = async (id: number, updates: Partial<RTSPCamera>): Promise<RTSPCamera> => {
-  const index = fakeRtspCameras.findIndex(camera => camera.id === id);
-  if (index === -1) throw new Error('Camera not found');
-  const updatedCamera = { ...fakeRtspCameras[index], ...updates };
-  fakeRtspCameras[index] = updatedCamera;
-  return updatedCamera;
+export const updateRTSPCamera = async (ip: string, updates: Partial<RTSPCamera>): Promise<RTSPCamera> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update RTSP camera');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
 }
 
-export const deleteRTSPCamera = async (id: number): Promise<boolean> => {
-  const index = fakeRtspCameras.findIndex(camera => camera.id === id);
-  if (index === -1) throw new Error('Camera not found');
-  fakeRtspCameras.splice(index, 1);
-  return true;
+export const deleteRTSPCamera = async (ip: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete RTSP camera');
+    }
+
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getRTSPCameraStatus = async (ip: string): Promise<string> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}/status`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get RTSP camera status');
+    }
+
+    const data = await response.json();
+    return data.status;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getRTSPCameraStream = async (ip: string): Promise<ReadableStream<Uint8Array>> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}/stream`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get RTSP camera stream');
+    }
+
+    return response.body as ReadableStream<Uint8Array>;
+  } catch (error) {
+    throw error;
+  }
 }
 
 export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
