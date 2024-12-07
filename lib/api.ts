@@ -492,22 +492,8 @@ export const getRTSPCameraStatus = async (ip: string): Promise<string> => {
   }
 }
 
-export const getRTSPCameraStream = async (ip: string): Promise<ReadableStream<Uint8Array>> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}/stream`, {
-      headers: {
-        'Authorization': `Bearer ${getTokenOrThrow()}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to get RTSP camera stream');
-    }
-
-    return response.body as ReadableStream<Uint8Array>;
-  } catch (error) {
-    throw error;
-  }
+export const getRTSPCameraStreamUrl = (ip: string): string => {
+  return `${getApiBaseUrl()}/devices-manager-service/camera/${ip}/stream`;
 }
 
 export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {

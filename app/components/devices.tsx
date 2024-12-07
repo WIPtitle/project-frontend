@@ -7,9 +7,8 @@ import { Input } from "@/components/ui/input"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStream } from "@/lib/api"
+import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStreamUrl } from "@/lib/api"
 import { RTSPCamera, MagneticReed, Permission } from "@/types"
-import { CameraStream } from './camera-stream';
 
 type DeviceProps = {
   permissions: Permission[]
@@ -155,7 +154,11 @@ export default function Component({ permissions }: DeviceProps) {
             </CardHeader>
             <CardContent className="flex-grow">
               {canAccessStreamCameras ? (
-                <CameraStream streamUrl={camera.ip} />
+                <img
+                    src={getRTSPCameraStreamUrl(camera.ip)}
+                    className="w-full h-full object-cover"
+                    alt="Camera Stream"
+                />
               ) : (
                 <div className="aspect-video bg-zinc-700 flex items-center justify-center text-zinc-400">
                   No access to camera stream
