@@ -140,7 +140,7 @@ export default function TabLayout() {
     return <Login onLogin={handleLogin} />
   }
 
-  const currentTab = pathname === "/" ? "alarm" : pathname.slice(1)
+  const currentTab = pathname === "/" ? "alarm" : pathname?.slice(1) || "alarm"
 
   const tabItems = [
     { value: "alarm", label: "Home alarm" },

@@ -156,7 +156,7 @@ export default function Component({ permissions }: DeviceProps) {
               {canAccessStreamCameras ? (
                 <img
                     src={getRTSPCameraStreamUrl(camera.ip)}
-                    className="w-full h-full object-cover"
+                    className="w-full h-auto object-cover"
                     alt="Camera Stream"
                 />
               ) : (
