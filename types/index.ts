@@ -3,11 +3,20 @@ export type Device = {
     name: string;
 };
 
-export type AlarmGroup = {
-    id: number;
-    name: string;
-    devices: Device[];
-    isActive: boolean;
+export enum DeviceGroupStatus {
+    LISTENING = "LISTENING",
+    IDLE = "IDLE",
+    ALARM = "ALARM",
+    WAITING_TO_START_LISTENING = "WAITING_TO_START_LISTENING"
+}
+
+export type DeviceGroup = {
+  id: number;
+  name: string;
+  wait_to_start_alarm: number;
+  wait_to_fire_alarm: number;
+  status: DeviceGroupStatus;
+  devices: Device[];
 };
 
 export enum Permission {

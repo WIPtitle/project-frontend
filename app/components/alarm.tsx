@@ -14,6 +14,13 @@ type AlarmProps = {
   permissions: Permission[]
 }
 
+type DeviceGroupInputDto {
+  name: string;
+  wait_to_start_alarm: number;
+  wait_to_fire_alarm: number;
+  devices: number[];
+}
+
 export default function Alarm({ permissions }: AlarmProps) {
   const [alarmGroups, setAlarmGroups] = useState<AlarmGroup[]>([])
   const [allDevices, setAllDevices] = useState<Device[]>([])
