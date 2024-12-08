@@ -14,7 +14,7 @@ type AlarmProps = {
   permissions: Permission[]
 }
 
-type DeviceGroupInputDto {
+type DeviceGroupInputDto = {
   name: string;
   wait_to_start_alarm: number;
   wait_to_fire_alarm: number;
