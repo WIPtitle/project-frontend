@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds } from "@/lib/api"
+import { getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
 import { DeviceGroup, RTSPCamera, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
 
 type AlarmProps = {
@@ -30,6 +30,12 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [groupReeds, setGroupReeds] = useState<{ [key: number]: MagneticReed[] }>({})
   const [selectedCameras, setSelectedCameras] = useState<RTSPCamera[]>([])
   const [selectedReeds, setSelectedReeds] = useState<MagneticReed[]>([])
+  const [isActivating, setIsActivating] = useState<{ [key: number]: boolean }>({})
+  const [isDeactivating, setIsDeactivating] = useState<{ [key: number]: boolean }>({})
+  const [pin, setPin] = useState<string>("")
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
+  const [isForceListening, setIsForceListening] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -164,6 +170,70 @@ export default function Alarm({ permissions }: AlarmProps) {
         return "text-zinc-300";
     }
   };
+
+  const handleActivateAlarm = useCallback(async (groupId: number) => {
+    setIsActivating(prev => ({ ...prev, [groupId]: true }))
+    try {
+      const success = await startListening(groupId, pin, isForceListening)
+      if (!success) {
+        setSelectedGroupId(groupId)
+        setIsForceListening(true)
+        setIsPinDialogOpen(true)
+      }
+      // Reload groups after 1 second
+      setTimeout(() => fetchGroups(), 1000)
+
+      const group = deviceGroups?.find(g => g.id === groupId)
+      if (group) {
+        // Schedule another reload after wait_to_start_alarm + 1 seconds
+        setTimeout(() => fetchGroups(), (group.wait_to_start_alarm + 1) * 1000)
+      }
+    } catch (error) {
+        setErrorMessage("Failed to activate alarm")
+    } finally {
+      setIsActivating(prev => ({ ...prev, [groupId]: false }))
+    }
+  }, [deviceGroups, pin, isForceListening])
+
+  const handleDeactivateAlarm = useCallback(async (groupId: number) => {
+    setIsDeactivating(prev => ({ ...prev, [groupId]: true }))
+    try {
+      await stopListening(groupId, pin)
+      // Reload groups after 1 second
+      setTimeout(() => fetchGroups(), 1000)
+    } catch (error) {
+      setErrorMessage("Failed to deactivate alarm")
+    } finally {
+      setIsDeactivating(prev => ({ ...prev, [groupId]: false }))
+    }
+  }, [pin])
+
+  const fetchGroups = useCallback(async () => {
+    try {
+      const groups = await getDeviceGroups()
+      setDeviceGroups(groups)
+      // Fetch cameras and reeds for each group
+      const camerasPromises = groups.map(group => getDeviceGroupCameras(group.id))
+      const reedsPromises = groups.map(group => getDeviceGroupReeds(group.id))
+
+      const groupCamerasData = await Promise.all(camerasPromises)
+      const groupReedsData = await Promise.all(reedsPromises)
+
+      const newGroupCameras: { [key: number]: RTSPCamera[] } = {}
+      const newGroupReeds: { [key: number]: MagneticReed[] } = {}
+
+      groups.forEach((group, index) => {
+        newGroupCameras[group.id] = groupCamerasData[index]
+        newGroupReeds[group.id] = groupReedsData[index]
+      })
+
+      setGroupCameras(newGroupCameras)
+      setGroupReeds(newGroupReeds)
+    } catch (error) {
+      console.error("Failed to fetch groups:", error)
+      setErrorMessage("Failed to fetch device groups. Please try again.")
+    }
+  }, [])
 
   return (
     <div>
@@ -319,11 +389,54 @@ export default function Alarm({ permissions }: AlarmProps) {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
+                <Button
+                  className="w-full bg-white text-black hover:bg-gray-200"
+                  onClick={() => {
+                    setSelectedGroupId(group.id)
+                    setIsForceListening(false)
+                    setIsPinDialogOpen(true)
+                  }}
+                  disabled={group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING || isActivating[group.id] || isDeactivating[group.id]}
+                >
+                  {group.status === DeviceGroupStatus.IDLE ? "Activate Alarm" : "Deactivate Alarm"}
+                </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       )}
+      <Dialog open={isPinDialogOpen} onOpenChange={setIsPinDialogOpen}>
+        <DialogContent className="bg-zinc-800 text-zinc-50">
+          <DialogHeader>
+            <DialogTitle>{isForceListening ? "Force Activate Alarm" : "Enter PIN"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault()
+            setIsPinDialogOpen(false)
+            if (selectedGroupId) {
+              if (deviceGroups?.find(g => g.id === selectedGroupId)?.status === DeviceGroupStatus.IDLE) {
+                handleActivateAlarm(selectedGroupId)
+              } else {
+                handleDeactivateAlarm(selectedGroupId)
+              }
+            }
+          }}>
+            <Input
+              type="password"
+              placeholder="Enter PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              className="bg-zinc-700 text-zinc-50 border-zinc-600 mb-4"
+            />
+            {isForceListening && (
+              <p className="text-yellow-500 mb-4">Warning: A magnetic reed in the group is open. Do you want to force activate the alarm?</p>
+            )}
+            <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+              {isForceListening ? "Force Activate" : "Submit"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
         <AlertDialogContent className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>

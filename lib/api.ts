@@ -746,3 +746,43 @@ export const getStorageInfo = async (): Promise<StorageInfo> => {
   }
 }
 
+export const startListening = async (groupId: number, pin: string, forceListening: boolean): Promise<boolean> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/start-listening?force_listening=${forceListening}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pin }),
+    });
+
+    if (response.ok) {
+      return true;
+    } else if (response.status === 409) {
+      return false;
+    }
+    throw new Error('Failed to start listening');
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const stopListening = async (groupId: number, pin: string): Promise<void> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/stop-listening`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pin }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to stop listening');
+    }
+  } catch (error) {
+    throw error;
+  }
+}
