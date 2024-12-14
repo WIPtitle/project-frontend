@@ -387,15 +387,6 @@ export const deleteUser = async (id: number): Promise<boolean> => {
   }
 };
 
-const fakeMagneticReeds: MagneticReed[] = [
-  { id: 1, name: "Reed 1", gpio_pin_number: 17, default_value_when_closed: "HIGH" },
-  { id: 2, name: "Reed 2", gpio_pin_number: 27, default_value_when_closed: "LOW" },
-];
-
-const fakeRtspCameras: RTSPCamera[] = [
-  { id: 1, name: "Camera 1", ip: "192.168.1.1", port: 8080, username: "user1", password: "pass1", path: "/stream1", sensibility: 5 },
-  { id: 2, name: "Camera 2", ip: "192.168.1.2", port: 8081, username: "user2", password: "pass2", path: "/stream2", sensibility: 7 },
-];
 
 // API functions
 export const getAllMagneticReeds = async (): Promise<MagneticReed[]> => {
@@ -416,7 +407,7 @@ export const getAllMagneticReeds = async (): Promise<MagneticReed[]> => {
   }
 }
 
-export const createMagneticReed = async (reed: Omit<MagneticReed, 'id'>): Promise<MagneticReed> => {
+export const createMagneticReed = async (reed: Omit<MagneticReed, 'id' | 'group_id'>): Promise<MagneticReed> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/`, {
       method: 'POST',
@@ -514,7 +505,7 @@ export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
   }
 }
 
-export const createRTSPCamera = async (camera: Omit<RTSPCamera, 'id'>): Promise<RTSPCamera> => {
+export const createRTSPCamera = async (camera: Omit<RTSPCamera, 'id' | 'group_id'>): Promise<RTSPCamera> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/`, {
       method: 'POST',

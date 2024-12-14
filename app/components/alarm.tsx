@@ -37,10 +37,6 @@ export default function Alarm({ permissions }: AlarmProps) {
       try {
         const groups = await getDeviceGroups()
         setDeviceGroups(groups)
-        const cameras = await getAllRtspCameras()
-        setAllCameras(cameras)
-        const reeds = await getAllMagneticReeds()
-        setAllReeds(reeds)
 
         // Fetch cameras and reeds for each group
         const camerasPromises = groups.map(group => getDeviceGroupCameras(group.id))
@@ -70,6 +66,18 @@ export default function Alarm({ permissions }: AlarmProps) {
     fetchData()
   }, [])
 
+  const fetchAllDevices = async () => {
+    try {
+      const cameras = await getAllRtspCameras()
+      const reeds = await getAllMagneticReeds()
+      setAllCameras(cameras)
+      setAllReeds(reeds)
+    } catch (error) {
+      console.error("Failed to fetch devices:", error)
+      setErrorMessage("Failed to fetch devices. Please try again.")
+    }
+  }
+
   const handleDelete = async (id: number) => {
     try {
       await deleteDeviceGroup(id)
@@ -89,14 +97,16 @@ export default function Alarm({ permissions }: AlarmProps) {
     }
   }
 
-  const handleAddGroup = () => {
-    setEditingGroup({ name: "", wait_to_start_alarm: 0, wait_to_fire_alarm: 0 })
+  const handleAddGroup = async () => {
+    await fetchAllDevices()
+    setEditingGroup({ id: 0, name: "", wait_to_start_alarm: 0, wait_to_fire_alarm: 0, status: DeviceGroupStatus.IDLE })
     setSelectedCameras([])
     setSelectedReeds([])
     setIsDialogOpen(true)
   }
 
-  const handleEditGroup = (group: DeviceGroup) => {
+  const handleEditGroup = async (group: DeviceGroup) => {
+    await fetchAllDevices()
     setEditingGroup({
       ...group,
     })
@@ -164,14 +174,14 @@ export default function Alarm({ permissions }: AlarmProps) {
             <Button
                 variant="outline"
                 className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                onClick={() => handleAddGroup()}
+                onClick={handleAddGroup}
               >
                 Add group
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-zinc-800 text-zinc-50">
             <DialogHeader>
-              <DialogTitle>{editingGroup?.name ? "Edit group" : "Add group"}</DialogTitle>
+              <DialogTitle>{editingGroup?.id ? "Edit group" : "Add group"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={(e) => {
               e.preventDefault()
@@ -214,9 +224,15 @@ export default function Alarm({ permissions }: AlarmProps) {
                               : prev.filter(c => c.id !== camera.id)
                           )
                         }}
+                        disabled={camera.group_id !== null && camera.group_id !== editingGroup?.id}
                         className="border-zinc-500"
                       />
-                      <label htmlFor={`camera-${camera.id}`} className="text-zinc-300">{camera.name}</label>
+                      <label
+                        htmlFor={`camera-${camera.id}`}
+                        className={`text-zinc-300 ${camera.group_id !== null && camera.group_id !== editingGroup?.id ? 'opacity-50' : ''}`}
+                      >
+                        {camera.name}
+                      </label>
                     </div>
                   ))}
                 </div>
@@ -234,14 +250,20 @@ export default function Alarm({ permissions }: AlarmProps) {
                               : prev.filter(r => r.id !== reed.id)
                           )
                         }}
+                        disabled={reed.group_id !== null && reed.group_id !== editingGroup?.id}
                         className="border-zinc-500"
                       />
-                      <label htmlFor={`reed-${reed.id}`} className="text-zinc-300">{reed.name}</label>
+                      <label
+                        htmlFor={`reed-${reed.id}`}
+                        className={`text-zinc-300 ${reed.group_id !== null && reed.group_id !== editingGroup?.id ? 'opacity-50' : ''}`}
+                      >
+                        {reed.name}
+                      </label>
                     </div>
                   ))}
                 </div>
                 <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                  {editingGroup?.name ? "Update" : "Create"}
+                  {editingGroup?.id ? "Update" : "Create"}
                 </Button>
               </div>
             </form>
