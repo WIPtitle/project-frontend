@@ -294,12 +294,11 @@ export default function Alarm({ permissions }: AlarmProps) {
                               : prev.filter(c => c.id !== camera.id)
                           )
                         }}
-                        disabled={camera.group_id !== null && camera.group_id !== editingGroup?.id}
                         className="border-zinc-500"
                       />
                       <label
                         htmlFor={`camera-${camera.id}`}
-                        className={`text-zinc-300 ${camera.group_id !== null && camera.group_id !== editingGroup?.id ? 'opacity-50' : ''}`}
+                        className="text-zinc-300"
                       >
                         {camera.name}
                       </label>
@@ -320,12 +319,11 @@ export default function Alarm({ permissions }: AlarmProps) {
                               : prev.filter(r => r.id !== reed.id)
                           )
                         }}
-                        disabled={reed.group_id !== null && reed.group_id !== editingGroup?.id}
                         className="border-zinc-500"
                       />
                       <label
                         htmlFor={`reed-${reed.id}`}
-                        className={`text-zinc-300 ${reed.group_id !== null && reed.group_id !== editingGroup?.id ? 'opacity-50' : ''}`}
+                        className="text-zinc-300"
                       >
                         {reed.name}
                       </label>
