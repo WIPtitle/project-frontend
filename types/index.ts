@@ -33,7 +33,6 @@ export interface User {
 }
 
 export interface MagneticReed {
-    id: number;
     name: string;
     gpio_pin_number: number;
     default_value_when_closed: 'HIGH' | 'LOW';
@@ -70,7 +69,6 @@ export interface NtfyCredentials {
 }
 
 export interface RTSPCamera {
-    id: number;
     name: string;
     ip: string;
     port: number;

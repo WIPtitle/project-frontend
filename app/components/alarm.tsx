@@ -10,6 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
 import { DeviceGroup, RTSPCamera, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
 
+const statusMapping: Record<DeviceGroupStatus, string> = {
+  [DeviceGroupStatus.LISTENING]: "Active",
+  [DeviceGroupStatus.IDLE]: "Inactive",
+  [DeviceGroupStatus.ALARM]: "Alarm Triggered",
+  [DeviceGroupStatus.WAITING_TO_START_LISTENING]: "Activating",
+};
+
 type AlarmProps = {
   permissions: Permission[]
 }
@@ -17,6 +24,14 @@ type AlarmProps = {
 type DeviceGroupInputDto = DeviceGroup & {
   id?: number;
 };
+
+export const getAvailableCameras = (cameras: RTSPCamera[], groupId: number | null): RTSPCamera[] => {
+  return cameras.filter(camera => camera.group_id === null || camera.group_id === groupId);
+}
+
+export const getAvailableReeds = (reeds: MagneticReed[], groupId: number | null): MagneticReed[] => {
+  return reeds.filter(reed => reed.group_id === null || reed.group_id === groupId);
+}
 
 export default function Alarm({ permissions }: AlarmProps) {
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[] | null>(null)
@@ -36,6 +51,7 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [isForceListening, setIsForceListening] = useState(false)
+  const [groupError, setGroupError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -132,21 +148,23 @@ export default function Alarm({ permissions }: AlarmProps) {
           })
           setDeviceGroups(prevGroups => prevGroups?.map(group => group.id === updatedGroupResponse.id ? updatedGroupResponse : group) || [])
 
-          // Update cameras and reeds
+          // Update cameras
           const updatedCameras = await updateDeviceGroupCameras(existingGroup.id, selectedCameras.map(c => c.ip))
-          const updatedReeds = await updateDeviceGroupReeds(existingGroup.id, selectedReeds.map(r => r.gpio_pin_number))
-
           setGroupCameras(prev => ({ ...prev, [existingGroup.id]: updatedCameras }))
+
+          // Update reeds
+          const updatedReeds = await updateDeviceGroupReeds(existingGroup.id, selectedReeds.map(r => r.gpio_pin_number))
           setGroupReeds(prev => ({ ...prev, [existingGroup.id]: updatedReeds }))
         } else {
           const newGroup = await createDeviceGroup(updatedGroup)
           setDeviceGroups(prevGroups => [...(prevGroups || []), newGroup])
 
-          // Add cameras and reeds to the new group
+          // Add cameras to the new group
           const newCameras = await updateDeviceGroupCameras(newGroup.id, selectedCameras.map(c => c.ip))
-          const newReeds = await updateDeviceGroupReeds(newGroup.id, selectedReeds.map(r => r.gpio_pin_number))
-
           setGroupCameras(prev => ({ ...prev, [newGroup.id]: newCameras }))
+
+          // Add reeds to the new group
+          const newReeds = await updateDeviceGroupReeds(newGroup.id, selectedReeds.map(r => r.gpio_pin_number))
           setGroupReeds(prev => ({ ...prev, [newGroup.id]: newReeds }))
         }
       }
@@ -154,6 +172,14 @@ export default function Alarm({ permissions }: AlarmProps) {
     } catch (error) {
       setErrorMessage("Failed to save device group")
     }
+  }
+
+  const getAvailableCameras = (groupId: number | null) => {
+    return allCameras.filter(camera => camera.group_id === null || camera.group_id === groupId);
+  }
+
+  const getAvailableReeds = (groupId: number | null) => {
+    return allReeds.filter(reed => reed.group_id === null || reed.group_id === groupId);
   }
 
   const getStatusColor = (status: DeviceGroupStatus) => {
@@ -236,17 +262,20 @@ export default function Alarm({ permissions }: AlarmProps) {
   }, [])
 
   return (
-    <div>
+    <div className="container mx-auto p-4">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
         <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Alarm dashboard</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) setGroupError(null);
+        }}>
           <DialogTrigger asChild>
             <Button
-                variant="outline"
-                className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                onClick={handleAddGroup}
-              >
-                Add group
+              variant="outline"
+              className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+              onClick={handleAddGroup}
+            >
+              Add group
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-zinc-800 text-zinc-50">
@@ -256,7 +285,12 @@ export default function Alarm({ permissions }: AlarmProps) {
             <form onSubmit={(e) => {
               e.preventDefault()
               if (editingGroup) {
-                handleSaveGroup(editingGroup)
+                if (selectedCameras.length === 0 && selectedReeds.length === 0) {
+                  setGroupError("No device set - please set at least one device");
+                } else {
+                  setGroupError(null);
+                  handleSaveGroup(editingGroup);
+                }
               }
             }}>
               <div className="space-y-4">
@@ -280,55 +314,60 @@ export default function Alarm({ permissions }: AlarmProps) {
                   onChange={(e) => setEditingGroup(prev => prev ? {...prev, wait_to_fire_alarm: parseInt(e.target.value)} : null)}
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
+                {groupError && (
+                  <p className="text-red-500 text-sm mt-2">{groupError}</p>
+                )}
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Cameras</h3>
                   {allCameras.map(camera => (
-                    <div key={camera.id} className="flex items-center space-x-2">
+                    <div key={camera.ip} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`camera-${camera.id}`}
-                        checked={selectedCameras.some(c => c.id === camera.id)}
+                        id={`camera-${camera.ip}`}
+                        checked={selectedCameras.some(c => c.ip === camera.ip)}
                         onCheckedChange={(checked) => {
                           setSelectedCameras(prev =>
                             checked
                               ? [...prev, camera]
-                              : prev.filter(c => c.id !== camera.id)
+                              : prev.filter(c => c.ip !== camera.ip)
                           )
                         }}
                         className="border-zinc-500"
                       />
                       <label
-                        htmlFor={`camera-${camera.id}`}
+                        htmlFor={`camera-${camera.ip}`}
                         className="text-zinc-300"
                       >
                         {camera.name}
                       </label>
                     </div>
                   ))}
+                  {allCameras.length === 0 && <p className="text-zinc-400">No camera available</p>}
                 </div>
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Reeds</h3>
                   {allReeds.map(reed => (
-                    <div key={reed.id} className="flex items-center space-x-2">
+                    <div key={reed.gpio_pin_number} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`reed-${reed.id}`}
-                        checked={selectedReeds.some(r => r.id === reed.id)}
+                        id={`reed-${reed.gpio_pin_number}`}
+                        checked={selectedReeds.some(r => r.gpio_pin_number === reed.gpio_pin_number)}
                         onCheckedChange={(checked) => {
                           setSelectedReeds(prev =>
                             checked
                               ? [...prev, reed]
-                              : prev.filter(r => r.id !== reed.id)
+                              : prev.filter(r => r.gpio_pin_number !== reed.gpio_pin_number)
                           )
                         }}
                         className="border-zinc-500"
                       />
                       <label
-                        htmlFor={`reed-${reed.id}`}
+                        htmlFor={`reed-${reed.gpio_pin_number}`}
                         className="text-zinc-300"
                       >
                         {reed.name}
                       </label>
                     </div>
                   ))}
+                  {allReeds.length === 0 && <p className="text-zinc-400">No reed available</p>}
                 </div>
                 <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
                   {editingGroup?.id ? "Update" : "Create"}
@@ -350,21 +389,23 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <CardTitle className="text-zinc-50">{group.name}</CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
-                <p className={`${getStatusColor(group.status)} font-semibold`}>Status: {group.status}</p>
+                <p className={`${getStatusColor(group.status)} font-semibold`}>Status: {statusMapping[group.status]}</p>
                 <p className="text-zinc-300">Wait to start alarm: {group.wait_to_start_alarm}s</p>
                 <p className="text-zinc-300">Wait to fire alarm: {group.wait_to_fire_alarm}s</p>
                 <h3 className="mt-2 font-semibold text-zinc-300">Cameras:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
                   {groupCameras[group.id]?.map((camera) => (
-                    <li key={camera.id}>{camera.name}</li>
+                    <li key={camera.ip}>{camera.name}</li>
                   ))}
                 </ul>
+                {groupCameras[group.id]?.length === 0 && <p className="text-zinc-400">No cameras</p>}
                 <h3 className="mt-2 font-semibold text-zinc-300">Reeds:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
                   {groupReeds[group.id]?.map((reed) => (
-                    <li key={reed.id}>{reed.name}</li>
+                    <li key={reed.gpio_pin_number}>{reed.name}</li>
                   ))}
                 </ul>
+                {groupReeds[group.id]?.length === 0 && <p className="text-zinc-400">No reeds</p>}
               </CardContent>
               <CardFooter className="flex flex-col mt-auto">
                 <div className="flex w-full mb-2">
@@ -387,17 +428,32 @@ export default function Alarm({ permissions }: AlarmProps) {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
-                <Button
-                  className="w-full bg-white text-black hover:bg-gray-200"
-                  onClick={() => {
-                    setSelectedGroupId(group.id)
-                    setIsForceListening(false)
-                    setIsPinDialogOpen(true)
-                  }}
-                  disabled={group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING || isActivating[group.id] || isDeactivating[group.id]}
-                >
-                  {group.status === DeviceGroupStatus.IDLE ? "Activate Alarm" : "Deactivate Alarm"}
-                </Button>
+                {permissions.includes(Permission.START_ALARM) && group.status === DeviceGroupStatus.IDLE && (
+                  <Button
+                    onClick={() => {
+                      setSelectedGroupId(group.id)
+                      setIsForceListening(false)
+                      setIsPinDialogOpen(true)
+                    }}
+                    disabled={isActivating[group.id]}
+                    className="w-full bg-white text-zinc-800 hover:bg-zinc-200"
+                  >
+                    Activate Alarm
+                  </Button>
+                )}
+                {permissions.includes(Permission.STOP_ALARM) && group.status !== DeviceGroupStatus.IDLE && (
+                  <Button
+                    onClick={() => {
+                      setSelectedGroupId(group.id)
+                      setIsForceListening(false)
+                      setIsPinDialogOpen(true)
+                    }}
+                    disabled={isDeactivating[group.id]}
+                    className="w-full bg-white text-zinc-800 hover:bg-zinc-200"
+                  >
+                    Deactivate Alarm
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
