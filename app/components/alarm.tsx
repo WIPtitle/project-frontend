@@ -480,10 +480,23 @@ export default function Alarm({ permissions }: AlarmProps) {
               </CardContent>
               <CardFooter className="flex flex-col mt-auto">
                 <div className="flex w-full mb-2">
-                  <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditGroup(group)}>Edit</Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                    onClick={() => handleEditGroup(group)}
+                    disabled={group.status !== DeviceGroupStatus.IDLE}
+                  >
+                    Edit
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
+                        disabled={group.status !== DeviceGroupStatus.IDLE}
+                      >
+                        Delete
+                      </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-zinc-800 text-zinc-50">
                       <AlertDialogHeader>
@@ -519,10 +532,10 @@ export default function Alarm({ permissions }: AlarmProps) {
                       setIsForceListening(false)
                       setIsPinDialogOpen(true)
                     }}
-                    disabled={isDeactivating[group.id]}
+                    disabled={isDeactivating[group.id] || group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING}
                     className="w-full bg-white text-zinc-800 hover:bg-zinc-200"
                   >
-                    Deactivate Alarm
+                    {group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING ? 'Activating...' : 'Deactivate Alarm'}
                   </Button>
                 )}
               </CardFooter>
