@@ -530,7 +530,13 @@ export default function Alarm({ permissions }: AlarmProps) {
           ))}
         </div>
       )}
-      <Dialog open={isPinDialogOpen} onOpenChange={setIsPinDialogOpen}>
+      <Dialog
+        open={isPinDialogOpen}
+        onOpenChange={(open) => {
+          setIsPinDialogOpen(open);
+          if (!open) setPin("");
+        }}
+      >
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle>{isForceListening ? "Force Activate Alarm" : "Enter PIN"}</DialogTitle>
@@ -538,6 +544,7 @@ export default function Alarm({ permissions }: AlarmProps) {
           <form onSubmit={(e) => {
             e.preventDefault()
             setIsPinDialogOpen(false)
+            setPin("") // Clear the PIN after submission
             if (selectedGroupId) {
               if (deviceGroups?.find(g => g.id === selectedGroupId)?.status === DeviceGroupStatus.IDLE) {
                 handleActivateAlarm(selectedGroupId)
@@ -546,14 +553,26 @@ export default function Alarm({ permissions }: AlarmProps) {
               }
             }
           }}>
-            <Input
-              type="password"
-              placeholder="Enter PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              className="bg-zinc-700 text-zinc-50 border-zinc-600 mb-4"
-              autoComplete="off"
-            />
+            <div className="relative">
+              <input
+                type="password"
+                name="pin-fake"
+                autoComplete="new-password"
+                className="absolute -z-10 opacity-0"
+                tabIndex={-1}
+                aria-hidden="true"
+              />
+              <Input
+                type="password"
+                placeholder="Enter PIN"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                className="bg-zinc-700 text-zinc-50 border-zinc-600 mb-4"
+                autoComplete="off"
+                name="pin"
+                key={isPinDialogOpen ? "open" : "closed"}
+              />
+            </div>
             {isForceListening && (
               <p className="text-yellow-500 mb-4">Warning: A magnetic reed in the group is open. Do you want to force activate the alarm?</p>
             )}
