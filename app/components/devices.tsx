@@ -177,14 +177,30 @@ export default function Component({ permissions }: DeviceProps) {
                   </div>
                 )}
                 <p className="text-zinc-300 mt-2">IP: {camera.ip}</p>
+                <p className={`text-zinc-300 mt-2 ${camera.listening ? 'text-green-500' : ''}`}>
+                  {camera.listening ? 'Listening' : 'Not Listening'}
+                </p>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
                   <div className="flex w-full">
-                    <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(camera, 'camera')}>Edit</Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => handleEditDevice(camera, 'camera')}
+                      disabled={camera.listening}
+                    >
+                      Edit
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
+                        <Button
+                          variant="destructive"
+                          className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
+                          disabled={camera.listening}
+                        >
+                          Delete
+                        </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent className="bg-zinc-800 text-zinc-50">
                         <AlertDialogHeader>
@@ -234,14 +250,30 @@ export default function Component({ permissions }: DeviceProps) {
                 <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
                 <p className="text-zinc-300">Type: {reed.default_value_when_closed === "HIGH" ? "Normally Open" : "Normally Closed"}</p>
                 <p className="text-zinc-300 mt-8">Current Status: {reedStatuses[reed.gpio_pin_number] || 'Loading...'}</p>
+                <p className={`text-zinc-300 mt-2 ${reed.listening ? 'text-green-500' : ''}`}>
+                  {reed.listening ? 'Listening' : 'Not Listening'}
+                </p>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
                   <div className="flex w-full">
-                    <Button variant="outline" className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleEditDevice(reed, 'reed')}>Edit</Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => handleEditDevice(reed, 'reed')}
+                      disabled={reed.listening}
+                    >
+                      Edit
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">Delete</Button>
+                        <Button
+                          variant="destructive"
+                          className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
+                          disabled={reed.listening}
+                        >
+                          Delete
+                        </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent className="bg-zinc-800 text-zinc-50">
                         <AlertDialogHeader>

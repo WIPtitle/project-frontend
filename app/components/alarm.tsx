@@ -245,13 +245,13 @@ export default function Alarm({ permissions }: AlarmProps) {
         setIsForceListening(true)
         setIsPinDialogOpen(true)
       }
-      // Reload groups after 1 second
-      setTimeout(() => fetchGroups(), 1000)
+      // Reload groups after 1.5 second
+      setTimeout(() => fetchGroups(), 1500)
 
       const group = deviceGroups?.find(g => g.id === groupId)
       if (group) {
-        // Schedule another reload after wait_to_start_alarm + 1 seconds
-        setTimeout(() => fetchGroups(), (group.wait_to_start_alarm + 1) * 1000)
+        // Schedule another reload after wait_to_start_alarm + 1.5 seconds
+        setTimeout(() => fetchGroups(), (group.wait_to_start_alarm + 1) * 1500)
       }
     } catch (error) {
       setErrorMessage("Failed to activate alarm")

@@ -407,7 +407,7 @@ export const getAllMagneticReeds = async (): Promise<MagneticReed[]> => {
   }
 }
 
-export const createMagneticReed = async (reed: Omit<MagneticReed, 'id' | 'group_id'>): Promise<MagneticReed> => {
+export const createMagneticReed = async (reed: Omit<MagneticReed, 'id' | 'group_id' | 'listening'>): Promise<MagneticReed> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/`, {
       method: 'POST',
@@ -505,7 +505,7 @@ export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
   }
 }
 
-export const createRTSPCamera = async (camera: Omit<RTSPCamera, 'id' | 'group_id'>): Promise<RTSPCamera> => {
+export const createRTSPCamera = async (camera: Omit<RTSPCamera, 'id' | 'group_id' | 'listening'>): Promise<RTSPCamera> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/`, {
       method: 'POST',

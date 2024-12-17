@@ -36,6 +36,7 @@ export interface MagneticReed {
     name: string;
     gpio_pin_number: number;
     default_value_when_closed: 'HIGH' | 'LOW';
+    listening: boolean;
     group_id: number;
 }
 
@@ -76,6 +77,7 @@ export interface RTSPCamera {
     password: string;
     path: string;
     sensibility: number;
+    listening: boolean;
     group_id: number;
 }
 
