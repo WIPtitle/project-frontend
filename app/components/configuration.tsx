@@ -219,8 +219,16 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             <div className="space-y-4">
               <Input
                 type="file"
-                accept="audio/*"
-                onChange={(e) => setEditingAudioConfig(prev => prev ? {...prev, audio: e.target.files?.[0] || null} : null)}
+                accept=".mp3"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && file.name.toLowerCase().endsWith('.mp3')) {
+                    setEditingAudioConfig(prev => prev ? {...prev, audio: file} : null);
+                  } else {
+                    alert("Please select an MP3 file.");
+                    e.target.value = '';
+                  }
+                }}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 required
               />
@@ -245,3 +253,4 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     </div>
   )
 }
+
