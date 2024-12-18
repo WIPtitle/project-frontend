@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
+import { getDeviceGroupStatusStream, getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
 import { DeviceGroup, RTSPCamera, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
 
 const statusMapping: Record<DeviceGroupStatus, string> = {
@@ -52,6 +52,30 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [isForceListening, setIsForceListening] = useState(false)
   const [groupError, setGroupError] = useState<string | null>(null);
+
+  const eventSources = useRef<{ [key: number]: EventSource }>({})
+  useEffect(() => {
+    // Close event sources for removed groups
+    for (const id in eventSources.current) {
+      if (!deviceGroups?.some(group => group.id === parseInt(id))) {
+        eventSources.current[id].close()
+        delete eventSources.current[id]
+      }
+    }
+    // Start event sources for new groups
+    for (const group of deviceGroups || []) {
+      if (!eventSources.current[group.id]) {
+        const stream = getDeviceGroupStatusStream(group.id)
+        eventSources.current[group.id] = stream
+        stream.onmessage = (event) => {
+            const status = event.data
+            setDeviceGroups(prevGroups => prevGroups?.map(g => g.id === group.id ? { ...g, status: status } : g) || [])
+        }
+      }
+    }
+
+    return () => { }
+  }, [deviceGroups]);
 
   useEffect(() => {
     const fetchData = async () => {
