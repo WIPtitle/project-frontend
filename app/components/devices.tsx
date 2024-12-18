@@ -177,9 +177,6 @@ export default function Component({ permissions }: DeviceProps) {
                   </div>
                 )}
                 <p className="text-zinc-300 mt-2">IP: {camera.ip}</p>
-                <p className={`text-zinc-300 mt-2 ${camera.listening ? 'text-green-500' : ''}`}>
-                  {camera.listening ? 'Listening' : 'Not Listening'}
-                </p>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
@@ -250,9 +247,6 @@ export default function Component({ permissions }: DeviceProps) {
                 <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
                 <p className="text-zinc-300">Type: {reed.default_value_when_closed === "HIGH" ? "Normally Open" : "Normally Closed"}</p>
                 <p className="text-zinc-300 mt-8">Current Status: {reedStatuses[reed.gpio_pin_number] || 'Loading...'}</p>
-                <p className={`text-zinc-300 mt-2 ${reed.listening ? 'text-green-500' : ''}`}>
-                  {reed.listening ? 'Listening' : 'Not Listening'}
-                </p>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">

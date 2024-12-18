@@ -786,3 +786,12 @@ export const stopListening = async (groupId: number, pin: string): Promise<void>
     throw error;
   }
 }
+
+export const getDeviceGroupStatusStream = (groupId: number) => {
+  const token = getTokenOrThrow();
+  const eventSource = new EventSource(
+    `${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/status/stream?auth_token=${encodeURIComponent(token)}`,
+    {}
+  );
+  return eventSource;
+}

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
+import { getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds, startListening, stopListening, getDeviceGroupStatusStream } from "@/lib/api"
 import { DeviceGroup, RTSPCamera, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
 
 const statusMapping: Record<DeviceGroupStatus, string> = {
@@ -52,7 +52,6 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [isForceListening, setIsForceListening] = useState(false)
   const [groupError, setGroupError] = useState<string | null>(null);
-  const [updateTimers, setUpdateTimers] = useState<{ [key: number]: NodeJS.Timeout }>({})
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,43 +88,26 @@ export default function Alarm({ permissions }: AlarmProps) {
     fetchData()
   }, [])
 
-  const updateTimersRef = useRef<{ [key: number]: NodeJS.Timeout }>({});
-
-    useEffect(() => {
-      const updateGroup = async (groupId: number) => {
+  useEffect(() => {
+    deviceGroups?.forEach(group => {
+      const eventSource = getDeviceGroupStatusStream(group.id);
+      eventSource.onmessage = (event) => {
         try {
-          const updatedGroup = await getDeviceGroups().then(groups => groups.find(g => g.id === groupId));
-          if (updatedGroup) {
-            setDeviceGroups(prevGroups =>
-              prevGroups?.map(group => group.id === groupId ? updatedGroup : group) || []
-            );
-            if (updatedGroup.status !== DeviceGroupStatus.LISTENING) {
-              clearInterval(updateTimersRef.current[groupId]);
-              delete updateTimersRef.current[groupId];
-            }
-          }
+          const updatedStatus = event.data;
+          setDeviceGroups(prevGroups =>
+            prevGroups?.map(g => g.id === group.id ? { ...g, status: updatedStatus } : g) || []
+          );
         } catch (error) {
-          console.error("Failed to update group:", error);
+          console.error("Failed to parse status update:", error);
         }
       };
-
-      const startUpdateTimer = (groupId: number) => {
-        if (!updateTimersRef.current[groupId]) {
-          const timer = setInterval(() => updateGroup(groupId), 10000);
-          updateTimersRef.current[groupId] = timer;
-        }
-      };
-
-      deviceGroups?.forEach(group => {
-        if (group.status === DeviceGroupStatus.LISTENING) {
-          startUpdateTimer(group.id);
-        }
-      });
 
       return () => {
-        Object.values(updateTimersRef.current).forEach(clearInterval);
+        eventSource.close();
       };
-    }, [deviceGroups]);
+    });
+  }, [deviceGroups]);
+
 
   const fetchAllDevices = async () => {
     try {
@@ -245,27 +227,17 @@ export default function Alarm({ permissions }: AlarmProps) {
         setIsForceListening(true)
         setIsPinDialogOpen(true)
       }
-      // Reload groups after 1.5 second
-      setTimeout(() => fetchGroups(), 1500)
-
-      const group = deviceGroups?.find(g => g.id === groupId)
-      if (group) {
-        // Schedule another reload after wait_to_start_alarm + 1.5 seconds
-        setTimeout(() => fetchGroups(), (group.wait_to_start_alarm + 1) * 1500)
-      }
     } catch (error) {
       setErrorMessage("Failed to activate alarm")
     } finally {
       setIsActivating(prev => ({ ...prev, [groupId]: false }))
     }
-  }, [deviceGroups, pin, isForceListening])
+  }, [pin, isForceListening])
 
   const handleDeactivateAlarm = useCallback(async (groupId: number) => {
     setIsDeactivating(prev => ({ ...prev, [groupId]: true }))
     try {
       await stopListening(groupId, pin)
-      // Reload groups after 1 second
-      setTimeout(() => fetchGroups(), 1000)
     } catch (error) {
       setErrorMessage("Failed to deactivate alarm")
     } finally {
@@ -277,37 +249,6 @@ export default function Alarm({ permissions }: AlarmProps) {
     try {
       const groups = await getDeviceGroups();
       setDeviceGroups(groups);
-
-      // Clear existing timers
-      Object.values(updateTimers).forEach(clearInterval);
-      setUpdateTimers({});
-
-      // Start new timers for LISTENING groups
-      groups.forEach(group => {
-        if (group.status === DeviceGroupStatus.LISTENING) {
-          const timer = setInterval(async () => {
-            try {
-              const updatedGroup = await getDeviceGroups().then(g => g.find(g => g.id === group.id));
-              if (updatedGroup) {
-                setDeviceGroups(prevGroups =>
-                  prevGroups?.map(g => g.id === group.id ? updatedGroup : g) || []
-                );
-                if (updatedGroup.status !== DeviceGroupStatus.LISTENING) {
-                  clearInterval(timer);
-                  setUpdateTimers(prev => {
-                    const newTimers = { ...prev };
-                    delete newTimers[group.id];
-                    return newTimers;
-                  });
-                }
-              }
-            } catch (error) {
-              console.error("Failed to update group:", error);
-            }
-          }, 10000);
-          setUpdateTimers(prev => ({ ...prev, [group.id]: timer }));
-        }
-      });
 
       // Fetch cameras and reeds for each group
       const camerasPromises = groups.map(group => getDeviceGroupCameras(group.id));
@@ -330,7 +271,7 @@ export default function Alarm({ permissions }: AlarmProps) {
       console.error("Failed to fetch groups:", error);
       setErrorMessage("Failed to fetch device groups. Please try again.");
     }
-  }, [updateTimers]);
+  }, []);
 
   return (
     <div className="container mx-auto p-4">
