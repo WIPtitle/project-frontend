@@ -52,7 +52,6 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [isForceListening, setIsForceListening] = useState(false)
   const [groupError, setGroupError] = useState<string | null>(null);
-  const [updateTimers, setUpdateTimers] = useState<{ [key: number]: NodeJS.Timeout }>({})
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,44 +87,6 @@ export default function Alarm({ permissions }: AlarmProps) {
     }
     fetchData()
   }, [])
-
-  const updateTimersRef = useRef<{ [key: number]: NodeJS.Timeout }>({});
-
-    useEffect(() => {
-      const updateGroup = async (groupId: number) => {
-        try {
-          const updatedGroup = await getDeviceGroups().then(groups => groups.find(g => g.id === groupId));
-          if (updatedGroup) {
-            setDeviceGroups(prevGroups =>
-              prevGroups?.map(group => group.id === groupId ? updatedGroup : group) || []
-            );
-            if (updatedGroup.status !== DeviceGroupStatus.LISTENING) {
-              clearInterval(updateTimersRef.current[groupId]);
-              delete updateTimersRef.current[groupId];
-            }
-          }
-        } catch (error) {
-          console.error("Failed to update group:", error);
-        }
-      };
-
-      const startUpdateTimer = (groupId: number) => {
-        if (!updateTimersRef.current[groupId]) {
-          const timer = setInterval(() => updateGroup(groupId), 10000);
-          updateTimersRef.current[groupId] = timer;
-        }
-      };
-
-      deviceGroups?.forEach(group => {
-        if (group.status === DeviceGroupStatus.LISTENING) {
-          startUpdateTimer(group.id);
-        }
-      });
-
-      return () => {
-        Object.values(updateTimersRef.current).forEach(clearInterval);
-      };
-    }, [deviceGroups]);
 
   const fetchAllDevices = async () => {
     try {
@@ -237,14 +198,6 @@ export default function Alarm({ permissions }: AlarmProps) {
         setIsForceListening(true)
         setIsPinDialogOpen(true)
       }
-      // Reload groups after 1.5 second
-      setTimeout(() => fetchGroups(), 1500)
-
-      const group = deviceGroups?.find(g => g.id === groupId)
-      if (group) {
-        // Schedule another reload after wait_to_start_alarm + 1.5 seconds
-        setTimeout(() => fetchGroups(), (group.wait_to_start_alarm + 1) * 1500)
-      }
     } catch (error) {
       setErrorMessage("Failed to activate alarm")
     } finally {
@@ -256,8 +209,6 @@ export default function Alarm({ permissions }: AlarmProps) {
     setIsDeactivating(prev => ({ ...prev, [groupId]: true }))
     try {
       await stopListening(groupId, pin)
-      // Reload groups after 1 second
-      setTimeout(() => fetchGroups(), 1000)
     } catch (error) {
       setErrorMessage("Failed to deactivate alarm")
     } finally {
@@ -265,64 +216,6 @@ export default function Alarm({ permissions }: AlarmProps) {
     }
   }, [pin])
 
-  const fetchGroups = useCallback(async () => {
-    try {
-      const groups = await getDeviceGroups();
-      setDeviceGroups(groups);
-
-      // Clear existing timers
-      Object.values(updateTimers).forEach(clearInterval);
-      setUpdateTimers({});
-
-      // Start new timers for LISTENING groups
-      groups.forEach(group => {
-        if (group.status === DeviceGroupStatus.LISTENING) {
-          const timer = setInterval(async () => {
-            try {
-              const updatedGroup = await getDeviceGroups().then(g => g.find(g => g.id === group.id));
-              if (updatedGroup) {
-                setDeviceGroups(prevGroups =>
-                  prevGroups?.map(g => g.id === group.id ? updatedGroup : g) || []
-                );
-                if (updatedGroup.status !== DeviceGroupStatus.LISTENING) {
-                  clearInterval(timer);
-                  setUpdateTimers(prev => {
-                    const newTimers = { ...prev };
-                    delete newTimers[group.id];
-                    return newTimers;
-                  });
-                }
-              }
-            } catch (error) {
-              console.error("Failed to update group:", error);
-            }
-          }, 10000);
-          setUpdateTimers(prev => ({ ...prev, [group.id]: timer }));
-        }
-      });
-
-      // Fetch cameras and reeds for each group
-      const camerasPromises = groups.map(group => getDeviceGroupCameras(group.id));
-      const reedsPromises = groups.map(group => getDeviceGroupReeds(group.id));
-
-      const groupCamerasData = await Promise.all(camerasPromises);
-      const groupReedsData = await Promise.all(reedsPromises);
-
-      const newGroupCameras: { [key: number]: RTSPCamera[] } = {};
-      const newGroupReeds: { [key: number]: MagneticReed[] } = {};
-
-      groups.forEach((group, index) => {
-        newGroupCameras[group.id] = groupCamerasData[index];
-        newGroupReeds[group.id] = groupReedsData[index];
-      });
-
-      setGroupCameras(newGroupCameras);
-      setGroupReeds(newGroupReeds);
-    } catch (error) {
-      console.error("Failed to fetch groups:", error);
-      setErrorMessage("Failed to fetch device groups. Please try again.");
-    }
-  }, [updateTimers]);
 
   return (
     <div className="container mx-auto p-4">
@@ -404,7 +297,7 @@ export default function Alarm({ permissions }: AlarmProps) {
                       </label>
                     </div>
                   ))}
-                  {allCameras.length === 0 && <p className="text-zinc-400">No camera available</p>}
+                  {getAvailableCameras(allCameras, editingGroup?.id ?? null).length === 0 && <p className="text-zinc-400">No camera available</p>}
                 </div>
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Reeds</h3>
@@ -430,7 +323,7 @@ export default function Alarm({ permissions }: AlarmProps) {
                       </label>
                     </div>
                   ))}
-                  {allReeds.length === 0 && <p className="text-zinc-400">No reed available</p>}
+                  {getAvailableReeds(allReeds, editingGroup?.id ?? null).length === 0 && <p className="text-zinc-400">No reed available</p>}
                 </div>
                 <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
                   {editingGroup?.id ? "Update" : "Create"}
