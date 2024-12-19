@@ -1,4 +1,4 @@
-import { NtfyCredentials, User, DeviceGroup, Permission, MagneticReed, RTSPCamera, AlarmAudioConfig, Recording, Camera, StorageInfo } from '@/types'
+import { NtfyCredentials, User, DeviceGroup, Permission, MagneticReed, RTSPCamera, AlarmAudioConfig, Recording, StorageInfo } from '@/types'
 
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
@@ -305,6 +305,14 @@ export const updateDeviceGroup = async (id: number, group: DeviceGroup): Promise
   }
 }
 
+export const getDeviceGroupStatusStream = (groupId: number) => {
+  const token = getTokenOrThrow();
+  const eventSource = new EventSource(
+    `${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/status/stream?auth_token=${encodeURIComponent(token)}`,
+    {}
+  );
+  return eventSource;
+}
 
 export const getAllUsers = async (): Promise<User[]> => {
   try {
@@ -497,6 +505,24 @@ export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
 
     if (!response.ok) {
       throw new Error('Failed to fetch RTSP cameras');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getRTSPCamera = async (ip: string): Promise<RTSPCamera> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch RTSP camera');
     }
 
     return await response.json();
@@ -709,43 +735,6 @@ export const deleteAlarmAudioConfig = async (): Promise<void> => {
   }
 }
 
-const mockRecordings: Recording[] = [
-  { id: 1, filename: "recording1.mp4", camera_ip: "192.168.1.100", is_completed: true },
-  { id: 2, filename: "recording2.mp4", camera_ip: "192.168.1.101", is_completed: true },
-  { id: 3, filename: "recording3.mp4", camera_ip: "192.168.1.100", is_completed: false },
-  { id: 4, filename: "recording4.mp4", camera_ip: "192.168.1.102", is_completed: true },
-]
-
-const mockCameras: Camera[] = [
-  { id: 1, name: "Front Door", ip: "192.168.1.100" },
-  { id: 2, name: "Back Yard", ip: "192.168.1.101" },
-  { id: 3, name: "Garage", ip: "192.168.1.102" },
-]
-
-export const getAllRecordings = async (): Promise<Recording[]> => {
-  return mockRecordings
-}
-
-export const getCamera = async (ip: string): Promise<Camera> => {
-  const camera = mockCameras.find(cam => cam.ip === ip)
-  if (!camera) throw new Error("Camera not found")
-  return camera
-}
-
-export const deleteRecording = async (id: number): Promise<void> => {
-  const index = mockRecordings.findIndex(rec => rec.id === id)
-  if (index === -1) throw new Error("Recording not found")
-  mockRecordings.splice(index, 1)
-}
-
-export const getStorageInfo = async (): Promise<StorageInfo> => {
-  return {
-    used_space: 500 * 1024 * 1024 * 1024, // 500 GB in bytes
-    free_space: 1.5 * 1024 * 1024 * 1024 * 1024, // 1.5 TB in bytes
-    total_space: 2 * 1024 * 1024 * 1024 * 1024, // 2 TB in bytes
-  }
-}
-
 export const startListening = async (groupId: number, pin: string, forceListening: boolean): Promise<boolean> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/start-listening?force_listening=${forceListening}`, {
@@ -787,11 +776,65 @@ export const stopListening = async (groupId: number, pin: string): Promise<void>
   }
 }
 
-export const getDeviceGroupStatusStream = (groupId: number) => {
+export const getAllRecordings = async (): Promise<Recording[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/recording`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch recordings');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const deleteRecording = async (id: number): Promise<void> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/recording/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete recording');
+    }
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getStorageInfo = async (): Promise<StorageInfo> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/disk-usage`, {
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch storage information');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getRecordingStreamUrl = (recordingId: number): string => {
   const token = getTokenOrThrow();
-  const eventSource = new EventSource(
-    `${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/status/stream?auth_token=${encodeURIComponent(token)}`,
-    {}
-  );
-  return eventSource;
+  return `${getApiBaseUrl()}/devices-manager-service/recording/${recordingId}/stream?auth_token=${encodeURIComponent(token)}`;
+}
+
+export const getRecordingDownloadUrl = (recordingId: number): string => {
+  const token = getTokenOrThrow();
+  return `${getApiBaseUrl()}/devices-manager-service/recording/${recordingId}/download?auth_token=${encodeURIComponent(token)}`;
 }

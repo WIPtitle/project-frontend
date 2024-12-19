@@ -314,6 +314,7 @@ export default function Component({ permissions }: DeviceProps) {
                     value={(editingDevice as CameraInputDto)?.ip || ""}
                     onChange={(e) => setEditingDevice(prev => prev ? {...prev, ip: e.target.value} : null)}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                    disabled={!isCreating}
                   />
                   <Input
                     type="number"

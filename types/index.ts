@@ -46,21 +46,16 @@ export interface AlarmAudioConfig {
 
 export interface Recording {
   id: number
-  filename: string
+  name: string
+  path: string
   camera_ip: string
   is_completed: boolean
 }
 
-export interface Camera {
-  id: number
-  name: string
-  ip: string
-}
-
 export interface StorageInfo {
-  used_space: number
-  free_space: number
-  total_space: number
+  used: number
+  free: number
+  total: number
 }
 
 export interface NtfyCredentials {

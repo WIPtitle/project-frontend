@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { getAllRecordings, getCamera, deleteRecording, getStorageInfo } from "@/lib/api"
-import { Recording, Camera, StorageInfo, Permission } from "@/types"
-import { FileVideo2 } from 'lucide-react'
+import { getAllRecordings, deleteRecording, getStorageInfo, getRecordingStreamUrl, getRecordingDownloadUrl, getRTSPCamera } from "@/lib/api"
+import { Recording, RTSPCamera, StorageInfo, Permission } from "@/types"
+import { FileVideo2, X } from 'lucide-react'
 
 type RecordingsProps = {
   permissions: Permission[]
@@ -14,9 +15,10 @@ type RecordingsProps = {
 
 export default function Recordings({ permissions }: RecordingsProps) {
   const [recordings, setRecordings] = useState<Recording[]>([])
-  const [cameras, setCameras] = useState<{[key: string]: Camera}>({})
+  const [cameras, setCameras] = useState<{[key: string]: RTSPCamera}>({})
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -24,20 +26,21 @@ export default function Recordings({ permissions }: RecordingsProps) {
         const allRecordings = await getAllRecordings()
         const completedRecordings = allRecordings
           .filter(recording => recording.is_completed)
-          .sort((a, b) => a.filename.localeCompare(b.filename))
+          .sort((a, b) => a.name.localeCompare(b.name))
         setRecordings(completedRecordings)
 
-        const cameraPromises = completedRecordings.map(recording => getCamera(recording.camera_ip))
+        const cameraPromises = completedRecordings.map(recording => getRTSPCamera(recording.camera_ip))
         const cameraResults = await Promise.all(cameraPromises)
-        const cameraMap = cameraResults.reduce((acc: {[key: string]: Camera}, camera: Camera) => {
+        const cameraMap = cameraResults.reduce((acc: {[key: string]: RTSPCamera}, camera: RTSPCamera) => {
           acc[camera.ip] = camera
           return acc
-        }, {} as {[key: string]: Camera})
+        }, {} as {[key: string]: RTSPCamera})
         setCameras(cameraMap)
 
         const storage = await getStorageInfo()
         setStorageInfo(storage)
       } catch (error) {
+          console.log(error)
         setErrorMessage("Failed to fetch recordings and storage information")
       }
     }
@@ -62,13 +65,21 @@ export default function Recordings({ permissions }: RecordingsProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
   }
 
+  const formatRecordingName = (filename: string) => {
+    // Extract date and time parts from filename (ignoring camera IP and extension)
+    const [year, month, day, hour, minute, second] = filename.split('_').slice(0, 6)
+
+    // Format as "hh:mm:ss DD/MM/YYYY"
+    return `${hour}:${minute}:${second} ${day}/${month}/${year}`
+  }
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Recordings</h1>
         {storageInfo && (
           <p className="text-zinc-300">
-            Space left: {formatBytes(storageInfo.free_space, 2)} / {formatBytes(storageInfo.total_space, 0)}
+            Disk usage: {formatBytes(storageInfo.used, 2)} / {formatBytes(storageInfo.total, 0)}
           </p>
         )}
       </div>
@@ -78,9 +89,9 @@ export default function Recordings({ permissions }: RecordingsProps) {
           <Card key={recording.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
             <CardContent className="flex flex-col items-center justify-center pt-6">
               <FileVideo2 size={48} className="text-zinc-400 mb-2" />
-              <p className="text-zinc-300 text-center">{recording.filename}</p>
+              <p className="text-zinc-300 text-center">{formatRecordingName(recording.name)}</p>
               <p className="text-zinc-400 text-sm mt-1">
-                {cameras[recording.camera_ip]?.name || 'Unknown Camera'}
+                Camera: {cameras[recording.camera_ip]?.name || 'Unknown Camera'}
               </p>
             </CardContent>
             <CardFooter className="flex flex-col">
@@ -88,14 +99,14 @@ export default function Recordings({ permissions }: RecordingsProps) {
                 <Button
                   variant="outline"
                   className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                  onClick={() => window.open(`http://localhost/stream/${recording.id}`, '_blank')}
+                  onClick={() => setSelectedRecording(recording)}
                 >
                   Stream
                 </Button>
                 <Button
                   variant="outline"
                   className="flex-1 ml-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                  onClick={() => window.open(`http://localhost/download/${recording.id}`, '_blank')}
+                  onClick={() => window.open(getRecordingDownloadUrl(recording.id), '_blank')}
                 >
                   Download
                 </Button>
@@ -121,6 +132,41 @@ export default function Recordings({ permissions }: RecordingsProps) {
           </Card>
         ))}
       </div>
+
+      {/* Video Streaming Dialog */}
+      <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex justify-between items-center">
+              <span>Recording: {selectedRecording ? formatRecordingName(selectedRecording.name) : ''}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedRecording(null)}
+                className="text-zinc-400 hover:text-zinc-50"
+              >
+                <X className="h-6 w-6" />
+              </Button>
+            </DialogTitle>
+            <DialogDescription>
+              Camera: {cameras[selectedRecording?.camera_ip || '']?.name || 'Unknown Camera'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedRecording && (
+            <div className="flex-grow overflow-hidden">
+              <video
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+                src={getRecordingStreamUrl(selectedRecording.id)}
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
         <AlertDialogContent className="bg-zinc-800 text-zinc-50">
