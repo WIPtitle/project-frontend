@@ -137,16 +137,8 @@ export default function Recordings({ permissions }: RecordingsProps) {
       <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex justify-between items-center">
-              <span>Recording: {selectedRecording ? formatRecordingName(selectedRecording.name) : ''}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelectedRecording(null)}
-                className="text-zinc-400 hover:text-zinc-50"
-              >
-                <X className="h-6 w-6" />
-              </Button>
+            <DialogTitle>
+              Recording: {selectedRecording ? formatRecordingName(selectedRecording.name) : ''}
             </DialogTitle>
             <DialogDescription>
               Camera: {cameras[selectedRecording?.camera_ip || '']?.name || 'Unknown Camera'}
@@ -159,7 +151,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
                 controls
                 autoPlay
                 className="w-full h-full object-contain"
-                src={getRecordingStreamUrl(selectedRecording.id)}
+                src={getRecordingDownloadUrl(selectedRecording.id)}
               >
                 Your browser does not support the video tag.
               </video>
