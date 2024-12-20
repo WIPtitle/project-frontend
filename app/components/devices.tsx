@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStreamUrl, getTokenOrThrow } from "@/lib/api"
 import { RTSPCamera, MagneticReed, Permission } from "@/types"
+import Image from "next/image"
+import { StreamingImage } from "./streaming-image"
 
 type DeviceProps = {
   permissions: Permission[]
@@ -42,6 +44,7 @@ export default function Component({ permissions }: DeviceProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingReeds, setIsLoadingReeds] = useState(true)
+  const [selectedCamera, setSelectedCamera] = useState<RTSPCamera | null>(null);
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const canAccessStreamCameras = permissions.includes(Permission.ACCESS_STREAM_CAMERAS)
@@ -165,21 +168,24 @@ export default function Component({ permissions }: DeviceProps) {
                 <CardTitle className="text-zinc-50">{camera.name}</CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
-                {canAccessStreamCameras ? (
-                  <img
-                      src={`${getRTSPCameraStreamUrl(camera.ip)}?auth_token=${getTokenOrThrow()}`}
-                      className="w-full h-auto object-cover"
-                      alt="Camera Stream"
-                  />
-                ) : (
-                  <div className="aspect-video bg-zinc-700 flex items-center justify-center text-zinc-400">
-                    No access to camera stream
-                  </div>
-                )}
-                <p className="text-zinc-300 mt-2">IP: {camera.ip}</p>
+                <div className="space-y-2">
+                  <p className="text-zinc-300">IP: {camera.ip}</p>
+                  <p className="text-zinc-300">Path: {camera.path}</p>
+                  <p className="text-zinc-300">Name: {camera.name}</p>
+                  <p className="text-zinc-300">Sensibility: {camera.sensibility}%</p>
+                </div>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
+                  {canAccessStreamCameras && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 mb-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full"
+                      onClick={() => setSelectedCamera(camera)}
+                    >
+                      Stream
+                    </Button>
+                  )}
                   <div className="flex w-full">
                     <Button
                       variant="outline"
@@ -391,6 +397,32 @@ export default function Component({ permissions }: DeviceProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Video Streaming Dialog */}
+      <Dialog open={!!selectedCamera} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedCamera(null)
+        }
+      }}>
+        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              Camera Stream: {selectedCamera?.name}
+            </DialogTitle>
+            <DialogDescription>
+              IP: {selectedCamera?.ip}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedCamera && (
+            <div className="flex-grow overflow-hidden">
+              <StreamingImage
+                camera={selectedCamera}
+                onError={(error) => setErrorMessage(error.message)}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
