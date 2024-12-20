@@ -403,7 +403,7 @@ export default function Component({ permissions }: DeviceProps) {
           setSelectedCamera(null)
         }
       }}>
-        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle>
               Camera Stream: {selectedCamera?.name}
