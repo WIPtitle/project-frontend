@@ -34,14 +34,18 @@ export function StreamingImage({ camera, onError }: StreamingImageProps) {
 
       if (type === 'frame' && contextRef.current) {
         // Adjust canvas size to match the image size
-        canvas.width = imageBitmap.width
-        canvas.height = imageBitmap.height
+        const aspectRatio = imageBitmap.width / imageBitmap.height
+        const canvasWidth = canvas.parentElement?.clientWidth || window.innerWidth
+        const canvasHeight = canvasWidth / aspectRatio
+
+        canvas.width = canvasWidth
+        canvas.height = canvasHeight
 
         // Clear previous frame
         contextRef.current.clearRect(0, 0, canvas.width, canvas.height)
 
         // Draw new frame
-        contextRef.current.drawImage(imageBitmap, 0, 0)
+        contextRef.current.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height)
 
         // Close the bitmap to free memory
         imageBitmap.close()
@@ -62,10 +66,10 @@ export function StreamingImage({ camera, onError }: StreamingImageProps) {
   }, [camera.ip, onError])
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full flex justify-center items-center p-2">
       <canvas
         ref={canvasRef}
-        className="object-contain"
+        className="object-contain max-w-full max-h-full"
         style={{ imageRendering: 'pixelated' }}
       />
     </div>
