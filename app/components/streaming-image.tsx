@@ -1,5 +1,3 @@
-'use client'
-
 import { useState, useEffect, useRef } from 'react'
 import { RTSPCamera } from '@/types'
 import { getRTSPCameraStreamUrl } from '@/lib/api'
@@ -35,7 +33,8 @@ export function StreamingImage({ camera, onError }: StreamingImageProps) {
       if (type === 'frame' && contextRef.current) {
         // Adjust canvas size to match the image size
         const aspectRatio = imageBitmap.width / imageBitmap.height
-        const canvasWidth = canvas.parentElement?.clientWidth || window.innerWidth
+        const maxWidth = 640 // Set a maximum width for large screens
+        const canvasWidth = Math.min(canvas.parentElement?.clientWidth || window.innerWidth, maxWidth)
         const canvasHeight = canvasWidth / aspectRatio
 
         canvas.width = canvasWidth
@@ -70,7 +69,7 @@ export function StreamingImage({ camera, onError }: StreamingImageProps) {
       <canvas
         ref={canvasRef}
         className="object-contain max-w-full max-h-full"
-        style={{ imageRendering: 'pixelated' }}
+        style={{ imageRendering: 'pixelated', maxWidth: '100%', maxHeight: '100%' }}
       />
     </div>
   )
