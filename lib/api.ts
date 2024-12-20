@@ -36,12 +36,12 @@ export const loginAndSetToken = async (email: string, password: string, remember
   let token: string | null = null
   let tokenExpiry: Date | null = null
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/token`, {
+    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/token?rememberme=${rememberMe}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&rememberme=${rememberMe}`,
+      body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
     })
 
     if (!response.ok) {
