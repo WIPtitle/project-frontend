@@ -15,7 +15,7 @@ type RecordingsProps = {
 
 export default function Recordings({ permissions }: RecordingsProps) {
   const [recordings, setRecordings] = useState<Recording[]>([])
-  const [cameras, setCameras] = useState<{[key: string]: RTSPCamera}>({})
+  const [cameras, setCameras] = useState<{[key: string]: RTSPCamera | null}>({})
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
@@ -29,12 +29,20 @@ export default function Recordings({ permissions }: RecordingsProps) {
           .sort((a, b) => a.name.localeCompare(b.name))
         setRecordings(completedRecordings)
 
-        const cameraPromises = completedRecordings.map(recording => getRTSPCamera(recording.camera_ip))
+        const cameraPromises = completedRecordings.map(async recording => {
+          try {
+            return await getRTSPCamera(recording.camera_ip)
+          } catch (error) {
+            return null
+          }
+        })
         const cameraResults = await Promise.all(cameraPromises)
-        const cameraMap = cameraResults.reduce((acc: {[key: string]: RTSPCamera}, camera: RTSPCamera) => {
-          acc[camera.ip] = camera
+        const cameraMap = cameraResults.reduce((acc: {[key: string]: RTSPCamera | null}, camera) => {
+          if (camera) {
+            acc[camera.ip] = camera
+          }
           return acc
-        }, {} as {[key: string]: RTSPCamera})
+        }, {} as {[key: string]: RTSPCamera | null})
         setCameras(cameraMap)
 
         const storage = await getStorageInfo()
