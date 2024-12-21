@@ -70,16 +70,34 @@ export default function Component({ permissions }: DeviceProps) {
 
   useEffect(() => {
     const fetchReedStatuses = async () => {
-      const statusPromises = magneticReeds.map(async (reed) => {
-        const status = await getReedCurrentStatus(reed.gpio_pin_number)
-        return [reed.gpio_pin_number, status]
-      })
-      const statuses = await Promise.all(statusPromises)
-      setReedStatuses(Object.fromEntries(statuses))
-    }
+      const newStatuses: Record<number, string> = {};
+      for (const reed of magneticReeds) {
+        try {
+          // Explicitly await the Promise<string> returned by getReedCurrentStatus
+          const status = await getReedCurrentStatus(reed.gpio_pin_number);
+          // Immediately update the status for this reed
+          setReedStatuses(prev => ({
+            ...prev,
+            [reed.gpio_pin_number]: status
+          }));
+        } catch (error) {
+          console.error(`Failed to fetch status for reed ${reed.gpio_pin_number}:`, error);
+          setReedStatuses(prev => ({
+            ...prev,
+            [reed.gpio_pin_number]: 'Error'
+          }));
+        }
+      }
+    };
 
-    fetchReedStatuses()
-  }, [magneticReeds])
+    fetchReedStatuses();
+
+    // Set up an interval to update statuses every 5 seconds
+    const interval = setInterval(fetchReedStatuses, 5000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [magneticReeds]);
 
 
   const handleAddDevice = (type: 'camera' | 'reed') => {
