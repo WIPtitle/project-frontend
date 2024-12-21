@@ -21,6 +21,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+function formatEmail(email: string): string {
+  if (email.length <= 25) return email;
+
+  const [localPart, domain] = email.split('@');
+  const [domainName, ...tld] = domain.split('.');
+  return `${localPart}@***${tld.length ? '.' + tld.join('.') : ''}`;
+}
+
 export default function TabLayout() {
   const [token, setToken] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
@@ -189,7 +197,7 @@ export default function TabLayout() {
             )}
 
               <div ref={userInfoRef} className="flex items-center space-x-2 pr-4">
-                <span className="text-zinc-400">{currentUser?.email}</span>
+                <span className="text-zinc-400">{formatEmail(currentUser?.email || '')}</span>
                 <Avatar>
                   <AvatarImage src="/avatar.webp" alt={currentUser?.email} />
                 </Avatar>
@@ -222,3 +230,4 @@ export default function TabLayout() {
     </div>
   )
 }
+
