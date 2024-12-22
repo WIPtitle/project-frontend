@@ -40,6 +40,7 @@ export default function Component({ permissions }: DeviceProps) {
   const [editingDevice, setEditingDevice] = useState<CameraInputDto | ReedInputDto | null>(null)
   const [deviceType, setDeviceType] = useState<'camera' | 'reed'>('camera')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [reedStatuses, setReedStatuses] = useState<Record<number, string>>({})
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingReeds, setIsLoadingReeds] = useState(true)
@@ -67,6 +68,36 @@ export default function Component({ permissions }: DeviceProps) {
     fetchDevices()
   }, [])
 
+  useEffect(() => {
+    const fetchReedStatuses = async () => {
+      const newStatuses: Record<number, string> = {};
+      for (const reed of magneticReeds) {
+        try {
+          // Explicitly await the Promise<string> returned by getReedCurrentStatus
+          const status = await getReedCurrentStatus(reed.gpio_pin_number);
+          // Immediately update the status for this reed
+          setReedStatuses(prev => ({
+            ...prev,
+            [reed.gpio_pin_number]: status
+          }));
+        } catch (error) {
+          console.error(`Failed to fetch status for reed ${reed.gpio_pin_number}:`, error);
+          setReedStatuses(prev => ({
+            ...prev,
+            [reed.gpio_pin_number]: 'Error'
+          }));
+        }
+      }
+    };
+
+    fetchReedStatuses();
+
+    // Set up an interval to update statuses every 5 seconds
+    const interval = setInterval(fetchReedStatuses, 5000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [magneticReeds]);
 
   const handleAddDevice = (type: 'camera' | 'reed') => {
     setDeviceType(type);
@@ -238,6 +269,7 @@ export default function Component({ permissions }: DeviceProps) {
               <CardContent className="flex-grow">
                 <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
                 <p className="text-zinc-300">Type: {reed.default_value_when_closed === "HIGH" ? "Normally Open" : "Normally Closed"}</p>
+                <p className="text-zinc-300 mt-8">Current Status: {reedStatuses[reed.gpio_pin_number] || 'Loading...'}</p>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
