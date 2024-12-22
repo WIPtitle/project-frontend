@@ -451,11 +451,6 @@ export default function Component({ permissions }: DeviceProps) {
                   unoptimized
                   sizes="(max-width: 640px) 100vw, 90vw"
                   priority
-                  onError={(e) => {
-                    if (onError) {
-                      onError(new Error('Failed to load camera stream frame'))
-                    }
-                  }}
                 />
               </div>
             </div>
