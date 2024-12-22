@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStreamUrl, getTokenOrThrow } from "@/lib/api"
 import { RTSPCamera, MagneticReed, Permission } from "@/types"
 import Image from "next/image"
-import { StreamingImage } from "./streaming-image"
 
 type DeviceProps = {
   permissions: Permission[]
@@ -431,7 +430,8 @@ export default function Component({ permissions }: DeviceProps) {
           setSelectedCamera(null)
         }
       }}>
-        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50 mx-auto">          <DialogHeader>
+        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50 mx-auto">
+        <DialogHeader>
             <DialogTitle>
               Camera Stream: {selectedCamera?.name}
             </DialogTitle>
@@ -442,10 +442,22 @@ export default function Component({ permissions }: DeviceProps) {
 
           {selectedCamera && (
             <div className="flex-grow overflow-hidden">
-              <StreamingImage
-                camera={selectedCamera}
-                onError={(error) => setErrorMessage(error.message)}
-              />
+              <div className="relative w-full h-full flex justify-center items-center p-2">
+                <Image
+                  src={`${getRTSPCameraStreamUrl(selectedCamera.ip)}`}
+                  alt={`Live stream from ${selectedCamera.name}`}
+                  fill
+                  className="w-full h-auto object-cover"
+                  unoptimized
+                  sizes="(max-width: 640px) 100vw, 90vw"
+                  priority
+                  onError={(e) => {
+                    if (onError) {
+                      onError(new Error('Failed to load camera stream frame'))
+                    }
+                  }}
+                />
+              </div>
             </div>
           )}
         </DialogContent>
