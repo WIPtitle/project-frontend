@@ -21,6 +21,10 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/icons/icon-192x192.png" />
         <meta name="theme-color" content="#4a90e2" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+        <meta name="mobile-web-app-capable" content="yes"/>
+        <meta name="apple-mobile-web-app-capable" content="yes"/>
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
       </head>
       <body className={`${inter.className} min-h-screen`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
