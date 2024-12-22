@@ -442,13 +442,10 @@ export default function Component({ permissions }: DeviceProps) {
           {selectedCamera && (
             <div className="flex-grow overflow-hidden">
               <div className="relative w-full h-full flex justify-center items-center p-2">
-                <Image
-                  src={getRTSPCameraStreamUrl(selectedCamera.ip)}
-                  alt={`Live stream from ${selectedCamera.name}`}
-                  fill
-                  className="w-full h-auto object-cover"
-                  sizes="(max-width: 640px) 100vw, 90vw"
-                  priority
+                <img
+                      src={`${getRTSPCameraStreamUrl(selectedCamera.ip)}`}
+                      className="w-full max-w-[640px] h-auto object-cover"
+                      alt="Camera Stream"
                 />
               </div>
             </div>
