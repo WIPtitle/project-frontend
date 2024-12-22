@@ -93,11 +93,7 @@ export default function Component({ permissions }: DeviceProps) {
 
     fetchReedStatuses();
 
-    // Set up an interval to update statuses every 5 seconds
-    const interval = setInterval(fetchReedStatuses, 5000);
-
-    // Cleanup interval on unmount
-    return () => clearInterval(interval);
+    return () => {}
   }, [magneticReeds]);
 
   const handleAddDevice = (type: 'camera' | 'reed') => {
