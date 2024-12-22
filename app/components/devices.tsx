@@ -40,6 +40,7 @@ export default function Component({ permissions }: DeviceProps) {
   const [editingDevice, setEditingDevice] = useState<CameraInputDto | ReedInputDto | null>(null)
   const [deviceType, setDeviceType] = useState<'camera' | 'reed'>('camera')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false);
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingReeds, setIsLoadingReeds] = useState(true)
   const [selectedCamera, setSelectedCamera] = useState<RTSPCamera | null>(null);
