@@ -35,7 +35,8 @@ export interface User {
 export interface MagneticReed {
     name: string;
     gpio_pin_number: number;
-    default_value_when_closed: 'HIGH' | 'LOW';
+    vcc: boolean;
+    normally_closed: boolean;
     listening: boolean;
     group_id: number;
 }
