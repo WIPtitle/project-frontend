@@ -435,7 +435,8 @@ export default function Component({ permissions }: DeviceProps) {
           setSelectedCamera(null)
         }
       }}>
-        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50 mx-auto">          <DialogHeader>
+        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] bg-zinc-800 text-zinc-50">
+          <DialogHeader>
             <DialogTitle>
               Camera Stream: {selectedCamera?.name}
             </DialogTitle>
@@ -445,10 +446,11 @@ export default function Component({ permissions }: DeviceProps) {
           </DialogHeader>
 
           {selectedCamera && (
-            <div className="flex-grow overflow-hidden">
+            <div className="flex-grow overflow-hidden bg-black rounded-lg">
               <StreamingImage
                 camera={selectedCamera}
                 onError={(error) => setErrorMessage(error.message)}
+                key={selectedCamera.ip}
               />
             </div>
           )}
