@@ -184,7 +184,6 @@ export default function Component({ permissions }: DeviceProps) {
                 <div className="space-y-2">
                   <p className="text-zinc-300">IP: {camera.ip}</p>
                   <p className="text-zinc-300">Path: {camera.path}</p>
-                  <p className="text-zinc-300">Name: {camera.name}</p>
                   <p className="text-zinc-300">Sensibility: {camera.sensibility}%</p>
                 </div>
               </CardContent>
@@ -430,7 +429,7 @@ export default function Component({ permissions }: DeviceProps) {
           setSelectedCamera(null)
         }
       }}>
-        <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1200px] max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50 mx-auto">
+      <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[640px] max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50 mx-auto">
         <DialogHeader>
             <DialogTitle>
               Camera Stream: {selectedCamera?.name}
@@ -444,11 +443,10 @@ export default function Component({ permissions }: DeviceProps) {
             <div className="flex-grow overflow-hidden">
               <div className="relative w-full h-full flex justify-center items-center p-2">
                 <Image
-                  src={`${getRTSPCameraStreamUrl(selectedCamera.ip)}`}
+                  src={getRTSPCameraStreamUrl(selectedCamera.ip)}
                   alt={`Live stream from ${selectedCamera.name}`}
                   fill
                   className="w-full h-auto object-cover"
-                  unoptimized
                   sizes="(max-width: 640px) 100vw, 90vw"
                   priority
                 />
