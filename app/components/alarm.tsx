@@ -486,6 +486,7 @@ export default function Alarm({ permissions }: AlarmProps) {
               />
               <Input
                 type="password"
+                inputMode="numeric"
                 placeholder="Enter PIN"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
@@ -518,3 +519,4 @@ export default function Alarm({ permissions }: AlarmProps) {
     </div>
   )
 }
+

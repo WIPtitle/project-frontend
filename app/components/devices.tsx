@@ -363,7 +363,7 @@ export default function Component({ permissions }: DeviceProps) {
                   />
                   <Input
                     type="number"
-                    placeholder="Sensibility"
+                    placeholder="Sensibility (percentage)"
                     value={(editingDevice as CameraInputDto)?.sensibility || ""}
                     onChange={(e) => setEditingDevice(prev => prev ? {...prev, sensibility: parseInt(e.target.value)} : null)}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
@@ -443,9 +443,9 @@ export default function Component({ permissions }: DeviceProps) {
             <div className="flex-grow overflow-hidden">
               <div className="relative w-full h-full flex justify-center items-center p-2">
                 <img
-                      src={`${getRTSPCameraStreamUrl(selectedCamera.ip)}`}
-                      className="w-full max-w-[640px] h-auto object-cover"
-                      alt="Camera Stream"
+                  src={`${getRTSPCameraStreamUrl(selectedCamera.ip)}`}
+                  className="w-full max-w-[640px] h-auto object-cover"
+                  alt="Camera Stream"
                 />
               </div>
             </div>
