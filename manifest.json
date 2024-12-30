@@ -17,6 +17,7 @@
   ],
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["fullscreen", "window-controls-overlay"],
   "background_color": "#ffffff",
   "theme_color": "#4a90e2",
   "screenshots": [
