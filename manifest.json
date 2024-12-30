@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "Home alarm system",
   "short_name": "Alarm",
   "description": "Your self hosted home alarm system",
@@ -17,5 +18,21 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4a90e2"
+  "theme_color": "#4a90e2",
+  "screenshots": [
+    {
+     "src": "screenshots/screenshot_wide.png",
+      "sizes": "1646x846",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Alarm"
+    },
+    {
+      "src": "screenshots/screenshot_narrow.png",
+      "sizes": "358x769",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Alarm"
+    }
+  ]
 }
