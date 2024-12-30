@@ -19,6 +19,14 @@ import { getAllUsers, createUser, updateUser, deleteUser, logout, getPermissions
 import { User, Permission } from "@/types"
 import { useRouter } from "next/navigation"
 
+function formatEmail(email: string): string {
+  if (email.length <= 25) return email;
+
+  const [localPart, domain] = email.split('@');
+  const [domainName, ...tld] = domain.split('.');
+  return `${localPart}@***${tld.length ? '.' + tld.join('.') : ''}`;
+}
+
 type UserManagementProps = {
   onUserUpdate: (user: User) => void
   currentUser: User | null
@@ -174,7 +182,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
           <Avatar>
             <AvatarImage src="/avatar.webp" alt={currentUser.email} />
           </Avatar>
-          <span className="text-zinc-300">{currentUser.email} (You)</span>
+          <span className="text-zinc-300">{formatEmail(currentUser.email)} (You)</span>
         </div>
         <div className="flex w-full sm:w-auto space-x-2">
           <Button variant="outline" className="flex-1 sm:flex-none bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(currentUser)}>Edit</Button>
@@ -205,7 +213,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
         <Avatar>
           <AvatarImage src="/avatar.webp" alt={user.email} />
         </Avatar>
-        <span className="text-zinc-300">{user.email}</span>
+        <span className="text-zinc-300">{formatEmail(user.email)}</span>
       </div>
       {isUserManager && (
         <div className="flex w-full sm:w-auto space-x-2">
