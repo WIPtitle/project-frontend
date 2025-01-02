@@ -735,9 +735,9 @@ export const deleteAlarmAudioConfig = async (): Promise<void> => {
   }
 }
 
-export const startListening = async (groupId: number, pin: string, forceListening: boolean): Promise<boolean> => {
+export const startListening = async (groupId: number, pin: string): Promise<void> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/start-listening?force_listening=${forceListening}`, {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/start-listening`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getTokenOrThrow()}`,
@@ -746,12 +746,9 @@ export const startListening = async (groupId: number, pin: string, forceListenin
       body: JSON.stringify({ pin }),
     });
 
-    if (response.ok) {
-      return true;
-    } else if (response.status === 409) {
-      return false;
+    if (!response.ok) {
+      throw new Error('Failed to start listening');
     }
-    throw new Error('Failed to start listening');
   } catch (error) {
     throw error;
   }

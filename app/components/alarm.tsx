@@ -50,7 +50,6 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [pin, setPin] = useState<string>("")
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
-  const [isForceListening, setIsForceListening] = useState(false)
   const [groupError, setGroupError] = useState<string | null>(null);
 
   const eventSources = useRef<{ [key: number]: EventSource }>({})
@@ -216,18 +215,13 @@ export default function Alarm({ permissions }: AlarmProps) {
   const handleActivateAlarm = useCallback(async (groupId: number) => {
     setIsActivating(prev => ({ ...prev, [groupId]: true }))
     try {
-      const success = await startListening(groupId, pin, isForceListening)
-      if (!success) {
-        setSelectedGroupId(groupId)
-        setIsForceListening(true)
-        setIsPinDialogOpen(true)
-      }
+      await startListening(groupId, pin)
     } catch (error) {
       setErrorMessage("Failed to activate alarm")
     } finally {
       setIsActivating(prev => ({ ...prev, [groupId]: false }))
     }
-  }, [deviceGroups, pin, isForceListening])
+  }, [deviceGroups, pin])
 
   const handleDeactivateAlarm = useCallback(async (groupId: number) => {
     setIsDeactivating(prev => ({ ...prev, [groupId]: true }))
@@ -425,7 +419,6 @@ export default function Alarm({ permissions }: AlarmProps) {
                   <Button
                     onClick={() => {
                       setSelectedGroupId(group.id)
-                      setIsForceListening(false)
                       setIsPinDialogOpen(true)
                     }}
                     disabled={isActivating[group.id]}
@@ -438,7 +431,6 @@ export default function Alarm({ permissions }: AlarmProps) {
                   <Button
                     onClick={() => {
                       setSelectedGroupId(group.id)
-                      setIsForceListening(false)
                       setIsPinDialogOpen(true)
                     }}
                     disabled={isDeactivating[group.id] || group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING}
@@ -461,7 +453,7 @@ export default function Alarm({ permissions }: AlarmProps) {
       >
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
-            <DialogTitle>{isForceListening ? "Force Activate Alarm" : "Enter PIN"}</DialogTitle>
+            <DialogTitle>{"Enter PIN"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault()
@@ -496,11 +488,8 @@ export default function Alarm({ permissions }: AlarmProps) {
                 key={isPinDialogOpen ? "open" : "closed"}
               />
             </div>
-            {isForceListening && (
-              <p className="text-yellow-500 mb-4">Warning: A magnetic reed in the group is open. Do you want to force activate the alarm?</p>
-            )}
             <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-              {isForceListening ? "Force Activate" : "Submit"}
+              {"Submit"}
             </Button>
           </form>
         </DialogContent>
