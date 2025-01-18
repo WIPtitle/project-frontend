@@ -22,7 +22,6 @@ type CameraInputDto = {
   username: string;
   password: string;
   path: string;
-  sensibility: number;
 }
 
 type ReedInputDto = {
@@ -98,7 +97,7 @@ export default function Component({ permissions }: DeviceProps) {
   const handleAddDevice = (type: 'camera' | 'reed') => {
     setDeviceType(type);
     setEditingDevice(type === 'camera'
-      ? { name: "", ip: "", port: 0, username: "", password: "", path: "", sensibility: 0 }
+      ? { name: "", ip: "", port: 0, username: "", password: "", path: "" }
       : { name: "", gpio_pin_number: 0, vcc: true, normally_closed: false });
     setIsCreating(true);
     setIsDialogOpen(true);
@@ -184,7 +183,6 @@ export default function Component({ permissions }: DeviceProps) {
                 <div className="space-y-2">
                   <p className="text-zinc-300">IP: {camera.ip}</p>
                   <p className="text-zinc-300">Path: {camera.path}</p>
-                  <p className="text-zinc-300">Sensibility: {camera.sensibility}%</p>
                 </div>
               </CardContent>
               {canModifyDevices && (
@@ -203,7 +201,6 @@ export default function Component({ permissions }: DeviceProps) {
                       variant="outline"
                       className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
                       onClick={() => handleEditDevice(camera, 'camera')}
-                      disabled={camera.listening}
                     >
                       Edit
                     </Button>
@@ -212,7 +209,6 @@ export default function Component({ permissions }: DeviceProps) {
                         <Button
                           variant="destructive"
                           className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
-                          disabled={camera.listening}
                         >
                           Delete
                         </Button>
@@ -359,13 +355,6 @@ export default function Component({ permissions }: DeviceProps) {
                     placeholder="Path"
                     value={(editingDevice as CameraInputDto)?.path || ""}
                     onChange={(e) => setEditingDevice(prev => prev ? {...prev, path: e.target.value} : null)}
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Sensibility (percentage)"
-                    value={(editingDevice as CameraInputDto)?.sensibility || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, sensibility: parseInt(e.target.value)} : null)}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
                 </>

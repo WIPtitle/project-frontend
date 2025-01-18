@@ -72,8 +72,5 @@ export interface RTSPCamera {
     username: string;
     password: string;
     path: string;
-    sensibility: number;
-    listening: boolean;
-    group_id: number;
 }
 

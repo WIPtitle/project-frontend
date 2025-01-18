@@ -26,10 +26,6 @@ type DeviceGroupInputDto = DeviceGroup & {
 };
 
 // filters not needed now, but could be in the future
-export const getAvailableCameras = (cameras: RTSPCamera[], groupId: number | null): RTSPCamera[] => {
-  return cameras.filter(camera => camera);
-}
-
 export const getAvailableReeds = (reeds: MagneticReed[], groupId: number | null): MagneticReed[] => {
   return reeds.filter(reed => reed);
 }
@@ -260,7 +256,7 @@ export default function Alarm({ permissions }: AlarmProps) {
             <form onSubmit={(e) => {
               e.preventDefault()
               if (editingGroup) {
-                if (selectedCameras.length === 0 && selectedReeds.length === 0) {
+                if (selectedReeds.length === 0) {
                   setGroupError("No device set - please set at least one device");
                 } else {
                   setGroupError(null);
@@ -292,32 +288,6 @@ export default function Alarm({ permissions }: AlarmProps) {
                 {groupError && (
                   <p className="text-red-500 text-sm mt-2">{groupError}</p>
                 )}
-                <div>
-                  <h3 className="mb-2 font-semibold text-zinc-300">Cameras</h3>
-                  {getAvailableCameras(allCameras, editingGroup?.id ?? null).map(camera => (
-                    <div key={camera.ip} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`camera-${camera.ip}`}
-                        checked={selectedCameras.some(c => c.ip === camera.ip)}
-                        onCheckedChange={(checked) => {
-                          setSelectedCameras(prev =>
-                            checked
-                              ? [...prev, camera]
-                              : prev.filter(c => c.ip !== camera.ip)
-                          )
-                        }}
-                        className="border-zinc-500"
-                      />
-                      <label
-                        htmlFor={`camera-${camera.ip}`}
-                        className="text-zinc-300"
-                      >
-                        {camera.name}
-                      </label>
-                    </div>
-                  ))}
-                  {getAvailableCameras(allCameras, editingGroup?.id ?? null).length === 0 && <p className="text-zinc-400">No camera available</p>}
-                </div>
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Reeds</h3>
                   {getAvailableReeds(allReeds, editingGroup?.id ?? null).map(reed => (
