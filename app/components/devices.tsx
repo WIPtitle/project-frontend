@@ -104,10 +104,12 @@ export default function Component({ permissions }: DeviceProps) {
   }
 
   const handleEditDevice = (device: RTSPCamera | MagneticReed, type: 'camera' | 'reed') => {
-    setDeviceType(type);
-    setEditingDevice(device);
-    setIsCreating(false);
-    setIsDialogOpen(true);
+    if (type === 'reed') {
+      setDeviceType(type);
+      setEditingDevice(device);
+      setIsCreating(false);
+      setIsDialogOpen(true);
+    }
   }
 
   const handleDeleteDevice = async (id: string | number, type: 'camera' | 'reed') => {
@@ -131,9 +133,6 @@ export default function Component({ permissions }: DeviceProps) {
         if (isCreating) {
           const newCamera = await createRTSPCamera(camera);
           setRtspCameras([...rtspCameras, newCamera]);
-        } else {
-          const updatedCamera = await updateRTSPCamera(camera.ip, camera);
-          setRtspCameras(rtspCameras.map(c => c.ip === updatedCamera.ip ? updatedCamera : c));
         }
       } else {
         const reed = device as ReedInputDto;
@@ -187,23 +186,16 @@ export default function Component({ permissions }: DeviceProps) {
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
-                  {canAccessStreamCameras && (
-                    <Button
-                      variant="outline"
-                      className="flex-1 mb-2 bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full"
-                      onClick={() => setSelectedCamera(camera)}
-                    >
-                      Stream
-                    </Button>
-                  )}
                   <div className="flex w-full">
-                    <Button
-                      variant="outline"
-                      className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                      onClick={() => handleEditDevice(camera, 'camera')}
-                    >
-                      Edit
-                    </Button>
+                    {canAccessStreamCameras && (
+                      <Button
+                        variant="outline"
+                        className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                        onClick={() => setSelectedCamera(camera)}
+                      >
+                        Stream
+                      </Button>
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
