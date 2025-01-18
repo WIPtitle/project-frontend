@@ -25,12 +25,13 @@ type DeviceGroupInputDto = DeviceGroup & {
   id?: number;
 };
 
+// filters not needed now, but could be in the future
 export const getAvailableCameras = (cameras: RTSPCamera[], groupId: number | null): RTSPCamera[] => {
-  return cameras.filter(camera => camera.group_id === null || camera.group_id === groupId);
+  return cameras.filter(camera => camera);
 }
 
 export const getAvailableReeds = (reeds: MagneticReed[], groupId: number | null): MagneticReed[] => {
-  return reeds.filter(reed => reed.group_id === null || reed.group_id === groupId);
+  return reeds.filter(reed => reed);
 }
 
 export default function Alarm({ permissions }: AlarmProps) {
