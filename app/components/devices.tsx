@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStreamUrl, getTokenOrThrow } from "@/lib/api"
 import { RTSPCamera, MagneticReed, Permission } from "@/types"
-import Image from "next/image"
+import HLSPlayer from "./hls-player"
 
 type DeviceProps = {
   permissions: Permission[]
@@ -423,10 +423,8 @@ export default function Component({ permissions }: DeviceProps) {
           {selectedCamera && (
             <div className="flex-grow overflow-hidden">
               <div className="relative w-full h-full flex justify-center items-center p-2">
-                <img
-                  src={`${getRTSPCameraStreamUrl(selectedCamera.ip)}`}
-                  className="w-full max-w-[640px] h-auto object-cover"
-                  alt="Camera Stream"
+                <HLSPlayer
+                    src={getRTSPCameraStreamUrl(selectedCamera.ip)}
                 />
               </div>
             </div>
@@ -436,4 +434,3 @@ export default function Component({ permissions }: DeviceProps) {
     </div>
   )
 }
-
