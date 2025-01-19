@@ -26,8 +26,17 @@ const HLSPlayer = ({ src }: {src: string}) => {
       });
     }
 
+    // Prevent pause/play via keyboard or mouse
+    const preventPause = (e: Event) => {
+      e.preventDefault();
+      video.play(); // Always try to play
+    };
+
+    video.addEventListener('pause', preventPause);
+
     return () => {
       if (videoRef.current) {
+        videoRef.current.removeEventListener('pause', preventPause);
         videoRef.current.pause();
         videoRef.current.src = "";
         videoRef.current.load();
@@ -46,9 +55,10 @@ const HLSPlayer = ({ src }: {src: string}) => {
       controls
       controlsList="noplaybackrate nofullscreen nodownload"
       disablePictureInPicture
-      className="max-w-full max-h-[70vh] [&::-webkit-media-controls-timeline]:hidden [&::-webkit-media-controls-current-time-display]:hidden [&::-webkit-media-controls-time-remaining-display]:hidden"
+      className="max-w-full max-h-[70vh] [&::-webkit-media-controls-timeline]:hidden [&::-webkit-media-controls-current-time-display]:hidden [&::-webkit-media-controls-time-remaining-display]:hidden [&::-webkit-media-controls-play-button]:hidden"
     />
   );
 };
 
 export default HLSPlayer;
+
