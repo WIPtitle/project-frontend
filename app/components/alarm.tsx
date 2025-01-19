@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getDeviceGroupStatusStream, getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllRtspCameras, getAllMagneticReeds, getDeviceGroupCameras, getDeviceGroupReeds, updateDeviceGroupCameras, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
-import { DeviceGroup, RTSPCamera, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
+import { getDeviceGroupStatusStream, getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllMagneticReeds, getDeviceGroupReeds, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
+import { DeviceGroup, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
 
 const statusMapping: Record<DeviceGroupStatus, string> = {
   [DeviceGroupStatus.LISTENING]: "Active",
@@ -32,15 +32,12 @@ export const getAvailableReeds = (reeds: MagneticReed[], groupId: number | null)
 
 export default function Alarm({ permissions }: AlarmProps) {
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[] | null>(null)
-  const [allCameras, setAllCameras] = useState<RTSPCamera[]>([])
   const [allReeds, setAllReeds] = useState<MagneticReed[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<DeviceGroupInputDto | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [groupCameras, setGroupCameras] = useState<{ [key: number]: RTSPCamera[] }>({})
   const [groupReeds, setGroupReeds] = useState<{ [key: number]: MagneticReed[] }>({})
-  const [selectedCameras, setSelectedCameras] = useState<RTSPCamera[]>([])
   const [selectedReeds, setSelectedReeds] = useState<MagneticReed[]>([])
   const [isActivating, setIsActivating] = useState<{ [key: number]: boolean }>({})
   const [isDeactivating, setIsDeactivating] = useState<{ [key: number]: boolean }>({})
@@ -80,26 +77,21 @@ export default function Alarm({ permissions }: AlarmProps) {
         const groups = await getDeviceGroups()
         setDeviceGroups(groups)
 
-        // Fetch cameras and reeds for each group
-        const camerasPromises = groups.map(group => getDeviceGroupCameras(group.id))
+        // Fetch reeds for each group
         const reedsPromises = groups.map(group => getDeviceGroupReeds(group.id))
 
-        const groupCamerasData = await Promise.all(camerasPromises)
         const groupReedsData = await Promise.all(reedsPromises)
 
-        const newGroupCameras: { [key: number]: RTSPCamera[] } = {}
         const newGroupReeds: { [key: number]: MagneticReed[] } = {}
 
         groups.forEach((group, index) => {
-          newGroupCameras[group.id] = groupCamerasData[index]
           newGroupReeds[group.id] = groupReedsData[index]
         })
 
-        setGroupCameras(newGroupCameras)
         setGroupReeds(newGroupReeds)
       } catch (error) {
         console.error("Failed to fetch data:", error);
-        setErrorMessage("Failed to fetch device groups, cameras, and reeds. Please try again later.");
+        setErrorMessage("Failed to fetch device groups and reeds. Please try again later.");
         setDeviceGroups([]);
       } finally {
         setIsLoading(false);
@@ -110,9 +102,7 @@ export default function Alarm({ permissions }: AlarmProps) {
 
   const fetchAllDevices = async () => {
     try {
-      const cameras = await getAllRtspCameras()
       const reeds = await getAllMagneticReeds()
-      setAllCameras(cameras)
       setAllReeds(reeds)
     } catch (error) {
       console.error("Failed to fetch devices:", error)
@@ -124,11 +114,6 @@ export default function Alarm({ permissions }: AlarmProps) {
     try {
       await deleteDeviceGroup(id)
       setDeviceGroups(prevGroups => prevGroups?.filter(group => group.id !== id) || [])
-      setGroupCameras(prev => {
-        const newGroupCameras = { ...prev }
-        delete newGroupCameras[id]
-        return newGroupCameras
-      })
       setGroupReeds(prev => {
         const newGroupReeds = { ...prev }
         delete newGroupReeds[id]
@@ -142,7 +127,6 @@ export default function Alarm({ permissions }: AlarmProps) {
   const handleAddGroup = async () => {
     await fetchAllDevices()
     setEditingGroup({ id: 0, name: "", wait_to_start_alarm: 0, wait_to_fire_alarm: 0, status: DeviceGroupStatus.IDLE })
-    setSelectedCameras([])
     setSelectedReeds([])
     setIsDialogOpen(true)
   }
@@ -152,7 +136,6 @@ export default function Alarm({ permissions }: AlarmProps) {
     setEditingGroup({
       ...group,
     })
-    setSelectedCameras(groupCameras[group.id] || [])
     setSelectedReeds(groupReeds[group.id] || [])
     setIsDialogOpen(true)
   }
@@ -168,20 +151,12 @@ export default function Alarm({ permissions }: AlarmProps) {
           })
           setDeviceGroups(prevGroups => prevGroups?.map(group => group.id === updatedGroupResponse.id ? updatedGroupResponse : group) || [])
 
-          // Update cameras
-          const updatedCameras = await updateDeviceGroupCameras(existingGroup.id, selectedCameras.map(c => c.ip))
-          setGroupCameras(prev => ({ ...prev, [existingGroup.id]: updatedCameras }))
-
           // Update reeds
           const updatedReeds = await updateDeviceGroupReeds(existingGroup.id, selectedReeds.map(r => r.gpio_pin_number))
           setGroupReeds(prev => ({ ...prev, [existingGroup.id]: updatedReeds }))
         } else {
           const newGroup = await createDeviceGroup(updatedGroup)
           setDeviceGroups(prevGroups => [...(prevGroups || []), newGroup])
-
-          // Add cameras to the new group
-          const newCameras = await updateDeviceGroupCameras(newGroup.id, selectedCameras.map(c => c.ip))
-          setGroupCameras(prev => ({ ...prev, [newGroup.id]: newCameras }))
 
           // Add reeds to the new group
           const newReeds = await updateDeviceGroupReeds(newGroup.id, selectedReeds.map(r => r.gpio_pin_number))
@@ -337,13 +312,6 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <p className={`${getStatusColor(group.status)} font-semibold`}>Status: {statusMapping[group.status]}</p>
                 <p className="text-zinc-300">Wait to start alarm: {group.wait_to_start_alarm}s</p>
                 <p className="text-zinc-300">Wait to fire alarm: {group.wait_to_fire_alarm}s</p>
-                <h3 className="mt-2 font-semibold text-zinc-300">Cameras:</h3>
-                <ul className="list-disc pl-5 text-zinc-300">
-                  {groupCameras[group.id]?.map((camera) => (
-                    <li key={camera.ip}>{camera.name}</li>
-                  ))}
-                </ul>
-                {groupCameras[group.id]?.length === 0 && <p className="text-zinc-400">No cameras</p>}
                 <h3 className="mt-2 font-semibold text-zinc-300">Reeds:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
                   {groupReeds[group.id]?.map((reed) => (
