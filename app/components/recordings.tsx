@@ -195,7 +195,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
                 controls
                 autoPlay
                 className="w-full h-full object-contain"
-                src={getRecordingDownloadUrl(selectedRecording.id)}
+                src={getRecordingStreamUrl(selectedRecording.id)}
               >
                 Your browser does not support the video tag.
               </video>
