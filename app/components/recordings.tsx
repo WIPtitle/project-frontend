@@ -18,6 +18,7 @@ import {
 import {
   getAllRecordings,
   deleteRecording,
+  deleteAllRecordings,
   getStorageInfo,
   getRecordingStreamUrl,
   getRecordingDownloadUrl,
@@ -89,6 +90,15 @@ export default function Recordings({ permissions }: RecordingsProps) {
     }
   }
 
+  const handleDeleteAll = async () => {
+    try {
+      await deleteAllRecordings()
+      setRecordings([])
+    } catch (error) {
+      setErrorMessage("Failed to delete all recordings")
+    }
+  }
+
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return "0 GB"
     const k = 1024
@@ -116,6 +126,30 @@ export default function Recordings({ permissions }: RecordingsProps) {
           </p>
         )}
       </div>
+
+      {recordings.length > 0 && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" className="w-full max-w-md mx-auto mb-4 block bg-red-900 hover:bg-red-800">
+              Delete All Recordings
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete all recordings?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete all recordings.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAll} className="bg-red-900 hover:bg-red-800 text-white">
+                Delete All
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {recordings.length === 0 ? (

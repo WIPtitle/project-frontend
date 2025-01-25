@@ -808,6 +808,23 @@ export const deleteRecording = async (id: number): Promise<void> => {
   }
 }
 
+export const deleteAllRecordings = async (): Promise<void> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/recording/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getTokenOrThrow()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete all recordings');
+    }
+  } catch (error) {
+    throw error;
+  }
+}
+
 export const getStorageInfo = async (): Promise<StorageInfo> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/disk-usage`, {
