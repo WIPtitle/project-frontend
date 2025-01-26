@@ -1,52 +1,76 @@
-'use client'
+"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getAllRtspCameras, getAllMagneticReeds, createRTSPCamera, createMagneticReed, updateRTSPCamera, updateMagneticReed, deleteRTSPCamera, deleteMagneticReed, getReedCurrentStatus, getRTSPCameraStreamUrl, getTokenOrThrow } from "@/lib/api"
-import { RTSPCamera, MagneticReed, Permission } from "@/types"
-import HLSPlayer from "./hls-player"
+import {
+  getAllRtspCameras,
+  getAllMagneticReeds,
+  createRTSPCamera,
+  createMagneticReed,
+  updateRTSPCamera,
+  updateMagneticReed,
+  deleteRTSPCamera,
+  deleteMagneticReed,
+  getReedCurrentStatus,
+  getTokenOrThrow,
+} from "@/lib/api"
+import { type RTSPCamera, type MagneticReed, Permission } from "@/types"
 
 type DeviceProps = {
   permissions: Permission[]
 }
 
 type CameraInputDto = {
-  name: string;
-  ip: string;
-  port: number;
-  username: string;
-  password: string;
-  path: string;
+  name: string
+  ip: string
+  port: number
+  username: string
+  password: string
+  path: string
 }
 
 type ReedInputDto = {
-  name: string;
-  gpio_pin_number: number;
-  vcc: boolean;
-  normally_closed: boolean;
+  name: string
+  gpio_pin_number: number
+  vcc: boolean
+  normally_closed: boolean
 }
-
 
 export default function Component({ permissions }: DeviceProps) {
   const [rtspCameras, setRtspCameras] = useState<RTSPCamera[]>([])
   const [magneticReeds, setMagneticReeds] = useState<MagneticReed[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDevice, setEditingDevice] = useState<CameraInputDto | ReedInputDto | null>(null)
-  const [deviceType, setDeviceType] = useState<'camera' | 'reed'>('camera')
+  const [deviceType, setDeviceType] = useState<"camera" | "reed">("camera")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [reedStatuses, setReedStatuses] = useState<Record<number, string>>({})
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false)
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingReeds, setIsLoadingReeds] = useState(true)
-  const [selectedCamera, setSelectedCamera] = useState<RTSPCamera | null>(null);
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
-  const canAccessStreamCameras = permissions.includes(Permission.ACCESS_STREAM_CAMERAS)
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -69,57 +93,59 @@ export default function Component({ permissions }: DeviceProps) {
 
   useEffect(() => {
     const fetchReedStatuses = async () => {
-      const newStatuses: Record<number, string> = {};
+      const newStatuses: Record<number, string> = {}
       for (const reed of magneticReeds) {
         try {
           // Explicitly await the Promise<string> returned by getReedCurrentStatus
-          const status = await getReedCurrentStatus(reed.gpio_pin_number);
+          const status = await getReedCurrentStatus(reed.gpio_pin_number)
           // Immediately update the status for this reed
-          setReedStatuses(prev => ({
+          setReedStatuses((prev) => ({
             ...prev,
-            [reed.gpio_pin_number]: status
-          }));
+            [reed.gpio_pin_number]: status,
+          }))
         } catch (error) {
-          console.error(`Failed to fetch status for reed ${reed.gpio_pin_number}:`, error);
-          setReedStatuses(prev => ({
+          console.error(`Failed to fetch status for reed ${reed.gpio_pin_number}:`, error)
+          setReedStatuses((prev) => ({
             ...prev,
-            [reed.gpio_pin_number]: 'Error'
-          }));
+            [reed.gpio_pin_number]: "Error",
+          }))
         }
       }
-    };
+    }
 
-    fetchReedStatuses();
+    fetchReedStatuses()
 
     return () => {}
-  }, [magneticReeds]);
+  }, [magneticReeds])
 
-  const handleAddDevice = (type: 'camera' | 'reed') => {
-    setDeviceType(type);
-    setEditingDevice(type === 'camera'
-      ? { name: "", ip: "", port: 0, username: "", password: "", path: "" }
-      : { name: "", gpio_pin_number: 0, vcc: true, normally_closed: false });
-    setIsCreating(true);
-    setIsDialogOpen(true);
+  const handleAddDevice = (type: "camera" | "reed") => {
+    setDeviceType(type)
+    setEditingDevice(
+      type === "camera"
+        ? { name: "", ip: "", port: 0, username: "", password: "", path: "" }
+        : { name: "", gpio_pin_number: 0, vcc: true, normally_closed: false },
+    )
+    setIsCreating(true)
+    setIsDialogOpen(true)
   }
 
-  const handleEditDevice = (device: RTSPCamera | MagneticReed, type: 'camera' | 'reed') => {
-    if (type === 'reed') {
-      setDeviceType(type);
-      setEditingDevice(device);
-      setIsCreating(false);
-      setIsDialogOpen(true);
+  const handleEditDevice = (device: RTSPCamera | MagneticReed, type: "camera" | "reed") => {
+    if (type === "reed") {
+      setDeviceType(type)
+      setEditingDevice(device)
+      setIsCreating(false)
+      setIsDialogOpen(true)
     }
   }
 
-  const handleDeleteDevice = async (id: string | number, type: 'camera' | 'reed') => {
+  const handleDeleteDevice = async (id: string | number, type: "camera" | "reed") => {
     try {
-      if (type === 'camera') {
+      if (type === "camera") {
         await deleteRTSPCamera(id as string)
-        setRtspCameras(rtspCameras.filter(camera => camera.ip !== id))
+        setRtspCameras(rtspCameras.filter((camera) => camera.ip !== id))
       } else {
         await deleteMagneticReed(id as number)
-        setMagneticReeds(magneticReeds.filter(reed => reed.gpio_pin_number !== id))
+        setMagneticReeds(magneticReeds.filter((reed) => reed.gpio_pin_number !== id))
       }
     } catch (error) {
       setErrorMessage(`Failed to delete ${type}`)
@@ -128,28 +154,29 @@ export default function Component({ permissions }: DeviceProps) {
 
   const handleSaveDevice = async (device: CameraInputDto | ReedInputDto) => {
     try {
-      if (deviceType === 'camera') {
-        const camera = device as CameraInputDto;
+      if (deviceType === "camera") {
+        const camera = device as CameraInputDto
         if (isCreating) {
-          const newCamera = await createRTSPCamera(camera);
-          setRtspCameras([...rtspCameras, newCamera]);
+          const newCamera = await createRTSPCamera(camera)
+          setRtspCameras([...rtspCameras, newCamera])
         }
       } else {
-        const reed = device as ReedInputDto;
+        const reed = device as ReedInputDto
         if (isCreating) {
-          const newReed = await createMagneticReed(reed);
-          setMagneticReeds([...magneticReeds, newReed]);
+          const newReed = await createMagneticReed(reed)
+          setMagneticReeds([...magneticReeds, newReed])
         } else {
-          const updatedReed = await updateMagneticReed(reed.gpio_pin_number, reed);
-          setMagneticReeds(magneticReeds.map(r => r.gpio_pin_number === updatedReed.gpio_pin_number ? updatedReed : r));
+          const updatedReed = await updateMagneticReed(reed.gpio_pin_number, reed)
+          setMagneticReeds(
+            magneticReeds.map((r) => (r.gpio_pin_number === updatedReed.gpio_pin_number ? updatedReed : r)),
+          )
         }
       }
-      setIsDialogOpen(false);
+      setIsDialogOpen(false)
     } catch (error) {
-      setErrorMessage(`Failed to ${isCreating ? 'create' : 'update'} ${deviceType}`);
+      setErrorMessage(`Failed to ${isCreating ? "create" : "update"} ${deviceType}`)
     }
   }
-
 
   return (
     <div>
@@ -161,7 +188,7 @@ export default function Component({ permissions }: DeviceProps) {
           <Button
             variant="outline"
             className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-            onClick={() => handleAddDevice('camera')}
+            onClick={() => handleAddDevice("camera")}
           >
             Add camera
           </Button>
@@ -187,21 +214,9 @@ export default function Component({ permissions }: DeviceProps) {
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
                   <div className="flex w-full">
-                    {canAccessStreamCameras && (
-                      <Button
-                        variant="outline"
-                        className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                        onClick={() => setSelectedCamera(camera)}
-                      >
-                        Stream
-                      </Button>
-                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
-                        >
+                        <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">
                           Delete
                         </Button>
                       </AlertDialogTrigger>
@@ -213,8 +228,15 @@ export default function Component({ permissions }: DeviceProps) {
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteDevice(camera.ip, 'camera')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteDevice(camera.ip, "camera")}
+                            className="bg-red-900 hover:bg-red-800 text-white"
+                          >
+                            Delete
+                          </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -232,7 +254,7 @@ export default function Component({ permissions }: DeviceProps) {
           <Button
             variant="outline"
             className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-            onClick={() => handleAddDevice('reed')}
+            onClick={() => handleAddDevice("reed")}
           >
             Add reed
           </Button>
@@ -253,7 +275,9 @@ export default function Component({ permissions }: DeviceProps) {
                 <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
                 <p className="text-zinc-300">Normally: {reed.normally_closed ? "Closed" : "Open"}</p>
                 <p className="text-zinc-300">Connected to: {reed.vcc ? "VCC" : "GND"}</p>
-                <p className="text-zinc-300 mt-8">Current Status: {reedStatuses[reed.gpio_pin_number] || 'Loading...'}</p>
+                <p className="text-zinc-300 mt-8">
+                  Current Status: {reedStatuses[reed.gpio_pin_number] || "Loading..."}
+                </p>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
@@ -261,7 +285,7 @@ export default function Component({ permissions }: DeviceProps) {
                     <Button
                       variant="outline"
                       className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                      onClick={() => handleEditDevice(reed, 'reed')}
+                      onClick={() => handleEditDevice(reed, "reed")}
                       disabled={reed.listening}
                     >
                       Edit
@@ -284,8 +308,15 @@ export default function Component({ permissions }: DeviceProps) {
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteDevice(reed.gpio_pin_number, 'reed')} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteDevice(reed.gpio_pin_number, "reed")}
+                            className="bg-red-900 hover:bg-red-800 text-white"
+                          >
+                            Delete
+                          </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -299,27 +330,31 @@ export default function Component({ permissions }: DeviceProps) {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
-            <DialogTitle>{isCreating ? "Add" : "Edit"} {deviceType === 'camera' ? "Camera" : "Magnetic Reed"}</DialogTitle>
+            <DialogTitle>
+              {isCreating ? "Add" : "Edit"} {deviceType === "camera" ? "Camera" : "Magnetic Reed"}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault()
-            if (editingDevice) {
-              handleSaveDevice(editingDevice)
-            }
-          }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (editingDevice) {
+                handleSaveDevice(editingDevice)
+              }
+            }}
+          >
             <div className="space-y-4">
               <Input
                 placeholder="Name"
                 value={editingDevice?.name || ""}
-                onChange={(e) => setEditingDevice(prev => prev ? {...prev, name: e.target.value} : null)}
+                onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, name: e.target.value } : null))}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
               />
-              {deviceType === 'camera' ? (
+              {deviceType === "camera" ? (
                 <>
                   <Input
                     placeholder="IP"
                     value={(editingDevice as CameraInputDto)?.ip || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, ip: e.target.value} : null)}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, ip: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                     disabled={!isCreating}
                   />
@@ -327,26 +362,28 @@ export default function Component({ permissions }: DeviceProps) {
                     type="number"
                     placeholder="Port"
                     value={(editingDevice as CameraInputDto)?.port || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, port: parseInt(e.target.value)} : null)}
+                    onChange={(e) =>
+                      setEditingDevice((prev) => (prev ? { ...prev, port: Number.parseInt(e.target.value) } : null))
+                    }
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
                   <Input
                     placeholder="Username"
                     value={(editingDevice as CameraInputDto)?.username || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, username: e.target.value} : null)}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, username: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
                   <Input
                     type="password"
                     placeholder="Password"
                     value={(editingDevice as CameraInputDto)?.password || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, password: e.target.value} : null)}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, password: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
                   <Input
                     placeholder="Path"
                     value={(editingDevice as CameraInputDto)?.path || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, path: e.target.value} : null)}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, path: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
                 </>
@@ -356,13 +393,19 @@ export default function Component({ permissions }: DeviceProps) {
                     type="number"
                     placeholder="GPIO Pin Number"
                     value={(editingDevice as ReedInputDto)?.gpio_pin_number || ""}
-                    onChange={(e) => setEditingDevice(prev => prev ? {...prev, gpio_pin_number: parseInt(e.target.value)} : null)}
+                    onChange={(e) =>
+                      setEditingDevice((prev) =>
+                        prev ? { ...prev, gpio_pin_number: Number.parseInt(e.target.value) } : null,
+                      )
+                    }
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                     disabled={!isCreating}
                   />
                   <Select
                     value={String((editingDevice as ReedInputDto)?.normally_closed)}
-                    onValueChange={(value) => setEditingDevice(prev => prev ? {...prev, normally_closed: value === "true"} : null)}
+                    onValueChange={(value) =>
+                      setEditingDevice((prev) => (prev ? { ...prev, normally_closed: value === "true" } : null))
+                    }
                   >
                     <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
                       <SelectValue placeholder="Select type" />
@@ -374,7 +417,9 @@ export default function Component({ permissions }: DeviceProps) {
                   </Select>
                   <Select
                     value={String((editingDevice as ReedInputDto)?.vcc)}
-                    onValueChange={(value) => setEditingDevice(prev => prev ? {...prev, vcc: value === "true"} : null)}
+                    onValueChange={(value) =>
+                      setEditingDevice((prev) => (prev ? { ...prev, vcc: value === "true" } : null))
+                    }
                   >
                     <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
                       <SelectValue placeholder="Select connection" />
@@ -394,43 +439,22 @@ export default function Component({ permissions }: DeviceProps) {
         </DialogContent>
       </Dialog>
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
-        <AlertDialogContent  className="bg-zinc-800 text-zinc-50">
+        <AlertDialogContent className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>
             <AlertDialogTitle>Error</AlertDialogTitle>
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">OK</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => setErrorMessage(null)}
+              className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            >
+              OK
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {/* Video Streaming Dialog */}
-      <Dialog open={!!selectedCamera} onOpenChange={(open) => {
-        if (!open) {
-          setSelectedCamera(null)
-        }
-      }}>
-      <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[640px] max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50 mx-auto">
-        <DialogHeader>
-            <DialogTitle>
-              Camera Stream: {selectedCamera?.name}
-            </DialogTitle>
-            <DialogDescription>
-              IP: {selectedCamera?.ip}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedCamera && (
-            <div className="flex-grow overflow-hidden">
-              <div className="relative w-full h-full flex justify-center items-center p-2">
-                <HLSPlayer
-                    src={getRTSPCameraStreamUrl(selectedCamera.ip)}
-                />
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
+
