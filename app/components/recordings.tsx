@@ -153,14 +153,16 @@ export default function Recordings({ permissions }: RecordingsProps) {
         </AlertDialog>
       )}
 
-      <div className="flex items-center justify-center gap-2 mb-4">
-        <span className="text-zinc-300">{showAlarmRecordings ? "Other recordings" : "Alarm recordings"}</span>
-        <Switch
-          checked={showAlarmRecordings}
-          onCheckedChange={setShowAlarmRecordings}
-          className="data-[state=unchecked]:bg-zinc-800 data-[state=unchecked]:border-zinc-700"
-        />
-      </div>
+      {recordings.length > 0 && (
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <span className="text-zinc-300">{showAlarmRecordings ? "Other recordings" : "Alarm recordings"}</span>
+          <Switch
+            checked={showAlarmRecordings}
+            onCheckedChange={setShowAlarmRecordings}
+            className="data-[state=unchecked]:bg-zinc-800 data-[state=unchecked]:border-zinc-700"
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {recordings.length === 0 ? (
