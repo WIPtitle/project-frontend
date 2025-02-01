@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,28 +15,30 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   getAllRtspCameras,
   getAllMagneticReeds,
   createRTSPCamera,
   createMagneticReed,
-  updateRTSPCamera,
   updateMagneticReed,
   deleteRTSPCamera,
   deleteMagneticReed,
   getReedCurrentStatus,
-  getTokenOrThrow,
+  getAllPirs,
+  createPir,
+  updatePir,
+  deletePir,
+  getPirCurrentStatus,
 } from "@/lib/api"
-import { type RTSPCamera, type MagneticReed, Permission } from "@/types"
+import { type RTSPCamera, type MagneticReed, Permission, type Pir } from "@/types"
+
+// Define PirStatus enum here since we need it as a value
+enum PirStatus {
+  MOVEMENT = "MOVEMENT",
+  IDLE = "IDLE",
+}
 
 type DeviceProps = {
   permissions: Permission[]
@@ -58,17 +60,25 @@ type ReedInputDto = {
   normally_closed: boolean
 }
 
+type PirInputDto = {
+  name: string
+  gpio_pin_number: number
+}
+
 export default function Component({ permissions }: DeviceProps) {
   const [rtspCameras, setRtspCameras] = useState<RTSPCamera[]>([])
   const [magneticReeds, setMagneticReeds] = useState<MagneticReed[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingDevice, setEditingDevice] = useState<CameraInputDto | ReedInputDto | null>(null)
-  const [deviceType, setDeviceType] = useState<"camera" | "reed">("camera")
+  const [editingDevice, setEditingDevice] = useState<CameraInputDto | ReedInputDto | PirInputDto | null>(null)
+  const [deviceType, setDeviceType] = useState<"camera" | "reed" | "pir">("camera")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [reedStatuses, setReedStatuses] = useState<Record<number, string>>({})
   const [isCreating, setIsCreating] = useState(false)
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingReeds, setIsLoadingReeds] = useState(true)
+  const [pirs, setPirs] = useState<Pir[]>([])
+  const [pirStatuses, setPirStatuses] = useState<Record<number, PirStatus>>({})
+  const [isLoadingPirs, setIsLoadingPirs] = useState(true)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
 
@@ -77,15 +87,19 @@ export default function Component({ permissions }: DeviceProps) {
       try {
         setIsLoadingCameras(true)
         setIsLoadingReeds(true)
+        setIsLoadingPirs(true)
         const cameras = await getAllRtspCameras()
         const reeds = await getAllMagneticReeds()
+        const pirSensors = await getAllPirs()
         setRtspCameras(cameras)
         setMagneticReeds(reeds)
+        setPirs(pirSensors)
       } catch (error) {
         setErrorMessage("Failed to fetch devices")
       } finally {
         setIsLoadingCameras(false)
         setIsLoadingReeds(false)
+        setIsLoadingPirs(false)
       }
     }
     fetchDevices()
@@ -118,19 +132,46 @@ export default function Component({ permissions }: DeviceProps) {
     return () => {}
   }, [magneticReeds])
 
-  const handleAddDevice = (type: "camera" | "reed") => {
+  useEffect(() => {
+    const fetchPirStatuses = async () => {
+      const newStatuses: Record<number, PirStatus> = {}
+      for (const pir of pirs) {
+        try {
+          const status = await getPirCurrentStatus(pir.gpio_pin_number)
+          setPirStatuses((prev) => ({
+            ...prev,
+            [pir.gpio_pin_number]: status,
+          }))
+        } catch (error) {
+          console.error(`Failed to fetch status for PIR ${pir.gpio_pin_number}:`, error)
+          setPirStatuses((prev) => ({
+            ...prev,
+            [pir.gpio_pin_number]: PirStatus.IDLE,
+          }))
+        }
+      }
+    }
+
+    fetchPirStatuses()
+
+    return () => {}
+  }, [pirs])
+
+  const handleAddDevice = (type: "camera" | "reed" | "pir") => {
     setDeviceType(type)
     setEditingDevice(
       type === "camera"
         ? { name: "", ip: "", port: 0, username: "", password: "", path: "" }
-        : { name: "", gpio_pin_number: 0, vcc: true, normally_closed: false },
+        : type === "reed"
+          ? { name: "", gpio_pin_number: 0, vcc: true, normally_closed: false }
+          : { name: "", gpio_pin_number: 0 },
     )
     setIsCreating(true)
     setIsDialogOpen(true)
   }
 
-  const handleEditDevice = (device: RTSPCamera | MagneticReed, type: "camera" | "reed") => {
-    if (type === "reed") {
+  const handleEditDevice = (device: RTSPCamera | MagneticReed | Pir, type: "camera" | "reed" | "pir") => {
+    if (type === "reed" || type === "pir") {
       setDeviceType(type)
       setEditingDevice(device)
       setIsCreating(false)
@@ -138,21 +179,24 @@ export default function Component({ permissions }: DeviceProps) {
     }
   }
 
-  const handleDeleteDevice = async (id: string | number, type: "camera" | "reed") => {
+  const handleDeleteDevice = async (id: string | number, type: "camera" | "reed" | "pir") => {
     try {
       if (type === "camera") {
         await deleteRTSPCamera(id as string)
         setRtspCameras(rtspCameras.filter((camera) => camera.ip !== id))
-      } else {
+      } else if (type === "reed") {
         await deleteMagneticReed(id as number)
         setMagneticReeds(magneticReeds.filter((reed) => reed.gpio_pin_number !== id))
+      } else if (type === "pir") {
+        await deletePir(id as number)
+        setPirs(pirs.filter((pir) => pir.gpio_pin_number !== id))
       }
     } catch (error) {
       setErrorMessage(`Failed to delete ${type}`)
     }
   }
 
-  const handleSaveDevice = async (device: CameraInputDto | ReedInputDto) => {
+  const handleSaveDevice = async (device: CameraInputDto | ReedInputDto | PirInputDto) => {
     try {
       if (deviceType === "camera") {
         const camera = device as CameraInputDto
@@ -160,7 +204,7 @@ export default function Component({ permissions }: DeviceProps) {
           const newCamera = await createRTSPCamera(camera)
           setRtspCameras([...rtspCameras, newCamera])
         }
-      } else {
+      } else if (deviceType === "reed") {
         const reed = device as ReedInputDto
         if (isCreating) {
           const newReed = await createMagneticReed(reed)
@@ -170,6 +214,15 @@ export default function Component({ permissions }: DeviceProps) {
           setMagneticReeds(
             magneticReeds.map((r) => (r.gpio_pin_number === updatedReed.gpio_pin_number ? updatedReed : r)),
           )
+        }
+      } else if (deviceType === "pir") {
+        const pir = device as PirInputDto
+        if (isCreating) {
+          const newPir = await createPir(pir)
+          setPirs([...pirs, newPir])
+        } else {
+          const updatedPir = await updatePir(pir.gpio_pin_number, pir)
+          setPirs(pirs.map((p) => (p.gpio_pin_number === updatedPir.gpio_pin_number ? updatedPir : p)))
         }
       }
       setIsDialogOpen(false)
@@ -327,11 +380,88 @@ export default function Component({ permissions }: DeviceProps) {
           ))
         )}
       </div>
+
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 mt-8">
+        <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">PIR Sensors</h2>
+        {canModifyDevices && (
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            onClick={() => handleAddDevice("pir")}
+          >
+            Add PIR sensor
+          </Button>
+        )}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {isLoadingPirs ? (
+          <p className="text-zinc-300">Loading PIR sensors...</p>
+        ) : pirs.length === 0 ? (
+          <p className="text-zinc-300">No PIR sensors found.</p>
+        ) : (
+          pirs.map((pir) => (
+            <Card key={pir.gpio_pin_number} className="bg-zinc-800 border-zinc-700 flex flex-col">
+              <CardHeader>
+                <CardTitle className="text-zinc-50">{pir.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <p className="text-zinc-300">GPIO: {pir.gpio_pin_number}</p>
+                <p className="text-zinc-300 mt-8">Current Status: {pirStatuses[pir.gpio_pin_number] || "Loading..."}</p>
+              </CardContent>
+              {canModifyDevices && (
+                <CardFooter className="flex flex-col mt-auto">
+                  <div className="flex w-full">
+                    <Button
+                      variant="outline"
+                      className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => handleEditDevice(pir, "pir")}
+                      disabled={pir.listening}
+                    >
+                      Edit
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
+                          disabled={pir.listening}
+                        >
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the PIR sensor.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteDevice(pir.gpio_pin_number, "pir")}
+                            className="bg-red-900 hover:bg-red-800 text-white"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </CardFooter>
+              )}
+            </Card>
+          ))
+        )}
+      </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle>
-              {isCreating ? "Add" : "Edit"} {deviceType === "camera" ? "Camera" : "Magnetic Reed"}
+              {isCreating ? "Add" : "Edit"}{" "}
+              {deviceType === "camera" ? "Camera" : deviceType === "reed" ? "Magnetic Reed" : "PIR Sensor"}
             </DialogTitle>
           </DialogHeader>
           <form
@@ -387,7 +517,7 @@ export default function Component({ permissions }: DeviceProps) {
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
                 </>
-              ) : (
+              ) : deviceType === "reed" ? (
                 <>
                   <Input
                     type="number"
@@ -429,6 +559,21 @@ export default function Component({ permissions }: DeviceProps) {
                       <SelectItem value="false">Connected to GND</SelectItem>
                     </SelectContent>
                   </Select>
+                </>
+              ) : (
+                <>
+                  <Input
+                    type="number"
+                    placeholder="GPIO Pin Number"
+                    value={(editingDevice as PirInputDto)?.gpio_pin_number || ""}
+                    onChange={(e) =>
+                      setEditingDevice((prev) =>
+                        prev ? { ...prev, gpio_pin_number: Number.parseInt(e.target.value) } : null,
+                      )
+                    }
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                    disabled={!isCreating}
+                  />
                 </>
               )}
               <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">

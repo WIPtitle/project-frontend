@@ -1,33 +1,61 @@
-'use client'
+"use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getDeviceGroupStatusStream, getDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, getAllMagneticReeds, getDeviceGroupReeds, updateDeviceGroupReeds, startListening, stopListening } from "@/lib/api"
-import { DeviceGroup, MagneticReed, Permission, DeviceGroupStatus } from "@/types"
+import {
+  getDeviceGroupStatusStream,
+  getDeviceGroups,
+  createDeviceGroup,
+  updateDeviceGroup,
+  deleteDeviceGroup,
+  getAllMagneticReeds,
+  getDeviceGroupReeds,
+  updateDeviceGroupReeds,
+  startListening,
+  stopListening,
+  getDeviceGroupPirs,
+  updateDeviceGroupPirs,
+  getAllPirs
+} from "@/lib/api"
+import { type DeviceGroup, type MagneticReed, Permission, DeviceGroupStatus, type Pir } from "@/types"
 
 const statusMapping: Record<DeviceGroupStatus, string> = {
   [DeviceGroupStatus.LISTENING]: "Active",
   [DeviceGroupStatus.IDLE]: "Inactive",
   [DeviceGroupStatus.ALARM]: "Alarm Triggered",
   [DeviceGroupStatus.WAITING_TO_START_LISTENING]: "Activating",
-};
+}
 
 type AlarmProps = {
   permissions: Permission[]
 }
 
 type DeviceGroupInputDto = DeviceGroup & {
-  id?: number;
-};
+  id?: number
+}
 
 // filters not needed now, but could be in the future
 export const getAvailableReeds = (reeds: MagneticReed[], groupId: number | null): MagneticReed[] => {
-  return reeds.filter(reed => reed);
+  return reeds.filter((reed) => reed)
+}
+
+export const getAvailablePirs = (pirs: Pir[], groupId: number | null): Pir[] => {
+  return pirs.filter((pir) => pir)
 }
 
 export default function Alarm({ permissions }: AlarmProps) {
@@ -44,13 +72,16 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [pin, setPin] = useState<string>("")
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
-  const [groupError, setGroupError] = useState<string | null>(null);
+  const [groupError, setGroupError] = useState<string | null>(null)
+  const [groupPirs, setGroupPirs] = useState<{ [key: number]: Pir[] }>({})
+  const [selectedPirs, setSelectedPirs] = useState<Pir[]>([])
+  const [allPirs, setAllPirs] = useState<Pir[]>([])
 
   const eventSources = useRef<{ [key: number]: EventSource }>({})
   useEffect(() => {
     // Close event sources for removed groups
     for (const id in eventSources.current) {
-      if (!deviceGroups?.some(group => group.id === parseInt(id))) {
+      if (!deviceGroups?.some((group) => group.id === Number.parseInt(id))) {
         eventSources.current[id].close()
         delete eventSources.current[id]
       }
@@ -61,40 +92,47 @@ export default function Alarm({ permissions }: AlarmProps) {
         const stream = getDeviceGroupStatusStream(group.id)
         eventSources.current[group.id] = stream
         stream.onmessage = (event) => {
-            const status = event.data
-            setDeviceGroups(prevGroups => prevGroups?.map(g => g.id === group.id ? { ...g, status: status } : g) || [])
+          const status = event.data
+          setDeviceGroups(
+            (prevGroups) => prevGroups?.map((g) => (g.id === group.id ? { ...g, status: status } : g)) || [],
+          )
         }
       }
     }
 
-    return () => { }
-  }, [deviceGroups]);
+    return () => {}
+  }, [deviceGroups])
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true);
+      setIsLoading(true)
       try {
         const groups = await getDeviceGroups()
         setDeviceGroups(groups)
 
-        // Fetch reeds for each group
-        const reedsPromises = groups.map(group => getDeviceGroupReeds(group.id))
+        // Fetch devices for each group
+        const reedsPromises = groups.map((group) => getDeviceGroupReeds(group.id))
+        const pirsPromises = groups.map((group) => getDeviceGroupPirs(group.id))
 
         const groupReedsData = await Promise.all(reedsPromises)
+        const groupPirsData = await Promise.all(pirsPromises)
 
         const newGroupReeds: { [key: number]: MagneticReed[] } = {}
+        const newGroupPirs: { [key: number]: Pir[] } = {}
 
         groups.forEach((group, index) => {
           newGroupReeds[group.id] = groupReedsData[index]
+          newGroupPirs[group.id] = groupPirsData[index]
         })
 
         setGroupReeds(newGroupReeds)
+        setGroupPirs(newGroupPirs)
       } catch (error) {
-        console.error("Failed to fetch data:", error);
-        setErrorMessage("Failed to fetch device groups and reeds. Please try again later.");
-        setDeviceGroups([]);
+        console.error("Failed to fetch data:", error)
+        setErrorMessage("Failed to fetch device groups and devices. Please try again later.")
+        setDeviceGroups([])
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
     }
     fetchData()
@@ -104,6 +142,9 @@ export default function Alarm({ permissions }: AlarmProps) {
     try {
       const reeds = await getAllMagneticReeds()
       setAllReeds(reeds)
+      //Added to fetch all PIRs
+      const pirs = await getAllPirs()
+      setAllPirs(pirs)
     } catch (error) {
       console.error("Failed to fetch devices:", error)
       setErrorMessage("Failed to fetch devices. Please try again.")
@@ -113,11 +154,16 @@ export default function Alarm({ permissions }: AlarmProps) {
   const handleDelete = async (id: number) => {
     try {
       await deleteDeviceGroup(id)
-      setDeviceGroups(prevGroups => prevGroups?.filter(group => group.id !== id) || [])
-      setGroupReeds(prev => {
+      setDeviceGroups((prevGroups) => prevGroups?.filter((group) => group.id !== id) || [])
+      setGroupReeds((prev) => {
         const newGroupReeds = { ...prev }
         delete newGroupReeds[id]
         return newGroupReeds
+      })
+      setGroupPirs((prev) => {
+        const newGroupPirs = { ...prev }
+        delete newGroupPirs[id]
+        return newGroupPirs
       })
     } catch (error) {
       setErrorMessage("Failed to delete device group")
@@ -128,6 +174,7 @@ export default function Alarm({ permissions }: AlarmProps) {
     await fetchAllDevices()
     setEditingGroup({ id: 0, name: "", wait_to_start_alarm: 0, wait_to_fire_alarm: 0, status: DeviceGroupStatus.IDLE })
     setSelectedReeds([])
+    setSelectedPirs([])
     setIsDialogOpen(true)
   }
 
@@ -137,30 +184,52 @@ export default function Alarm({ permissions }: AlarmProps) {
       ...group,
     })
     setSelectedReeds(groupReeds[group.id] || [])
+    setSelectedPirs(groupPirs[group.id] || [])
     setIsDialogOpen(true)
   }
 
   const handleSaveGroup = async (updatedGroup: DeviceGroupInputDto) => {
     try {
       if (editingGroup) {
-        const existingGroup = deviceGroups?.find(g => g.id === editingGroup.id)
+        const existingGroup = deviceGroups?.find((g) => g.id === editingGroup.id)
         if (existingGroup) {
           const updatedGroupResponse = await updateDeviceGroup(existingGroup.id, {
             ...existingGroup,
             ...updatedGroup,
           })
-          setDeviceGroups(prevGroups => prevGroups?.map(group => group.id === updatedGroupResponse.id ? updatedGroupResponse : group) || [])
+          setDeviceGroups(
+            (prevGroups) =>
+              prevGroups?.map((group) => (group.id === updatedGroupResponse.id ? updatedGroupResponse : group)) || [],
+          )
 
-          // Update reeds
-          const updatedReeds = await updateDeviceGroupReeds(existingGroup.id, selectedReeds.map(r => r.gpio_pin_number))
-          setGroupReeds(prev => ({ ...prev, [existingGroup.id]: updatedReeds }))
+          // Update devices
+          const updatedReeds = await updateDeviceGroupReeds(
+            existingGroup.id,
+            selectedReeds.map((r) => r.gpio_pin_number),
+          )
+          const updatedPirs = await updateDeviceGroupPirs(
+            existingGroup.id,
+            selectedPirs.map((p) => p.gpio_pin_number),
+          )
+
+          setGroupReeds((prev) => ({ ...prev, [existingGroup.id]: updatedReeds }))
+          setGroupPirs((prev) => ({ ...prev, [existingGroup.id]: updatedPirs }))
         } else {
           const newGroup = await createDeviceGroup(updatedGroup)
-          setDeviceGroups(prevGroups => [...(prevGroups || []), newGroup])
+          setDeviceGroups((prevGroups) => [...(prevGroups || []), newGroup])
 
-          // Add reeds to the new group
-          const newReeds = await updateDeviceGroupReeds(newGroup.id, selectedReeds.map(r => r.gpio_pin_number))
-          setGroupReeds(prev => ({ ...prev, [newGroup.id]: newReeds }))
+          // Add devices to the new group
+          const newReeds = await updateDeviceGroupReeds(
+            newGroup.id,
+            selectedReeds.map((r) => r.gpio_pin_number),
+          )
+          const newPirs = await updateDeviceGroupPirs(
+            newGroup.id,
+            selectedPirs.map((p) => p.gpio_pin_number),
+          )
+
+          setGroupReeds((prev) => ({ ...prev, [newGroup.id]: newReeds }))
+          setGroupPirs((prev) => ({ ...prev, [newGroup.id]: newPirs }))
         }
       }
       setIsDialogOpen(false)
@@ -172,49 +241,57 @@ export default function Alarm({ permissions }: AlarmProps) {
   const getStatusColor = (status: DeviceGroupStatus) => {
     switch (status) {
       case DeviceGroupStatus.LISTENING:
-        return "text-green-500";
+        return "text-green-500"
       case DeviceGroupStatus.IDLE:
-        return "text-grey-500";
+        return "text-grey-500"
       case DeviceGroupStatus.ALARM:
-        return "text-red-500";
+        return "text-red-500"
       case DeviceGroupStatus.WAITING_TO_START_LISTENING:
-        return "text-yellow-500";
+        return "text-yellow-500"
       default:
-        return "text-zinc-300";
+        return "text-zinc-300"
     }
-  };
+  }
 
-  const handleActivateAlarm = useCallback(async (groupId: number) => {
-    setIsActivating(prev => ({ ...prev, [groupId]: true }))
-    try {
-      await startListening(groupId, pin)
-    } catch (error) {
-      setErrorMessage("Failed to activate alarm")
-    } finally {
-      setIsActivating(prev => ({ ...prev, [groupId]: false }))
-    }
-  }, [deviceGroups, pin])
+  const handleActivateAlarm = useCallback(
+    async (groupId: number) => {
+      setIsActivating((prev) => ({ ...prev, [groupId]: true }))
+      try {
+        await startListening(groupId, pin)
+      } catch (error) {
+        setErrorMessage("Failed to activate alarm")
+      } finally {
+        setIsActivating((prev) => ({ ...prev, [groupId]: false }))
+      }
+    },
+    [deviceGroups, pin],
+  )
 
-  const handleDeactivateAlarm = useCallback(async (groupId: number) => {
-    setIsDeactivating(prev => ({ ...prev, [groupId]: true }))
-    try {
-      await stopListening(groupId, pin)
-    } catch (error) {
-      setErrorMessage("Failed to deactivate alarm")
-    } finally {
-      setIsDeactivating(prev => ({ ...prev, [groupId]: false }))
-    }
-  }, [pin])
-
+  const handleDeactivateAlarm = useCallback(
+    async (groupId: number) => {
+      setIsDeactivating((prev) => ({ ...prev, [groupId]: true }))
+      try {
+        await stopListening(groupId, pin)
+      } catch (error) {
+        setErrorMessage("Failed to deactivate alarm")
+      } finally {
+        setIsDeactivating((prev) => ({ ...prev, [groupId]: false }))
+      }
+    },
+    [pin],
+  )
 
   return (
     <div className="container mx-auto p-4">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
         <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Alarm dashboard</h1>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) setGroupError(null);
-        }}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open)
+            if (!open) setGroupError(null)
+          }}
+        >
           <DialogTrigger asChild>
             <Button
               variant="outline"
@@ -228,66 +305,94 @@ export default function Alarm({ permissions }: AlarmProps) {
             <DialogHeader>
               <DialogTitle>{editingGroup?.id ? "Edit group" : "Add group"}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              if (editingGroup) {
-                if (selectedReeds.length === 0) {
-                  setGroupError("No device set - please set at least one device");
-                } else {
-                  setGroupError(null);
-                  handleSaveGroup(editingGroup);
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (editingGroup) {
+                  if (selectedReeds.length === 0 && selectedPirs.length === 0) {
+                    setGroupError("No device set - please set at least one device")
+                  } else {
+                    setGroupError(null)
+                    handleSaveGroup(editingGroup)
+                  }
                 }
-              }
-            }}>
+              }}
+            >
               <div className="space-y-4">
                 <Input
                   placeholder="Group name"
                   value={editingGroup?.name || ""}
-                  onChange={(e) => setEditingGroup(prev => prev ? {...prev, name: e.target.value} : null)}
+                  onChange={(e) => setEditingGroup((prev) => (prev ? { ...prev, name: e.target.value } : null))}
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
                 <Input
                   type="number"
                   placeholder="Wait to start alarm (seconds)"
                   value={editingGroup?.wait_to_start_alarm || ""}
-                  onChange={(e) => setEditingGroup(prev => prev ? {...prev, wait_to_start_alarm: parseInt(e.target.value)} : null)}
+                  onChange={(e) =>
+                    setEditingGroup((prev) =>
+                      prev ? { ...prev, wait_to_start_alarm: Number.parseInt(e.target.value) } : null,
+                    )
+                  }
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
                 <Input
                   type="number"
                   placeholder="Wait to fire alarm (seconds)"
                   value={editingGroup?.wait_to_fire_alarm || ""}
-                  onChange={(e) => setEditingGroup(prev => prev ? {...prev, wait_to_fire_alarm: parseInt(e.target.value)} : null)}
+                  onChange={(e) =>
+                    setEditingGroup((prev) =>
+                      prev ? { ...prev, wait_to_fire_alarm: Number.parseInt(e.target.value) } : null,
+                    )
+                  }
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
-                {groupError && (
-                  <p className="text-red-500 text-sm mt-2">{groupError}</p>
-                )}
+                {groupError && <p className="text-red-500 text-sm mt-2">{groupError}</p>}
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Reeds</h3>
-                  {getAvailableReeds(allReeds, editingGroup?.id ?? null).map(reed => (
+                  {getAvailableReeds(allReeds, editingGroup?.id ?? null).map((reed) => (
                     <div key={reed.gpio_pin_number} className="flex items-center space-x-2">
                       <Checkbox
                         id={`reed-${reed.gpio_pin_number}`}
-                        checked={selectedReeds.some(r => r.gpio_pin_number === reed.gpio_pin_number)}
+                        checked={selectedReeds.some((r) => r.gpio_pin_number === reed.gpio_pin_number)}
                         onCheckedChange={(checked) => {
-                          setSelectedReeds(prev =>
-                            checked
-                              ? [...prev, reed]
-                              : prev.filter(r => r.gpio_pin_number !== reed.gpio_pin_number)
+                          setSelectedReeds((prev) =>
+                            checked ? [...prev, reed] : prev.filter((r) => r.gpio_pin_number !== reed.gpio_pin_number),
                           )
                         }}
                         className="border-zinc-500"
                       />
-                      <label
-                        htmlFor={`reed-${reed.gpio_pin_number}`}
-                        className="text-zinc-300"
-                      >
+                      <label htmlFor={`reed-${reed.gpio_pin_number}`} className="text-zinc-300">
                         {reed.name}
                       </label>
                     </div>
                   ))}
-                  {getAvailableReeds(allReeds, editingGroup?.id ?? null).length === 0 && <p className="text-zinc-400">No reed available</p>}
+                  {getAvailableReeds(allReeds, editingGroup?.id ?? null).length === 0 && (
+                    <p className="text-zinc-400">No reed available</p>
+                  )}
+                </div>
+                <div>
+                  <h3 className="mb-2 font-semibold text-zinc-300">PIR sensors</h3>
+                  {getAvailablePirs(allPirs, editingGroup?.id ?? null).map((pir) => (
+                    <div key={pir.gpio_pin_number} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`pir-${pir.gpio_pin_number}`}
+                        checked={selectedPirs.some((p) => p.gpio_pin_number === pir.gpio_pin_number)}
+                        onCheckedChange={(checked) => {
+                          setSelectedPirs((prev) =>
+                            checked ? [...prev, pir] : prev.filter((p) => p.gpio_pin_number !== pir.gpio_pin_number),
+                          )
+                        }}
+                        className="border-zinc-500"
+                      />
+                      <label htmlFor={`pir-${pir.gpio_pin_number}`} className="text-zinc-300">
+                        {pir.name}
+                      </label>
+                    </div>
+                  ))}
+                  {getAvailablePirs(allPirs, editingGroup?.id ?? null).length === 0 && (
+                    <p className="text-zinc-400">No PIR sensors available</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
                   {editingGroup?.id ? "Update" : "Create"}
@@ -319,6 +424,14 @@ export default function Alarm({ permissions }: AlarmProps) {
                   ))}
                 </ul>
                 {groupReeds[group.id]?.length === 0 && <p className="text-zinc-400">No reeds</p>}
+
+                <h3 className="mt-2 font-semibold text-zinc-300">PIR Sensors:</h3>
+                <ul className="list-disc pl-5 text-zinc-300">
+                  {groupPirs[group.id]?.map((pir) => (
+                    <li key={pir.gpio_pin_number}>{pir.name}</li>
+                  ))}
+                </ul>
+                {groupPirs[group.id]?.length === 0 && <p className="text-zinc-400">No PIR sensors</p>}
               </CardContent>
               <CardFooter className="flex flex-col mt-auto">
                 <div className="flex w-full mb-2">
@@ -348,8 +461,15 @@ export default function Alarm({ permissions }: AlarmProps) {
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(group.id)} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
+                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(group.id)}
+                          className="bg-red-900 hover:bg-red-800 text-white"
+                        >
+                          Delete
+                        </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
@@ -375,7 +495,9 @@ export default function Alarm({ permissions }: AlarmProps) {
                     disabled={isDeactivating[group.id] || group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING}
                     className="w-full bg-white text-zinc-800 hover:bg-zinc-200"
                   >
-                    {group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING ? 'Activating...' : 'Deactivate Alarm'}
+                    {group.status === DeviceGroupStatus.WAITING_TO_START_LISTENING
+                      ? "Activating..."
+                      : "Deactivate Alarm"}
                   </Button>
                 )}
               </CardFooter>
@@ -386,26 +508,28 @@ export default function Alarm({ permissions }: AlarmProps) {
       <Dialog
         open={isPinDialogOpen}
         onOpenChange={(open) => {
-          setIsPinDialogOpen(open);
-          if (!open) setPin("");
+          setIsPinDialogOpen(open)
+          if (!open) setPin("")
         }}
       >
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle>{"Enter PIN"}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault()
-            setIsPinDialogOpen(false)
-            setPin("") // Clear the PIN after submission
-            if (selectedGroupId) {
-              if (deviceGroups?.find(g => g.id === selectedGroupId)?.status === DeviceGroupStatus.IDLE) {
-                handleActivateAlarm(selectedGroupId)
-              } else {
-                handleDeactivateAlarm(selectedGroupId)
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              setIsPinDialogOpen(false)
+              setPin("") // Clear the PIN after submission
+              if (selectedGroupId) {
+                if (deviceGroups?.find((g) => g.id === selectedGroupId)?.status === DeviceGroupStatus.IDLE) {
+                  handleActivateAlarm(selectedGroupId)
+                } else {
+                  handleDeactivateAlarm(selectedGroupId)
+                }
               }
-            }
-          }}>
+            }}
+          >
             <div className="relative">
               <input
                 type="password"
@@ -440,7 +564,12 @@ export default function Alarm({ permissions }: AlarmProps) {
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">OK</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => setErrorMessage(null)}
+              className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            >
+              OK
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

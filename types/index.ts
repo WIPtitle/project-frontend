@@ -1,17 +1,17 @@
 export enum DeviceGroupStatus {
-    LISTENING = "LISTENING",
-    IDLE = "IDLE",
-    ALARM = "ALARM",
-    WAITING_TO_START_LISTENING = "WAITING_TO_START_LISTENING"
+  LISTENING = "LISTENING",
+  IDLE = "IDLE",
+  ALARM = "ALARM",
+  WAITING_TO_START_LISTENING = "WAITING_TO_START_LISTENING",
 }
 
 export type DeviceGroup = {
-    id: number;
-    name: string;
-    wait_to_start_alarm: number;
-    wait_to_fire_alarm: number;
-    status: DeviceGroupStatus;
-};
+  id: number
+  name: string
+  wait_to_start_alarm: number
+  wait_to_fire_alarm: number
+  status: DeviceGroupStatus
+}
 
 export enum Permission {
   USER_MANAGER = "USER_MANAGER",
@@ -21,7 +21,7 @@ export enum Permission {
   ACCESS_STREAM_CAMERAS = "ACCESS_STREAM_CAMERAS",
   CHANGE_ALARM_SOUND = "CHANGE_ALARM_SOUND",
   UPDATE_NOTIFICATIONS_CONFIG = "UPDATE_NOTIFICATIONS_CONFIG",
-  MODIFY_DEVICES = "MODIFY_DEVICES"
+  MODIFY_DEVICES = "MODIFY_DEVICES",
 }
 
 export interface User {
@@ -33,12 +33,24 @@ export interface User {
 }
 
 export interface MagneticReed {
-    name: string;
-    gpio_pin_number: number;
-    vcc: boolean;
-    normally_closed: boolean;
-    listening: boolean;
-    group_id: number;
+  name: string
+  gpio_pin_number: number
+  vcc: boolean
+  normally_closed: boolean
+  listening: boolean
+  group_id: number
+}
+
+export enum PirStatus {
+  MOVEMENT = "MOVEMENT",
+  IDLE = "IDLE",
+}
+
+export interface Pir {
+  name: string
+  gpio_pin_number: number
+  listening: boolean
+  group_id: number
 }
 
 export interface AlarmAudioConfig {
@@ -60,17 +72,17 @@ export interface StorageInfo {
 }
 
 export interface NtfyCredentials {
-  user: string;
-  password: string;
-  topic: string;
+  user: string
+  password: string
+  topic: string
 }
 
 export interface RTSPCamera {
-    name: string;
-    ip: string;
-    port: number;
-    username: string;
-    password: string;
-    path: string;
+  name: string
+  ip: string
+  port: number
+  username: string
+  password: string
+  path: string
 }
 
