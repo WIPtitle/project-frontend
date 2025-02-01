@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   getAllRtspCameras,
   getAllMagneticReeds,
@@ -51,6 +53,7 @@ type CameraInputDto = {
   username: string
   password: string
   path: string
+  always_recording: boolean
 }
 
 type ReedInputDto = {
@@ -161,7 +164,7 @@ export default function Component({ permissions }: DeviceProps) {
     setDeviceType(type)
     setEditingDevice(
       type === "camera"
-        ? { name: "", ip: "", port: 0, username: "", password: "", path: "" }
+        ? { name: "", ip: "", port: 0, username: "", password: "", path: "", always_recording: false }
         : type === "reed"
           ? { name: "", gpio_pin_number: 0, vcc: true, normally_closed: false }
           : { name: "", gpio_pin_number: 0 },
@@ -259,9 +262,10 @@ export default function Component({ permissions }: DeviceProps) {
                 <CardTitle className="text-zinc-50">{camera.name}</CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
-                <div className="space-y-2">
+                <div>
                   <p className="text-zinc-300">IP: {camera.ip}</p>
                   <p className="text-zinc-300">Path: {camera.path}</p>
+                  <p className="text-zinc-300">Always recording: {camera.always_recording ? "Yes" : "No"}</p>
                 </div>
               </CardContent>
               {canModifyDevices && (
@@ -328,7 +332,7 @@ export default function Component({ permissions }: DeviceProps) {
                 <p className="text-zinc-300">GPIO: {reed.gpio_pin_number}</p>
                 <p className="text-zinc-300">Normally: {reed.normally_closed ? "Closed" : "Open"}</p>
                 <p className="text-zinc-300">Connected to: {reed.vcc ? "VCC" : "GND"}</p>
-                <p className="text-zinc-300 mt-8">
+                <p className="text-zinc-300 mt-6">
                   Current Status: {reedStatuses[reed.gpio_pin_number] || "Loading..."}
                 </p>
               </CardContent>
@@ -406,7 +410,7 @@ export default function Component({ permissions }: DeviceProps) {
               </CardHeader>
               <CardContent className="flex-grow">
                 <p className="text-zinc-300">GPIO: {pir.gpio_pin_number}</p>
-                <p className="text-zinc-300 mt-8">Current Status: {pirStatuses[pir.gpio_pin_number] || "Loading..."}</p>
+                <p className="text-zinc-300 mt-6">Current Status: {pirStatuses[pir.gpio_pin_number] || "Loading..."}</p>
               </CardContent>
               {canModifyDevices && (
                 <CardFooter className="flex flex-col mt-auto">
@@ -516,6 +520,19 @@ export default function Component({ permissions }: DeviceProps) {
                     onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, path: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                   />
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="always-recording" className="text-zinc-50">
+                      Always recording
+                    </Label>
+                    <Switch
+                      id="always-recording"
+                      checked={(editingDevice as CameraInputDto)?.always_recording || false}
+                      onCheckedChange={(checked) =>
+                        setEditingDevice((prev) => (prev ? { ...prev, always_recording: checked } : null))
+                      }
+                      className="data-[state=unchecked]:bg-zinc-700 data-[state=unchecked]:border-zinc-600"
+                    />
+                  </div>
                 </>
               ) : deviceType === "reed" ? (
                 <>

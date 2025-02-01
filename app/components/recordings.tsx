@@ -25,7 +25,8 @@ import {
   getRTSPCamera,
 } from "@/lib/api"
 import type { Recording, RTSPCamera, StorageInfo, Permission } from "@/types"
-import { FileVideo2, X } from "lucide-react"
+import { FileVideo2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
 type RecordingsProps = {
   permissions: Permission[]
@@ -37,6 +38,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
+  const [showAlarmRecordings, setShowAlarmRecordings] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -151,65 +153,80 @@ export default function Recordings({ permissions }: RecordingsProps) {
         </AlertDialog>
       )}
 
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <span className="text-zinc-300">{showAlarmRecordings ? "Other recordings" : "Alarm recordings"}</span>
+        <Switch
+          checked={showAlarmRecordings}
+          onCheckedChange={setShowAlarmRecordings}
+          className="data-[state=unchecked]:bg-zinc-800 data-[state=unchecked]:border-zinc-700"
+        />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {recordings.length === 0 ? (
           <p className="text-zinc-400 col-span-full">No recordings found.</p>
         ) : (
-          recordings.map((recording) => (
-            <Card key={recording.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
-              <CardContent className="flex flex-col items-center justify-center pt-6">
-                <FileVideo2 size={48} className="text-zinc-400 mb-2" />
-                <p className="text-zinc-300 text-center">{formatRecordingName(recording.name)}</p>
-                <p className="text-zinc-400 text-sm mt-1">
-                  Camera: {cameras[recording.camera_ip]?.name || "Unknown Camera"}
-                </p>
-              </CardContent>
-              <CardFooter className="flex flex-col">
-                <div className="flex w-full mb-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    onClick={() => setSelectedRecording(recording)}
-                  >
-                    Stream
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 ml-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    onClick={() => window.open(getRecordingDownloadUrl(recording.id), "_blank")}
-                  >
-                    Download
-                  </Button>
-                </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="w-full bg-red-900 hover:bg-red-800">
-                      Delete
+          recordings
+            .filter((recording) =>
+              showAlarmRecordings
+                ? !recording.path.includes("alarm_recordings")
+                : recording.path.includes("alarm_recordings"),
+            )
+            .map((recording) => (
+              <Card key={recording.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
+                <CardContent className="flex flex-col items-center justify-center pt-6">
+                  <FileVideo2 size={48} className="text-zinc-400 mb-2" />
+                  <p className="text-zinc-300 text-center">{formatRecordingName(recording.name)}</p>
+                  <p className="text-zinc-400 text-sm mt-1">
+                    Camera: {cameras[recording.camera_ip]?.name || "Unknown Camera"}
+                  </p>
+                </CardContent>
+                <CardFooter className="flex flex-col">
+                  <div className="flex w-full mb-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => setSelectedRecording(recording)}
+                    >
+                      Stream
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="bg-zinc-800 text-zinc-50">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the recording.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDelete(recording.id)}
-                        className="bg-red-900 hover:bg-red-800 text-white"
-                      >
+                    <Button
+                      variant="outline"
+                      className="flex-1 ml-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => window.open(getRecordingDownloadUrl(recording.id), "_blank")}
+                    >
+                      Download
+                    </Button>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full bg-red-900 hover:bg-red-800">
                         Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardFooter>
-            </Card>
-          ))
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the recording.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(recording.id)}
+                          className="bg-red-900 hover:bg-red-800 text-white"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardFooter>
+              </Card>
+            ))
         )}
       </div>
 

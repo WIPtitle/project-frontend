@@ -38,7 +38,6 @@ const permissionDisplayMap: Record<Permission, string> = {
   [Permission.START_ALARM]: "Start alarm",
   [Permission.STOP_ALARM]: "Stop alarm",
   [Permission.ACCESS_RECORDINGS]: "Access recordings",
-  [Permission.ACCESS_STREAM_CAMERAS]: "Access stream cameras",
   [Permission.CHANGE_ALARM_SOUND]: "Change alarm sound",
   [Permission.UPDATE_NOTIFICATIONS_CONFIG]: "Update NTFY configuration",
   [Permission.MODIFY_DEVICES]: "Modify devices"

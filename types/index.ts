@@ -18,7 +18,6 @@ export enum Permission {
   START_ALARM = "START_ALARM",
   STOP_ALARM = "STOP_ALARM",
   ACCESS_RECORDINGS = "ACCESS_RECORDINGS",
-  ACCESS_STREAM_CAMERAS = "ACCESS_STREAM_CAMERAS",
   CHANGE_ALARM_SOUND = "CHANGE_ALARM_SOUND",
   UPDATE_NOTIFICATIONS_CONFIG = "UPDATE_NOTIFICATIONS_CONFIG",
   MODIFY_DEVICES = "MODIFY_DEVICES",
@@ -84,5 +83,6 @@ export interface RTSPCamera {
   username: string
   password: string
   path: string
+  always_recording: boolean
 }
 
