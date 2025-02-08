@@ -1,14 +1,31 @@
-'use client'
+"use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getNtfyCredentials, updateNtfyCredentials, getAlarmAudioConfig, createAlarmAudioConfig, updateAlarmAudioConfig, deleteAlarmAudioConfig } from "@/lib/api"
-import { NtfyCredentials, AlarmAudioConfig, Permission } from "@/types"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  getNtfyCredentials,
+  updateNtfyCredentials,
+  getAlarmAudioConfig,
+  createAlarmAudioConfig,
+  updateAlarmAudioConfig,
+  deleteAlarmAudioConfig,
+} from "@/lib/api"
+import { type NtfyCredentials, type AlarmAudioConfig, Permission } from "@/types"
 
 type ConfigurationProps = {
   permissions: Permission[]
@@ -90,7 +107,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-800">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-2xl font-bold text-zinc-50">Loading...</div>
       </div>
     )
@@ -113,7 +130,9 @@ export default function Configuration({ permissions }: ConfigurationProps) {
               {ntfyCredentials ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="url" className="text-sm font-medium text-zinc-300">URL</Label>
+                    <Label htmlFor="url" className="text-sm font-medium text-zinc-300">
+                      URL
+                    </Label>
                     <Input
                       id="url"
                       value={`http://${window.location.hostname}:8080`}
@@ -122,7 +141,9 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="user" className="text-sm font-medium text-zinc-300">User</Label>
+                    <Label htmlFor="user" className="text-sm font-medium text-zinc-300">
+                      User
+                    </Label>
                     <Input
                       id="user"
                       value={ntfyCredentials.user}
@@ -131,7 +152,9 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-zinc-300">Password</Label>
+                    <Label htmlFor="password" className="text-sm font-medium text-zinc-300">
+                      Password
+                    </Label>
                     <Input
                       id="password"
                       value={ntfyCredentials.password}
@@ -140,7 +163,9 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="topic" className="text-sm font-medium text-zinc-300">Topic</Label>
+                    <Label htmlFor="topic" className="text-sm font-medium text-zinc-300">
+                      Topic
+                    </Label>
                     <Input
                       id="topic"
                       value={ntfyCredentials.topic}
@@ -149,6 +174,8 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                     />
                   </div>
                 </>
+              ) : isLoading ? (
+                <p className="text-zinc-300">Loading Ntfy configuration...</p>
               ) : (
                 <p className="text-zinc-400">No Ntfy configuration saved</p>
               )}
@@ -172,6 +199,8 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             <CardContent className="flex-grow">
               {alarmAudioConfig?.audio ? (
                 <p className="text-zinc-300">Audio file: {alarmAudioConfig.audio.name}</p>
+              ) : isLoading ? (
+                <p className="text-zinc-300">Loading alarm audio configuration...</p>
               ) : (
                 <p className="text-zinc-400">No alarm audio configuration saved</p>
               )}
@@ -179,10 +208,18 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             <CardFooter className="mt-auto">
               {alarmAudioConfig ? (
                 <div className="flex justify-end space-x-2 w-full">
-                  <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleEditAudioConfig}>Edit</Button>
+                  <Button
+                    variant="outline"
+                    className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                    onClick={handleEditAudioConfig}
+                  >
+                    Edit
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="bg-red-900 hover:bg-red-800">Delete</Button>
+                      <Button variant="destructive" className="bg-red-900 hover:bg-red-800">
+                        Delete
+                      </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-zinc-800 text-zinc-50">
                       <AlertDialogHeader>
@@ -192,14 +229,27 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteAudioConfig} className="bg-red-900 hover:bg-red-800  text-white">Delete</AlertDialogAction>
+                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteAudioConfig}
+                          className="bg-red-900 hover:bg-red-800  text-white"
+                        >
+                          Delete
+                        </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
               ) : (
-                <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full" onClick={handleAddAudioConfig}>Add audio</Button>
+                <Button
+                  variant="outline"
+                  className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full"
+                  onClick={handleAddAudioConfig}
+                >
+                  Add audio
+                </Button>
               )}
             </CardFooter>
           </Card>
@@ -210,23 +260,25 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           <DialogHeader>
             <DialogTitle>{alarmAudioConfig ? "Edit" : "Add"} Alarm audio</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault()
-            if (editingAudioConfig) {
-              handleSaveAudioConfig(editingAudioConfig)
-            }
-          }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (editingAudioConfig) {
+                handleSaveAudioConfig(editingAudioConfig)
+              }
+            }}
+          >
             <div className="space-y-4">
               <Input
                 type="file"
                 accept=".mp3"
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file && file.name.toLowerCase().endsWith('.mp3')) {
-                    setEditingAudioConfig(prev => prev ? {...prev, audio: file} : null);
+                  const file = e.target.files?.[0]
+                  if (file && file.name.toLowerCase().endsWith(".mp3")) {
+                    setEditingAudioConfig((prev) => (prev ? { ...prev, audio: file } : null))
                   } else {
-                    alert("Please select an MP3 file.");
-                    e.target.value = '';
+                    alert("Please select an MP3 file.")
+                    e.target.value = ""
                   }
                 }}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
@@ -246,7 +298,12 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">OK</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => setErrorMessage(null)}
+              className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            >
+              OK
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
