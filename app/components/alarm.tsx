@@ -30,7 +30,7 @@ import {
   stopListening,
   getDeviceGroupPirs,
   updateDeviceGroupPirs,
-  getAllPirs
+  getAllPirs,
 } from "@/lib/api"
 import { type DeviceGroup, type MagneticReed, Permission, DeviceGroupStatus, type Pir } from "@/types"
 
@@ -540,11 +540,15 @@ export default function Alarm({ permissions }: AlarmProps) {
                 aria-hidden="true"
               />
               <Input
-                type="password"
+                type="text"
                 inputMode="numeric"
                 placeholder="Enter PIN"
                 value={pin}
-                onChange={(e) => setPin(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, "")
+                  if (value.length > 8) return
+                  setPin(value)
+                }}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600 mb-4"
                 autoComplete="off"
                 name="pin"

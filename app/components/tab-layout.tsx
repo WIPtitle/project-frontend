@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { usePathname, useRouter } from "next/navigation"
@@ -42,8 +42,6 @@ export default function TabLayout() {
   const [isMenuCollapsed, setIsMenuCollapsed] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const tabsRef = useRef<HTMLDivElement>(null)
-  const userInfoRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const storedToken = localStorage.getItem("token")
@@ -79,41 +77,18 @@ export default function TabLayout() {
 
   useEffect(() => {
     const handleResize = () => {
-      if (tabsRef.current && userInfoRef.current) {
-        const tabsRect = tabsRef.current.getBoundingClientRect()
-        const userInfoRect = userInfoRef.current.getBoundingClientRect()
-        const lastTabElement = tabsRef.current.lastElementChild as HTMLElement
-        if (lastTabElement) {
-          const lastTabRect = lastTabElement.getBoundingClientRect()
-          const shouldCollapse = lastTabRect.right + 20 > userInfoRect.left
-          setIsMenuCollapsed(shouldCollapse)
-        }
-      }
+      setIsMenuCollapsed(window.innerWidth < 768) // Use 768px as breakpoint for md
     }
 
     // Check on initial load
     handleResize()
 
-    // Check on window resize
+    // Add event listener for window resize
     window.addEventListener("resize", handleResize)
 
     // Cleanup
     return () => window.removeEventListener("resize", handleResize)
-  }, [])
-
-  useEffect(() => {
-    // Recheck menu collapse when currentUser changes (which may affect tab items)
-    if (tabsRef.current && userInfoRef.current) {
-      const tabsRect = tabsRef.current.getBoundingClientRect()
-      const userInfoRect = userInfoRef.current.getBoundingClientRect()
-      const lastTabElement = tabsRef.current.lastElementChild as HTMLElement
-      if (lastTabElement) {
-        const lastTabRect = lastTabElement.getBoundingClientRect()
-        const shouldCollapse = lastTabRect.right + 20 > userInfoRect.left
-        setIsMenuCollapsed(shouldCollapse)
-      }
-    }
-  }, [tabsRef, userInfoRef]) // Removed unnecessary currentUser dependency
+  }, []) // Only run on mount
 
   const handleLogin = async (newToken: string) => {
     setToken(newToken)
@@ -194,7 +169,7 @@ export default function TabLayout() {
                   </DropdownMenu>
                 </div>
               ) : (
-                <TabsList ref={tabsRef} className="bg-transparent">
+                <TabsList className="bg-transparent hidden md:flex">
                   {tabItems.map((item) => (
                     <TabsTrigger
                       key={item.value}
@@ -207,7 +182,7 @@ export default function TabLayout() {
                 </TabsList>
               )}
 
-              <div ref={userInfoRef} className="flex items-center space-x-2 pr-4">
+              <div className="flex items-center space-x-2 pr-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <div className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
