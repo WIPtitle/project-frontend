@@ -1,32 +1,38 @@
-'use client'
+"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu } from 'lucide-react'
+import { Menu } from "lucide-react"
 import Login from "./login"
 import Alarm from "./alarm"
 import Devices from "./devices"
 import Recordings from "./recordings"
 import Configuration from "./configuration"
 import UserManagement from "./user-management"
-import { getUserMyself, logout, getNtfyCredentials } from "@/lib/api"
-import { User, Permission, NtfyCredentials } from "@/types"
+import { getUserMyself, logout } from "@/lib/api"
+import { type User, Permission } from "@/types"
 import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 function formatEmail(email: string): string {
-  if (email.length <= 25) return email;
+  if (email.length <= 25) return email
 
-  const [localPart, domain] = email.split('@');
-  const [domainName, ...tld] = domain.split('.');
-  return `${localPart}@***${tld.length ? '.' + tld.join('.') : ''}`;
+  const [localPart, domain] = email.split("@")
+  const [domainName, ...tld] = domain.split(".")
+  return `${localPart}@***${tld.length ? "." + tld.join(".") : ""}`
 }
 
 export default function TabLayout() {
@@ -40,8 +46,8 @@ export default function TabLayout() {
   const userInfoRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token')
-    const tokenExpiry = localStorage.getItem('tokenExpiry')
+    const storedToken = localStorage.getItem("token")
+    const tokenExpiry = localStorage.getItem("tokenExpiry")
 
     if (storedToken) {
       setToken(storedToken)
@@ -56,7 +62,7 @@ export default function TabLayout() {
           setIsLoading(false)
         })
 
-      if (tokenExpiry && tokenExpiry !== 'infinite') {
+      if (tokenExpiry && tokenExpiry !== "infinite") {
         const expiryTime = new Date(tokenExpiry).getTime()
         const timeUntilExpiry = expiryTime - Date.now()
 
@@ -74,40 +80,40 @@ export default function TabLayout() {
   useEffect(() => {
     const handleResize = () => {
       if (tabsRef.current && userInfoRef.current) {
-        const tabsRect = tabsRef.current.getBoundingClientRect();
-        const userInfoRect = userInfoRef.current.getBoundingClientRect();
-        const lastTabElement = tabsRef.current.lastElementChild as HTMLElement;
+        const tabsRect = tabsRef.current.getBoundingClientRect()
+        const userInfoRect = userInfoRef.current.getBoundingClientRect()
+        const lastTabElement = tabsRef.current.lastElementChild as HTMLElement
         if (lastTabElement) {
-          const lastTabRect = lastTabElement.getBoundingClientRect();
-          const shouldCollapse = lastTabRect.right + 20 > userInfoRect.left;
-          setIsMenuCollapsed(shouldCollapse);
+          const lastTabRect = lastTabElement.getBoundingClientRect()
+          const shouldCollapse = lastTabRect.right + 20 > userInfoRect.left
+          setIsMenuCollapsed(shouldCollapse)
         }
       }
-    };
+    }
 
     // Check on initial load
-    handleResize();
+    handleResize()
 
     // Check on window resize
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize)
 
     // Cleanup
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
 
   useEffect(() => {
     // Recheck menu collapse when currentUser changes (which may affect tab items)
     if (tabsRef.current && userInfoRef.current) {
-      const tabsRect = tabsRef.current.getBoundingClientRect();
-      const userInfoRect = userInfoRef.current.getBoundingClientRect();
-      const lastTabElement = tabsRef.current.lastElementChild as HTMLElement;
+      const tabsRect = tabsRef.current.getBoundingClientRect()
+      const userInfoRect = userInfoRef.current.getBoundingClientRect()
+      const lastTabElement = tabsRef.current.lastElementChild as HTMLElement
       if (lastTabElement) {
-        const lastTabRect = lastTabElement.getBoundingClientRect();
-        const shouldCollapse = lastTabRect.right + 20 > userInfoRect.left;
-        setIsMenuCollapsed(shouldCollapse);
+        const lastTabRect = lastTabElement.getBoundingClientRect()
+        const shouldCollapse = lastTabRect.right + 20 > userInfoRect.left
+        setIsMenuCollapsed(shouldCollapse)
       }
     }
-  }, [currentUser]);
+  }, [tabsRef, userInfoRef]) // Removed unnecessary currentUser dependency
 
   const handleLogin = async (newToken: string) => {
     setToken(newToken)
@@ -123,9 +129,9 @@ export default function TabLayout() {
     logout()
     setToken(null)
     setCurrentUser(null)
-    localStorage.removeItem('token')
-    localStorage.removeItem('tokenExpiry')
-    router.push('/')
+    localStorage.removeItem("token")
+    localStorage.removeItem("tokenExpiry")
+    router.push("/")
   }
 
   const handleTabChange = (value: string) => {
@@ -153,9 +159,14 @@ export default function TabLayout() {
   const tabItems = [
     { value: "alarm", label: "Alarm dashboard" },
     { value: "devices", label: "Devices" },
-    ...(currentUser?.permissions.includes(Permission.ACCESS_RECORDINGS) ? [{ value: "recordings", label: "Recordings" }] : []),
+    ...(currentUser?.permissions.includes(Permission.ACCESS_RECORDINGS)
+      ? [{ value: "recordings", label: "Recordings" }]
+      : []),
     { value: "users", label: "User management" },
-    ...(currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG) ? [{ value: "configuration", label: "Configuration" }] : []),
+    ...(currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) ||
+    currentUser?.permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
+      ? [{ value: "configuration", label: "Configuration" }]
+      : []),
   ]
 
   return (
@@ -165,42 +176,70 @@ export default function TabLayout() {
           <div className="mb-4 border-b border-zinc-800">
             <div className="flex justify-between items-center mb-2">
               {isMenuCollapsed ? (
-              <div className="pl-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <Menu className="h-4 w-4" />
-                      <span className="sr-only">Open menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {tabItems.map((item) => (
-                      <DropdownMenuItem key={item.value} onSelect={() => handleTabChange(item.value)}>
-                        {item.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                <div className="pl-4">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <Menu className="h-4 w-4" />
+                        <span className="sr-only">Open menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {tabItems.map((item) => (
+                        <DropdownMenuItem key={item.value} onSelect={() => handleTabChange(item.value)}>
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               ) : (
-              <TabsList ref={tabsRef} className="bg-transparent">
-                {tabItems.map((item) => (
-                  <TabsTrigger
-                    key={item.value}
-                    value={item.value}
-                    className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50"
-                  >
-                    {item.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            )}
+                <TabsList ref={tabsRef} className="bg-transparent">
+                  {tabItems.map((item) => (
+                    <TabsTrigger
+                      key={item.value}
+                      value={item.value}
+                      className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-zinc-50 text-zinc-400 hover:text-zinc-50"
+                    >
+                      {item.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              )}
 
               <div ref={userInfoRef} className="flex items-center space-x-2 pr-4">
-                <span className="text-zinc-400">{formatEmail(currentUser?.email || '')}</span>
-                <Avatar>
-                  <AvatarImage src="/avatar.webp" alt={currentUser?.email} />
-                </Avatar>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <div className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+                      <span className="text-zinc-400">{formatEmail(currentUser?.email || "")}</span>
+                      <Avatar>
+                        <AvatarImage src="/avatar.webp" alt={currentUser?.email} />
+                      </Avatar>
+                    </div>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-zinc-400">
+                        This will log you out of your account. You will need to log in again to access the application.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          handleLogout()
+                          window.location.reload()
+                        }}
+                        className="bg-red-900 hover:bg-red-800 text-white"
+                      >
+                        Logout
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           </div>
@@ -217,9 +256,14 @@ export default function TabLayout() {
               </TabsContent>
             )}
             <TabsContent value="users">
-              <UserManagement onUserUpdate={handleUserUpdate} currentUser={currentUser} permissions={currentUser?.permissions || []} />
+              <UserManagement
+                onUserUpdate={handleUserUpdate}
+                currentUser={currentUser}
+                permissions={currentUser?.permissions || []}
+              />
             </TabsContent>
-            {(currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) || currentUser?.permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)) && (
+            {(currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) ||
+              currentUser?.permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)) && (
               <TabsContent value="configuration">
                 <Configuration permissions={currentUser?.permissions || []} />
               </TabsContent>
