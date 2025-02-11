@@ -138,10 +138,7 @@ export default function TabLayout() {
       ? [{ value: "recordings", label: "Recordings" }]
       : []),
     { value: "users", label: "User management" },
-    ...(currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) ||
-    currentUser?.permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
-      ? [{ value: "configuration", label: "Configuration" }]
-      : []),
+    { value: "configuration", label: "Configuration" }, // Configuration tab is always visible
   ]
 
   return (
@@ -237,12 +234,9 @@ export default function TabLayout() {
                 permissions={currentUser?.permissions || []}
               />
             </TabsContent>
-            {(currentUser?.permissions.includes(Permission.CHANGE_ALARM_SOUND) ||
-              currentUser?.permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)) && (
-              <TabsContent value="configuration">
-                <Configuration permissions={currentUser?.permissions || []} />
-              </TabsContent>
-            )}
+            <TabsContent value="configuration">
+              <Configuration permissions={currentUser?.permissions || []} />
+            </TabsContent>
           </div>
         </Tabs>
       </div>

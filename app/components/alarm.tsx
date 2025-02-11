@@ -293,13 +293,15 @@ export default function Alarm({ permissions }: AlarmProps) {
           }}
         >
           <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-              onClick={handleAddGroup}
-            >
-              Add group
-            </Button>
+            {permissions.includes(Permission.MODIFY_DEVICES) && (
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                onClick={handleAddGroup}
+              >
+                Add group
+              </Button>
+            )}
           </DialogTrigger>
           <DialogContent className="bg-zinc-800 text-zinc-50">
             <DialogHeader>
@@ -434,46 +436,48 @@ export default function Alarm({ permissions }: AlarmProps) {
                 {groupPirs[group.id]?.length === 0 && <p className="text-zinc-400">No PIR sensors</p>}
               </CardContent>
               <CardFooter className="flex flex-col mt-auto">
-                <div className="flex w-full mb-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    onClick={() => handleEditGroup(group)}
-                    disabled={group.status !== DeviceGroupStatus.IDLE}
-                  >
-                    Edit
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
-                        disabled={group.status !== DeviceGroupStatus.IDLE}
-                      >
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-zinc-800 text-zinc-50">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the device group.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(group.id)}
-                          className="bg-red-900 hover:bg-red-800 text-white"
+                {permissions.includes(Permission.MODIFY_DEVICES) && (
+                  <div className="flex w-full mb-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => handleEditGroup(group)}
+                      disabled={group.status !== DeviceGroupStatus.IDLE}
+                    >
+                      Edit
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          className="flex-1 ml-1 bg-red-900 hover:bg-red-800"
+                          disabled={group.status !== DeviceGroupStatus.IDLE}
                         >
                           Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the device group.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(group.id)}
+                            className="bg-red-900 hover:bg-red-800 text-white"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
                 {permissions.includes(Permission.START_ALARM) && group.status === DeviceGroupStatus.IDLE && (
                   <Button
                     onClick={() => {

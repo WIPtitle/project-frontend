@@ -45,14 +45,9 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
-        const promises = []
-        if (canChangeNotificationsConfig) {
-          promises.push(getNtfyCredentials().then(setNtfyCredentials))
-        }
-        if (canChangeAlarmSound) {
-          promises.push(getAlarmAudioConfig().then(setAlarmAudioConfig))
-        }
-        await Promise.all(promises)
+        const [credentials, audio] = await Promise.all([getNtfyCredentials(), getAlarmAudioConfig()])
+        setNtfyCredentials(credentials)
+        setAlarmAudioConfig(audio)
       } catch (error) {
         setErrorMessage("Failed to fetch configurations")
       } finally {
@@ -60,7 +55,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       }
     }
     fetchConfigs()
-  }, [canChangeNotificationsConfig, canChangeAlarmSound])
+  }, [])
 
   const handleRefreshNotificationsConfig = async () => {
     try {
@@ -113,73 +108,67 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     )
   }
 
-  if (!canChangeNotificationsConfig && !canChangeAlarmSound) {
-    return null
-  }
-
   return (
     <div>
       <h1 className="text-3xl font-bold mb-4 text-zinc-50">Configuration</h1>
       <div className="grid gap-4 md:grid-cols-2">
-        {canChangeNotificationsConfig && (
-          <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-zinc-50">Ntfy</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-4">
-              {ntfyCredentials ? (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="url" className="text-sm font-medium text-zinc-300">
-                      URL
-                    </Label>
-                    <Input
-                      id="url"
-                      value={`http://${window.location.hostname}:8080`}
-                      readOnly
-                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="user" className="text-sm font-medium text-zinc-300">
-                      User
-                    </Label>
-                    <Input
-                      id="user"
-                      value={ntfyCredentials.user}
-                      readOnly
-                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-zinc-300">
-                      Password
-                    </Label>
-                    <Input
-                      id="password"
-                      value={ntfyCredentials.password}
-                      readOnly
-                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="topic" className="text-sm font-medium text-zinc-300">
-                      Topic
-                    </Label>
-                    <Input
-                      id="topic"
-                      value={ntfyCredentials.topic}
-                      readOnly
-                      className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
-                    />
-                  </div>
-                </>
-              ) : isLoading ? (
-                <p className="text-zinc-300">Loading Ntfy configuration...</p>
-              ) : (
-                <p className="text-zinc-400">No Ntfy configuration saved</p>
-              )}
-            </CardContent>
+        <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
+          <CardHeader>
+            <CardTitle className="text-zinc-50">Ntfy</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-grow space-y-4">
+            {ntfyCredentials ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="url" className="text-sm font-medium text-zinc-300">
+                    URL
+                  </Label>
+                  <Input
+                    id="url"
+                    value={`http://${window.location.hostname}:8080`}
+                    readOnly
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="user" className="text-sm font-medium text-zinc-300">
+                    User
+                  </Label>
+                  <Input
+                    id="user"
+                    value={ntfyCredentials.user}
+                    readOnly
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium text-zinc-300">
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    value={ntfyCredentials.password}
+                    readOnly
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="topic" className="text-sm font-medium text-zinc-300">
+                    Topic
+                  </Label>
+                  <Input
+                    id="topic"
+                    value={ntfyCredentials.topic}
+                    readOnly
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-zinc-400">No Ntfy configuration saved</p>
+            )}
+          </CardContent>
+          {canChangeNotificationsConfig && (
             <CardFooter className="mt-auto">
               <Button
                 variant="outline"
@@ -189,22 +178,20 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                 Refresh configuration
               </Button>
             </CardFooter>
-          </Card>
-        )}
-        {canChangeAlarmSound && (
-          <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-zinc-50">Alarm audio</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              {alarmAudioConfig?.audio ? (
-                <p className="text-zinc-300">Audio file: {alarmAudioConfig.audio.name}</p>
-              ) : isLoading ? (
-                <p className="text-zinc-300">Loading alarm audio configuration...</p>
-              ) : (
-                <p className="text-zinc-400">No alarm audio configuration saved</p>
-              )}
-            </CardContent>
+          )}
+        </Card>
+        <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
+          <CardHeader>
+            <CardTitle className="text-zinc-50">Alarm audio</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-grow">
+            {alarmAudioConfig?.audio ? (
+              <p className="text-zinc-300">Audio file: {alarmAudioConfig.audio.name}</p>
+            ) : (
+              <p className="text-zinc-400">No alarm audio configuration saved</p>
+            )}
+          </CardContent>
+          {canChangeAlarmSound && (
             <CardFooter className="mt-auto">
               {alarmAudioConfig ? (
                 <div className="flex justify-end space-x-2 w-full">
@@ -252,8 +239,8 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                 </Button>
               )}
             </CardFooter>
-          </Card>
-        )}
+          )}
+        </Card>
       </div>
       <Dialog open={isAudioDialogOpen} onOpenChange={setIsAudioDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
