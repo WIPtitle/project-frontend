@@ -1,5 +1,7 @@
 #!/bin/sh
 
+rm node_modules -rf
+
 cd /app
 
-npm install && npm run build && npm start
+npm update && npm install && npm run build && npm start
