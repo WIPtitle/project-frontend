@@ -10,6 +10,7 @@ import type {
   StorageInfo,
   Pir,
   PirStatus,
+  RecordingType
 } from "@/types"
 
 const getApiBaseUrl = () => {
@@ -784,23 +785,38 @@ export const stopListening = async (groupId: number, pin: string): Promise<void>
   }
 }
 
-export const getAllRecordings = async (): Promise<Recording[]> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/recording`, {
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch recordings")
+export const getAllRecordings = async (
+    params?: {
+        offset?: number;
+        type?: RecordingType;
     }
+): Promise<Recording[]> => {
+    try {
+        const url = new URL(`${await getApiBaseUrl()}/devices-manager-service/recording`);
 
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
+        if (params?.offset !== undefined) {
+            url.searchParams.append('offset', params.offset.toString());
+        }
+
+        if (params?.type) {
+            url.searchParams.append('type', params.type);
+        }
+
+        const response = await fetch(url.toString(), {
+            headers: {
+                Authorization: `Bearer ${getTokenOrThrow()}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch recordings");
+        }
+
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};
 
 export const deleteRecording = async (id: number): Promise<void> => {
   try {

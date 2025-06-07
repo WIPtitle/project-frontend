@@ -56,10 +56,16 @@ export interface AlarmAudioConfig {
   audio: File | null
 }
 
+export enum RecordingType {
+    ALARM = "ALARM",
+    NORMAL = "NORMAL"
+}
+
 export interface Recording {
   id: number
   name: string
   path: string
+  type: RecordingType
   camera_ip: string
   is_completed: boolean
 }
