@@ -3,14 +3,13 @@ import type {
   User,
   DeviceGroup,
   Permission,
-  MagneticReed,
+  Sensor,
   RTSPCamera,
   AlarmAudioConfig,
   Recording,
   StorageInfo,
-  Pir,
-  PirStatus,
-  RecordingType
+  SensorStatus,
+  RecordingType,
 } from "@/types"
 
 const getApiBaseUrl = () => {
@@ -251,45 +250,6 @@ export const updateDeviceGroupCameras = async (groupId: number, cameraIps: strin
   }
 }
 
-export const getDeviceGroupReeds = async (groupId: number): Promise<MagneticReed[]> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/reeds`, {
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch device group reeds")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
-export const updateDeviceGroupReeds = async (groupId: number, reedPins: number[]): Promise<MagneticReed[]> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/reeds`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(reedPins),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to update device group reeds")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
 export const updateDeviceGroup = async (id: number, group: DeviceGroup): Promise<DeviceGroup> => {
   try {
     const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
@@ -402,16 +362,16 @@ export const deleteUser = async (id: number): Promise<boolean> => {
 }
 
 // API functions
-export const getAllMagneticReeds = async (): Promise<MagneticReed[]> => {
+export const getAllSensors = async (): Promise<Sensor[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
     })
 
     if (!response.ok) {
-      throw new Error("Failed to fetch magnetic reeds")
+      throw new Error("Failed to fetch sensors")
     }
 
     return await response.json()
@@ -420,21 +380,19 @@ export const getAllMagneticReeds = async (): Promise<MagneticReed[]> => {
   }
 }
 
-export const createMagneticReed = async (
-  reed: Omit<MagneticReed, "id" | "group_id" | "listening">,
-): Promise<MagneticReed> => {
+export const createSensor = async (sensor: Omit<Sensor, "id" | "group_id" | "listening">): Promise<Sensor> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/`, {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(reed),
+      body: JSON.stringify(sensor),
     })
 
     if (!response.ok) {
-      throw new Error("Failed to create magnetic reed")
+      throw new Error("Failed to create sensor")
     }
 
     return await response.json()
@@ -443,9 +401,9 @@ export const createMagneticReed = async (
   }
 }
 
-export const updateMagneticReed = async (gpioNumber: number, updates: Partial<MagneticReed>): Promise<MagneticReed> => {
+export const updateSensor = async (gpioNumber: number, updates: Partial<Sensor>): Promise<Sensor> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/${gpioNumber}`, {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -455,7 +413,7 @@ export const updateMagneticReed = async (gpioNumber: number, updates: Partial<Ma
     })
 
     if (!response.ok) {
-      throw new Error("Failed to update magnetic reed")
+      throw new Error("Failed to update sensor")
     }
 
     return await response.json()
@@ -464,9 +422,9 @@ export const updateMagneticReed = async (gpioNumber: number, updates: Partial<Ma
   }
 }
 
-export const deleteMagneticReed = async (gpioNumber: number): Promise<boolean> => {
+export const deleteSensor = async (gpioNumber: number): Promise<boolean> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/${gpioNumber}`, {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -474,7 +432,7 @@ export const deleteMagneticReed = async (gpioNumber: number): Promise<boolean> =
     })
 
     if (!response.ok) {
-      throw new Error("Failed to delete magnetic reed")
+      throw new Error("Failed to delete sensor")
     }
 
     return true
@@ -483,20 +441,59 @@ export const deleteMagneticReed = async (gpioNumber: number): Promise<boolean> =
   }
 }
 
-export const getReedCurrentStatus = async (gpioNumber: number): Promise<string> => {
+export const getSensorCurrentStatus = async (gpioNumber: number): Promise<SensorStatus> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/reed/${gpioNumber}/status`, {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}/status`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
     })
 
     if (!response.ok) {
-      throw new Error("Failed to get magnetic reed status")
+      throw new Error("Failed to get sensor status")
     }
 
     const data = await response.json()
     return data.status
+  } catch (error) {
+    throw error
+  }
+}
+
+export const getDeviceGroupSensors = async (groupId: number): Promise<Sensor[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch device group sensors")
+    }
+
+    return await response.json()
+  } catch (error) {
+    throw error
+  }
+}
+
+export const updateDeviceGroupSensors = async (groupId: number, sensorPins: number[]): Promise<Sensor[]> => {
+  try {
+    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sensorPins),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to update device group sensors")
+    }
+
+    return await response.json()
   } catch (error) {
     throw error
   }
@@ -785,38 +782,36 @@ export const stopListening = async (groupId: number, pin: string): Promise<void>
   }
 }
 
-export const getAllRecordings = async (
-    params?: {
-        offset?: number;
-        type?: RecordingType;
+export const getAllRecordings = async (params?: {
+  offset?: number
+  type?: RecordingType
+}): Promise<Recording[]> => {
+  try {
+    const url = new URL(`${await getApiBaseUrl()}/devices-manager-service/recording`)
+
+    if (params?.offset !== undefined) {
+      url.searchParams.append("offset", params.offset.toString())
     }
-): Promise<Recording[]> => {
-    try {
-        const url = new URL(`${await getApiBaseUrl()}/devices-manager-service/recording`);
 
-        if (params?.offset !== undefined) {
-            url.searchParams.append('offset', params.offset.toString());
-        }
-
-        if (params?.type) {
-            url.searchParams.append('type', params.type);
-        }
-
-        const response = await fetch(url.toString(), {
-            headers: {
-                Authorization: `Bearer ${getTokenOrThrow()}`,
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to fetch recordings");
-        }
-
-        return await response.json();
-    } catch (error) {
-        throw error;
+    if (params?.type) {
+      url.searchParams.append("type", params.type)
     }
-};
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch recordings")
+    }
+
+    return await response.json()
+  } catch (error) {
+    throw error
+  }
+}
 
 export const deleteRecording = async (id: number): Promise<void> => {
   try {
@@ -879,141 +874,3 @@ export const getRecordingDownloadUrl = (recordingId: number): string => {
   const token = getTokenOrThrow()
   return `${getApiBaseUrl()}/devices-manager-service/recording/${recordingId}/download?auth_token=${encodeURIComponent(token)}`
 }
-
-export const getAllPirs = async (): Promise<Pir[]> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/pir/`, {
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch PIR sensors")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
-export const createPir = async (pir: Omit<Pir, "id" | "group_id" | "listening">): Promise<Pir> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/pir/`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(pir),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to create PIR sensor")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
-export const updatePir = async (gpioNumber: number, updates: Partial<Pir>): Promise<Pir> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/pir/${gpioNumber}`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updates),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to update PIR sensor")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
-export const deletePir = async (gpioNumber: number): Promise<boolean> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/pir/${gpioNumber}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to delete PIR sensor")
-    }
-
-    return true
-  } catch (error) {
-    throw error
-  }
-}
-
-export const getPirCurrentStatus = async (gpioNumber: number): Promise<PirStatus> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/pir/${gpioNumber}/status`, {
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to get PIR sensor status")
-    }
-
-    const data = await response.json()
-    return data.status
-  } catch (error) {
-    throw error
-  }
-}
-
-export const getDeviceGroupPirs = async (groupId: number): Promise<Pir[]> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/pirs`, {
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch device group PIRs")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
-export const updateDeviceGroupPirs = async (groupId: number, pirPins: number[]): Promise<Pir[]> => {
-  try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/pirs`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(pirPins),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to update device group PIRs")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-

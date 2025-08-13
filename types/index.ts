@@ -31,21 +31,12 @@ export interface User {
   permissions: Permission[]
 }
 
-export interface MagneticReed {
-  name: string
-  gpio_pin_number: number
-  vcc: boolean
-  normally_closed: boolean
-  listening: boolean
-  group_id: number
+export enum SensorStatus {
+  HIGH = "HIGH",
+  LOW = "LOW",
 }
 
-export enum PirStatus {
-  MOVEMENT = "MOVEMENT",
-  IDLE = "IDLE",
-}
-
-export interface Pir {
+export interface Sensor {
   name: string
   gpio_pin_number: number
   listening: boolean
@@ -57,8 +48,8 @@ export interface AlarmAudioConfig {
 }
 
 export enum RecordingType {
-    ALARM = "ALARM",
-    NORMAL = "NORMAL"
+  ALARM = "ALARM",
+  NORMAL = "NORMAL",
 }
 
 export interface Recording {
@@ -91,4 +82,3 @@ export interface RTSPCamera {
   path: string
   always_recording: boolean
 }
-

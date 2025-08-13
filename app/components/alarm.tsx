@@ -23,16 +23,13 @@ import {
   createDeviceGroup,
   updateDeviceGroup,
   deleteDeviceGroup,
-  getAllMagneticReeds,
-  getDeviceGroupReeds,
-  updateDeviceGroupReeds,
+  getAllSensors,
+  getDeviceGroupSensors,
+  updateDeviceGroupSensors,
   startListening,
   stopListening,
-  getDeviceGroupPirs,
-  updateDeviceGroupPirs,
-  getAllPirs,
 } from "@/lib/api"
-import { type DeviceGroup, type MagneticReed, Permission, DeviceGroupStatus, type Pir } from "@/types"
+import { type DeviceGroup, type Sensor, Permission, DeviceGroupStatus } from "@/types"
 
 const statusMapping: Record<DeviceGroupStatus, string> = {
   [DeviceGroupStatus.LISTENING]: "Active",
@@ -49,33 +46,25 @@ type DeviceGroupInputDto = DeviceGroup & {
   id?: number
 }
 
-// filters not needed now, but could be in the future
-export const getAvailableReeds = (reeds: MagneticReed[], groupId: number | null): MagneticReed[] => {
-  return reeds.filter((reed) => reed)
-}
-
-export const getAvailablePirs = (pirs: Pir[], groupId: number | null): Pir[] => {
-  return pirs.filter((pir) => pir)
+export const getAvailableSensors = (sensors: Sensor[], groupId: number | null): Sensor[] => {
+  return sensors.filter((sensor) => sensor)
 }
 
 export default function Alarm({ permissions }: AlarmProps) {
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[] | null>(null)
-  const [allReeds, setAllReeds] = useState<MagneticReed[]>([])
+  const [allSensors, setAllSensors] = useState<Sensor[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<DeviceGroupInputDto | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [groupReeds, setGroupReeds] = useState<{ [key: number]: MagneticReed[] }>({})
-  const [selectedReeds, setSelectedReeds] = useState<MagneticReed[]>([])
+  const [groupSensors, setGroupSensors] = useState<{ [key: number]: Sensor[] }>({})
+  const [selectedSensors, setSelectedSensors] = useState<Sensor[]>([])
   const [isActivating, setIsActivating] = useState<{ [key: number]: boolean }>({})
   const [isDeactivating, setIsDeactivating] = useState<{ [key: number]: boolean }>({})
   const [pin, setPin] = useState<string>("")
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [groupError, setGroupError] = useState<string | null>(null)
-  const [groupPirs, setGroupPirs] = useState<{ [key: number]: Pir[] }>({})
-  const [selectedPirs, setSelectedPirs] = useState<Pir[]>([])
-  const [allPirs, setAllPirs] = useState<Pir[]>([])
 
   const eventSources = useRef<{ [key: number]: EventSource }>({})
   useEffect(() => {
@@ -110,23 +99,18 @@ export default function Alarm({ permissions }: AlarmProps) {
         const groups = await getDeviceGroups()
         setDeviceGroups(groups)
 
-        // Fetch devices for each group
-        const reedsPromises = groups.map((group) => getDeviceGroupReeds(group.id))
-        const pirsPromises = groups.map((group) => getDeviceGroupPirs(group.id))
+        // Fetch sensors for each group
+        const sensorsPromises = groups.map((group) => getDeviceGroupSensors(group.id))
 
-        const groupReedsData = await Promise.all(reedsPromises)
-        const groupPirsData = await Promise.all(pirsPromises)
+        const groupSensorsData = await Promise.all(sensorsPromises)
 
-        const newGroupReeds: { [key: number]: MagneticReed[] } = {}
-        const newGroupPirs: { [key: number]: Pir[] } = {}
+        const newGroupSensors: { [key: number]: Sensor[] } = {}
 
         groups.forEach((group, index) => {
-          newGroupReeds[group.id] = groupReedsData[index]
-          newGroupPirs[group.id] = groupPirsData[index]
+          newGroupSensors[group.id] = groupSensorsData[index]
         })
 
-        setGroupReeds(newGroupReeds)
-        setGroupPirs(newGroupPirs)
+        setGroupSensors(newGroupSensors)
       } catch (error) {
         console.error("Failed to fetch data:", error)
         setErrorMessage("Failed to fetch device groups and devices. Please try again later.")
@@ -140,11 +124,8 @@ export default function Alarm({ permissions }: AlarmProps) {
 
   const fetchAllDevices = async () => {
     try {
-      const reeds = await getAllMagneticReeds()
-      setAllReeds(reeds)
-      //Added to fetch all PIRs
-      const pirs = await getAllPirs()
-      setAllPirs(pirs)
+      const sensors = await getAllSensors()
+      setAllSensors(sensors)
     } catch (error) {
       console.error("Failed to fetch devices:", error)
       setErrorMessage("Failed to fetch devices. Please try again.")
@@ -155,15 +136,10 @@ export default function Alarm({ permissions }: AlarmProps) {
     try {
       await deleteDeviceGroup(id)
       setDeviceGroups((prevGroups) => prevGroups?.filter((group) => group.id !== id) || [])
-      setGroupReeds((prev) => {
-        const newGroupReeds = { ...prev }
-        delete newGroupReeds[id]
-        return newGroupReeds
-      })
-      setGroupPirs((prev) => {
-        const newGroupPirs = { ...prev }
-        delete newGroupPirs[id]
-        return newGroupPirs
+      setGroupSensors((prev) => {
+        const newGroupSensors = { ...prev }
+        delete newGroupSensors[id]
+        return newGroupSensors
       })
     } catch (error) {
       setErrorMessage("Failed to delete device group")
@@ -173,8 +149,7 @@ export default function Alarm({ permissions }: AlarmProps) {
   const handleAddGroup = async () => {
     await fetchAllDevices()
     setEditingGroup({ id: 0, name: "", wait_to_start_alarm: 0, wait_to_fire_alarm: 0, status: DeviceGroupStatus.IDLE })
-    setSelectedReeds([])
-    setSelectedPirs([])
+    setSelectedSensors([])
     setIsDialogOpen(true)
   }
 
@@ -183,8 +158,7 @@ export default function Alarm({ permissions }: AlarmProps) {
     setEditingGroup({
       ...group,
     })
-    setSelectedReeds(groupReeds[group.id] || [])
-    setSelectedPirs(groupPirs[group.id] || [])
+    setSelectedSensors(groupSensors[group.id] || [])
     setIsDialogOpen(true)
   }
 
@@ -202,34 +176,24 @@ export default function Alarm({ permissions }: AlarmProps) {
               prevGroups?.map((group) => (group.id === updatedGroupResponse.id ? updatedGroupResponse : group)) || [],
           )
 
-          // Update devices
-          const updatedReeds = await updateDeviceGroupReeds(
+          // Update sensors
+          const updatedSensors = await updateDeviceGroupSensors(
             existingGroup.id,
-            selectedReeds.map((r) => r.gpio_pin_number),
-          )
-          const updatedPirs = await updateDeviceGroupPirs(
-            existingGroup.id,
-            selectedPirs.map((p) => p.gpio_pin_number),
+            selectedSensors.map((s) => s.gpio_pin_number),
           )
 
-          setGroupReeds((prev) => ({ ...prev, [existingGroup.id]: updatedReeds }))
-          setGroupPirs((prev) => ({ ...prev, [existingGroup.id]: updatedPirs }))
+          setGroupSensors((prev) => ({ ...prev, [existingGroup.id]: updatedSensors }))
         } else {
           const newGroup = await createDeviceGroup(updatedGroup)
           setDeviceGroups((prevGroups) => [...(prevGroups || []), newGroup])
 
-          // Add devices to the new group
-          const newReeds = await updateDeviceGroupReeds(
+          // Add sensors to the new group
+          const newSensors = await updateDeviceGroupSensors(
             newGroup.id,
-            selectedReeds.map((r) => r.gpio_pin_number),
-          )
-          const newPirs = await updateDeviceGroupPirs(
-            newGroup.id,
-            selectedPirs.map((p) => p.gpio_pin_number),
+            selectedSensors.map((s) => s.gpio_pin_number),
           )
 
-          setGroupReeds((prev) => ({ ...prev, [newGroup.id]: newReeds }))
-          setGroupPirs((prev) => ({ ...prev, [newGroup.id]: newPirs }))
+          setGroupSensors((prev) => ({ ...prev, [newGroup.id]: newSensors }))
         }
       }
       setIsDialogOpen(false)
@@ -311,8 +275,8 @@ export default function Alarm({ permissions }: AlarmProps) {
               onSubmit={(e) => {
                 e.preventDefault()
                 if (editingGroup) {
-                  if (selectedReeds.length === 0 && selectedPirs.length === 0) {
-                    setGroupError("No device set - please set at least one device")
+                  if (selectedSensors.length === 0) {
+                    setGroupError("No device set - please set at least one sensor")
                   } else {
                     setGroupError(null)
                     handleSaveGroup(editingGroup)
@@ -351,49 +315,28 @@ export default function Alarm({ permissions }: AlarmProps) {
                 />
                 {groupError && <p className="text-red-500 text-sm mt-2">{groupError}</p>}
                 <div>
-                  <h3 className="mb-2 font-semibold text-zinc-300">Reeds</h3>
-                  {getAvailableReeds(allReeds, editingGroup?.id ?? null).map((reed) => (
-                    <div key={reed.gpio_pin_number} className="flex items-center space-x-2">
+                  <h3 className="mb-2 font-semibold text-zinc-300">Sensors</h3>
+                  {getAvailableSensors(allSensors, editingGroup?.id ?? null).map((sensor) => (
+                    <div key={sensor.gpio_pin_number} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`reed-${reed.gpio_pin_number}`}
-                        checked={selectedReeds.some((r) => r.gpio_pin_number === reed.gpio_pin_number)}
+                        id={`sensor-${sensor.gpio_pin_number}`}
+                        checked={selectedSensors.some((s) => s.gpio_pin_number === sensor.gpio_pin_number)}
                         onCheckedChange={(checked) => {
-                          setSelectedReeds((prev) =>
-                            checked ? [...prev, reed] : prev.filter((r) => r.gpio_pin_number !== reed.gpio_pin_number),
+                          setSelectedSensors((prev) =>
+                            checked
+                              ? [...prev, sensor]
+                              : prev.filter((s) => s.gpio_pin_number !== sensor.gpio_pin_number),
                           )
                         }}
                         className="border-zinc-500"
                       />
-                      <label htmlFor={`reed-${reed.gpio_pin_number}`} className="text-zinc-300">
-                        {reed.name}
+                      <label htmlFor={`sensor-${sensor.gpio_pin_number}`} className="text-zinc-300">
+                        {sensor.name}
                       </label>
                     </div>
                   ))}
-                  {getAvailableReeds(allReeds, editingGroup?.id ?? null).length === 0 && (
-                    <p className="text-zinc-400">No reed available</p>
-                  )}
-                </div>
-                <div>
-                  <h3 className="mb-2 font-semibold text-zinc-300">PIR sensors</h3>
-                  {getAvailablePirs(allPirs, editingGroup?.id ?? null).map((pir) => (
-                    <div key={pir.gpio_pin_number} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`pir-${pir.gpio_pin_number}`}
-                        checked={selectedPirs.some((p) => p.gpio_pin_number === pir.gpio_pin_number)}
-                        onCheckedChange={(checked) => {
-                          setSelectedPirs((prev) =>
-                            checked ? [...prev, pir] : prev.filter((p) => p.gpio_pin_number !== pir.gpio_pin_number),
-                          )
-                        }}
-                        className="border-zinc-500"
-                      />
-                      <label htmlFor={`pir-${pir.gpio_pin_number}`} className="text-zinc-300">
-                        {pir.name}
-                      </label>
-                    </div>
-                  ))}
-                  {getAvailablePirs(allPirs, editingGroup?.id ?? null).length === 0 && (
-                    <p className="text-zinc-400">No PIR sensors available</p>
+                  {getAvailableSensors(allSensors, editingGroup?.id ?? null).length === 0 && (
+                    <p className="text-zinc-400">No sensors available</p>
                   )}
                 </div>
                 <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
@@ -419,21 +362,13 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <p className={`${getStatusColor(group.status)} font-semibold`}>Status: {statusMapping[group.status]}</p>
                 <p className="text-zinc-300">Wait to start alarm: {group.wait_to_start_alarm}s</p>
                 <p className="text-zinc-300">Wait to fire alarm: {group.wait_to_fire_alarm}s</p>
-                <h3 className="mt-2 font-semibold text-zinc-300">Reeds:</h3>
+                <h3 className="mt-2 font-semibold text-zinc-300">Sensors:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
-                  {groupReeds[group.id]?.map((reed) => (
-                    <li key={reed.gpio_pin_number}>{reed.name}</li>
+                  {groupSensors[group.id]?.map((sensor) => (
+                    <li key={sensor.gpio_pin_number}>{sensor.name}</li>
                   ))}
                 </ul>
-                {groupReeds[group.id]?.length === 0 && <p className="text-zinc-400">No reeds</p>}
-
-                <h3 className="mt-2 font-semibold text-zinc-300">PIR Sensors:</h3>
-                <ul className="list-disc pl-5 text-zinc-300">
-                  {groupPirs[group.id]?.map((pir) => (
-                    <li key={pir.gpio_pin_number}>{pir.name}</li>
-                  ))}
-                </ul>
-                {groupPirs[group.id]?.length === 0 && <p className="text-zinc-400">No PIR sensors</p>}
+                {groupSensors[group.id]?.length === 0 && <p className="text-zinc-400">No sensors</p>}
               </CardContent>
               <CardFooter className="flex flex-col mt-auto">
                 {permissions.includes(Permission.MODIFY_DEVICES) && (
@@ -584,4 +519,3 @@ export default function Alarm({ permissions }: AlarmProps) {
     </div>
   )
 }
-
