@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,7 +26,7 @@ import {
   updateSensor,
   deleteRTSPCamera,
   deleteSensor,
-  getSensorCurrentStatus,
+  getSensorStatusStream,
 } from "@/lib/api"
 import { type RTSPCamera, type Sensor, Permission, type SensorStatus } from "@/types"
 
@@ -62,6 +62,7 @@ export default function Component({ permissions }: DeviceProps) {
   const [isLoadingSensors, setIsLoadingSensors] = useState(true)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
+  const eventSources = useRef<{ [key: number]: EventSource }>({})
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -83,27 +84,45 @@ export default function Component({ permissions }: DeviceProps) {
   }, [])
 
   useEffect(() => {
-    const fetchSensorStatuses = async () => {
-      for (const sensor of sensors) {
-        try {
-          const status = await getSensorCurrentStatus(sensor.gpio_pin_number)
-          setSensorStatuses((prev) => ({
-            ...prev,
+    // Close event sources for removed sensors
+    for (const gpio in eventSources.current) {
+      if (!sensors.some((sensor) => sensor.gpio_pin_number === Number.parseInt(gpio))) {
+        eventSources.current[gpio].close()
+        delete eventSources.current[gpio]
+      }
+    }
+
+    // Start event sources for new sensors
+    for (const sensor of sensors) {
+      if (!eventSources.current[sensor.gpio_pin_number]) {
+        const stream = getSensorStatusStream(sensor.gpio_pin_number)
+        eventSources.current[sensor.gpio_pin_number] = stream
+
+        stream.onmessage = (event) => {
+          const status = event.data as SensorStatus
+          setSensorStatuses((prevStatuses) => ({
+            ...prevStatuses,
             [sensor.gpio_pin_number]: status,
           }))
-        } catch (error) {
-          console.error(`Failed to fetch status for sensor ${sensor.gpio_pin_number}:`, error)
-          setSensorStatuses((prev) => ({
-            ...prev,
-            [sensor.gpio_pin_number]: "LOW" as SensorStatus,
+        }
+
+        stream.onerror = (error) => {
+          console.error(`Error in sensor stream for GPIO ${sensor.gpio_pin_number}:`, error)
+          setSensorStatuses((prevStatuses) => ({
+            ...prevStatuses,
+            [sensor.gpio_pin_number]: "LOW" as SensorStatus, // Default to LOW on error
           }))
         }
       }
     }
 
-    fetchSensorStatuses()
-
-    return () => {}
+    // Cleanup function
+    return () => {
+      // Close all event sources when component unmounts
+      for (const gpio in eventSources.current) {
+        eventSources.current[gpio].close()
+      }
+    }
   }, [sensors])
 
   const handleAddDevice = (type: "camera" | "sensor") => {
@@ -132,6 +151,10 @@ export default function Component({ permissions }: DeviceProps) {
         await deleteRTSPCamera(id as string)
         setRtspCameras(rtspCameras.filter((camera) => camera.ip !== id))
       } else if (type === "sensor") {
+        if (eventSources.current[id as number]) {
+          eventSources.current[id as number].close()
+          delete eventSources.current[id as number]
+        }
         await deleteSensor(id as number)
         setSensors(sensors.filter((sensor) => sensor.gpio_pin_number !== id))
       }

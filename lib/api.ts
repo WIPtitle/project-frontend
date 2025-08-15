@@ -13,7 +13,6 @@ import type {
 } from "@/types"
 
 const getApiBaseUrl = () => {
-  // Ora usa sempre /api come prefisso, senza specificare porta
   return "/api"
 }
 
@@ -456,6 +455,15 @@ export const getSensorCurrentStatus = async (gpioNumber: number): Promise<Sensor
   } catch (error) {
     throw error
   }
+}
+
+export const getSensorStatusStream = (gpioNumber: number) => {
+  const token = getTokenOrThrow()
+  const eventSource = new EventSource(
+    `${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}/status/stream?auth_token=${encodeURIComponent(token)}`,
+    {},
+  )
+  return eventSource
 }
 
 export const getDeviceGroupSensors = async (groupId: number): Promise<Sensor[]> => {
