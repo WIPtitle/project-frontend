@@ -125,7 +125,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                   </Label>
                   <Input
                     id="url"
-                    value={`http://${window.location.hostname}:8080`}
+                    value={`${window.location.protocol}//${window.location.hostname}`}
                     readOnly
                     className="bg-zinc-700 text-zinc-50 border-zinc-600 overflow-x-auto whitespace-nowrap"
                   />
