@@ -13,15 +13,13 @@ import type {
 } from "@/types"
 
 const getApiBaseUrl = () => {
-  if (typeof window !== "undefined") {
-    return `http://${window.location.hostname}:8000`
-  }
-  return "" // Fallback for server-side rendering
+  // Ora usa sempre /api come prefisso, senza specificare porta
+  return "/api"
 }
 
 export const registerUser = async (email: string, password: string, pin: string): Promise<void> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users/first`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/users/first`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -46,7 +44,7 @@ export const loginAndSetToken = async (email: string, password: string, remember
   let token: string | null = null
   let tokenExpiry: Date | null = null
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/token?rememberme=${rememberMe}`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/auth/token?rememberme=${rememberMe}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -94,7 +92,7 @@ export const getTokenOrThrow = (): string => {
 
 export const getUserMyself = async (): Promise<User> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/user`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/auth/user`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -112,7 +110,7 @@ export const getUserMyself = async (): Promise<User> => {
 
 export const getPermissions = async (): Promise<Permission[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/auth/permissions`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/auth/permissions`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -135,7 +133,7 @@ export const logout = () => {
 
 export const isFirstUser = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/info/is-initialized`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/info/is-initialized`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -155,7 +153,7 @@ export const isFirstUser = async (): Promise<boolean> => {
 
 export const getDeviceGroups = async (): Promise<DeviceGroup[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -173,7 +171,7 @@ export const getDeviceGroups = async (): Promise<DeviceGroup[]> => {
 
 export const createDeviceGroup = async (group: Omit<DeviceGroup, "id" | "status">): Promise<DeviceGroup> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -194,7 +192,7 @@ export const createDeviceGroup = async (group: Omit<DeviceGroup, "id" | "status"
 
 export const deleteDeviceGroup = async (id: number): Promise<boolean> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -213,7 +211,7 @@ export const deleteDeviceGroup = async (id: number): Promise<boolean> => {
 
 export const getDeviceGroupCameras = async (groupId: number): Promise<RTSPCamera[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -231,7 +229,7 @@ export const getDeviceGroupCameras = async (groupId: number): Promise<RTSPCamera
 
 export const updateDeviceGroupCameras = async (groupId: number, cameraIps: string[]): Promise<RTSPCamera[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -252,7 +250,7 @@ export const updateDeviceGroupCameras = async (groupId: number, cameraIps: strin
 
 export const updateDeviceGroup = async (id: number, group: DeviceGroup): Promise<DeviceGroup> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -282,7 +280,7 @@ export const getDeviceGroupStatusStream = (groupId: number) => {
 
 export const getAllUsers = async (): Promise<User[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/users`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -302,7 +300,7 @@ export const getAllUsers = async (): Promise<User[]> => {
 
 export const createUser = async (user: Omit<User, "id">): Promise<User> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/users`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -323,7 +321,7 @@ export const createUser = async (user: Omit<User, "id">): Promise<User> => {
 
 export const updateUser = async (id: number, updates: Partial<User>): Promise<User> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users/${id}`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/users/${id}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -344,7 +342,7 @@ export const updateUser = async (id: number, updates: Partial<User>): Promise<Us
 
 export const deleteUser = async (id: number): Promise<boolean> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/auth-service/users/${id}`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth-service/users/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -364,7 +362,7 @@ export const deleteUser = async (id: number): Promise<boolean> => {
 // API functions
 export const getAllSensors = async (): Promise<Sensor[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -382,7 +380,7 @@ export const getAllSensors = async (): Promise<Sensor[]> => {
 
 export const createSensor = async (sensor: Omit<Sensor, "id" | "group_id" | "listening">): Promise<Sensor> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -403,7 +401,7 @@ export const createSensor = async (sensor: Omit<Sensor, "id" | "group_id" | "lis
 
 export const updateSensor = async (gpioNumber: number, updates: Partial<Sensor>): Promise<Sensor> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -424,7 +422,7 @@ export const updateSensor = async (gpioNumber: number, updates: Partial<Sensor>)
 
 export const deleteSensor = async (gpioNumber: number): Promise<boolean> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -443,7 +441,7 @@ export const deleteSensor = async (gpioNumber: number): Promise<boolean> => {
 
 export const getSensorCurrentStatus = async (gpioNumber: number): Promise<SensorStatus> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}/status`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}/status`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -462,7 +460,7 @@ export const getSensorCurrentStatus = async (gpioNumber: number): Promise<Sensor
 
 export const getDeviceGroupSensors = async (groupId: number): Promise<Sensor[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -480,7 +478,7 @@ export const getDeviceGroupSensors = async (groupId: number): Promise<Sensor[]> 
 
 export const updateDeviceGroupSensors = async (groupId: number, sensorPins: number[]): Promise<Sensor[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -501,7 +499,7 @@ export const updateDeviceGroupSensors = async (groupId: number, sensorPins: numb
 
 export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/camera/`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -519,7 +517,7 @@ export const getAllRtspCameras = async (): Promise<RTSPCamera[]> => {
 
 export const getRTSPCamera = async (ip: string): Promise<RTSPCamera> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -539,7 +537,7 @@ export const createRTSPCamera = async (
   camera: Omit<RTSPCamera, "id" | "group_id" | "listening">,
 ): Promise<RTSPCamera> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/camera/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -560,7 +558,7 @@ export const createRTSPCamera = async (
 
 export const updateRTSPCamera = async (ip: string, updates: Partial<RTSPCamera>): Promise<RTSPCamera> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -581,7 +579,7 @@ export const updateRTSPCamera = async (ip: string, updates: Partial<RTSPCamera>)
 
 export const deleteRTSPCamera = async (ip: string): Promise<boolean> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/camera/${ip}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -600,7 +598,7 @@ export const deleteRTSPCamera = async (ip: string): Promise<boolean> => {
 
 export const getRTSPCameraStatus = async (ip: string): Promise<string> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/camera/${ip}/status`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/camera/${ip}/status`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -623,7 +621,7 @@ export const getRTSPCameraStreamUrl = (ip: string): string => {
 
 export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
+    const response = await fetch(`${getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -643,7 +641,7 @@ export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
 
 export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
+    const response = await fetch(`${getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -663,7 +661,7 @@ export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
 
 export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/audio-service/audio/`, {
+    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -699,7 +697,7 @@ export const createAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<
       formData.append("audio", config.audio)
     }
 
-    const response = await fetch(`${await getApiBaseUrl()}/audio-service/audio/`, {
+    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -723,7 +721,7 @@ export const updateAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<
 
 export const deleteAlarmAudioConfig = async (): Promise<void> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/audio-service/audio/`, {
+    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -741,7 +739,7 @@ export const deleteAlarmAudioConfig = async (): Promise<void> => {
 export const startListening = async (groupId: number, pin: string): Promise<void> => {
   try {
     const response = await fetch(
-      `${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/start-listening`,
+      `${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/start-listening`,
       {
         method: "POST",
         headers: {
@@ -763,7 +761,7 @@ export const startListening = async (groupId: number, pin: string): Promise<void
 export const stopListening = async (groupId: number, pin: string): Promise<void> => {
   try {
     const response = await fetch(
-      `${await getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/stop-listening`,
+      `${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/stop-listening`,
       {
         method: "POST",
         headers: {
@@ -787,17 +785,22 @@ export const getAllRecordings = async (params?: {
   type?: RecordingType
 }): Promise<Recording[]> => {
   try {
-    const url = new URL(`${await getApiBaseUrl()}/devices-manager-service/recording`)
+    let url = `${getApiBaseUrl()}/devices-manager-service/recording`
+    const queryParams: string[] = []
 
     if (params?.offset !== undefined) {
-      url.searchParams.append("offset", params.offset.toString())
+      queryParams.push(`offset=${params.offset}`)
     }
 
     if (params?.type) {
-      url.searchParams.append("type", params.type)
+      queryParams.push(`type=${params.type}`)
     }
 
-    const response = await fetch(url.toString(), {
+    if (queryParams.length > 0) {
+      url += `?${queryParams.join('&')}`
+    }
+
+    const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -815,7 +818,7 @@ export const getAllRecordings = async (params?: {
 
 export const deleteRecording = async (id: number): Promise<void> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/recording/${id}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/recording/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -832,7 +835,7 @@ export const deleteRecording = async (id: number): Promise<void> => {
 
 export const deleteAllRecordings = async (): Promise<void> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/recording/`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/recording/`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -849,7 +852,7 @@ export const deleteAllRecordings = async (): Promise<void> => {
 
 export const getStorageInfo = async (): Promise<StorageInfo> => {
   try {
-    const response = await fetch(`${await getApiBaseUrl()}/devices-manager-service/disk-usage`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/disk-usage`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
