@@ -60,9 +60,12 @@ export default function Component({ permissions }: DeviceProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingSensors, setIsLoadingSensors] = useState(true)
+  const [streamErrors, setStreamErrors] = useState<{ [key: number]: number }>({})
+  const [connectionStatus, setConnectionStatus] = useState<{ [key: number]: 'connected' | 'connecting' | 'error' | 'unknown' }>({})
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const eventSources = useRef<{ [key: number]: EventSource }>({})
+  const reconnectTimeouts = useRef<{ [key: number]: NodeJS.Timeout }>({})
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -89,41 +92,109 @@ export default function Component({ permissions }: DeviceProps) {
       if (!sensors.some((sensor) => sensor.gpio_pin_number === Number.parseInt(gpio))) {
         eventSources.current[gpio].close()
         delete eventSources.current[gpio]
+
+        // Clear any pending reconnect timeouts
+        if (reconnectTimeouts.current[gpio]) {
+          clearTimeout(reconnectTimeouts.current[gpio])
+          delete reconnectTimeouts.current[gpio]
+        }
       }
     }
 
     // Start event sources for new sensors
     for (const sensor of sensors) {
       if (!eventSources.current[sensor.gpio_pin_number]) {
-        const stream = getSensorStatusStream(sensor.gpio_pin_number)
-        eventSources.current[sensor.gpio_pin_number] = stream
+        const createEventSource = () => {
+          setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'connecting' }))
 
-        stream.onmessage = (event) => {
-          const status = event.data as SensorStatus
-          setSensorStatuses((prevStatuses) => ({
-            ...prevStatuses,
-            [sensor.gpio_pin_number]: status,
-          }))
+          const stream = getSensorStatusStream(sensor.gpio_pin_number)
+          eventSources.current[sensor.gpio_pin_number] = stream
+
+          stream.onmessage = (event) => {
+            const status = event.data as SensorStatus
+            setSensorStatuses((prevStatuses) => ({
+              ...prevStatuses,
+              [sensor.gpio_pin_number]: status,
+            }))
+            // Reset error count on successful message
+            setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
+            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'connected' }))
+          }
+
+          stream.onerror = (error) => {
+            console.error(`Error in sensor stream for GPIO ${sensor.gpio_pin_number}:`, error)
+            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'error' }))
+
+            // Increment error count
+            setStreamErrors((prev) => {
+              const errorCount = (prev[sensor.gpio_pin_number] || 0) + 1
+
+              // If too many errors, show a warning
+              if (errorCount > 3) {
+                console.warn(`Sensor ${sensor.gpio_pin_number} stream has failed ${errorCount} times`)
+              }
+
+              // Set status to UNKNOWN after errors
+              setSensorStatuses((prevStatuses) => ({
+                ...prevStatuses,
+                [sensor.gpio_pin_number]: "UNKNOWN" as SensorStatus,
+              }))
+
+              return { ...prev, [sensor.gpio_pin_number]: errorCount }
+            })
+
+            // If too many failures, implement exponential backoff
+            const errorCount = streamErrors[sensor.gpio_pin_number] || 0
+            if (errorCount > 10) {
+              console.error(`Too many failures for sensor ${sensor.gpio_pin_number}, implementing backoff`)
+              stream.close()
+              delete eventSources.current[sensor.gpio_pin_number]
+
+              // Exponential backoff: 30s, 60s, 120s, etc.
+              const backoffTime = Math.min(30000 * Math.pow(2, Math.floor(errorCount / 10) - 1), 300000) // Max 5 minutes
+
+              reconnectTimeouts.current[sensor.gpio_pin_number] = setTimeout(() => {
+                console.log(`Attempting to reconnect sensor ${sensor.gpio_pin_number} stream after ${backoffTime}ms backoff`)
+                setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
+                createEventSource()
+              }, backoffTime)
+            }
+          }
+
+          stream.onopen = () => {
+            console.log(`Connected to sensor stream for GPIO ${sensor.gpio_pin_number}`)
+            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'connected' }))
+            // Reset error count on successful connection
+            setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
+          }
         }
 
-        stream.onerror = (error) => {
-          console.error(`Error in sensor stream for GPIO ${sensor.gpio_pin_number}:`, error)
-          setSensorStatuses((prevStatuses) => ({
-            ...prevStatuses,
-            [sensor.gpio_pin_number]: "LOW" as SensorStatus, // Default to LOW on error
-          }))
-        }
+        createEventSource()
       }
     }
 
     // Cleanup function
     return () => {
+      // Clear all reconnect timeouts
+      for (const timeout of Object.values(reconnectTimeouts.current)) {
+        clearTimeout(timeout)
+      }
+    }
+  }, [sensors, streamErrors])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
       // Close all event sources when component unmounts
       for (const gpio in eventSources.current) {
         eventSources.current[gpio].close()
       }
+      // Clear all timeouts
+      for (const timeout of Object.values(reconnectTimeouts.current)) {
+        clearTimeout(timeout)
+      }
     }
-  }, [sensors])
+  }, [])
 
   const handleAddDevice = (type: "camera" | "sensor") => {
     setDeviceType(type)
@@ -155,6 +226,10 @@ export default function Component({ permissions }: DeviceProps) {
           eventSources.current[id as number].close()
           delete eventSources.current[id as number]
         }
+        if (reconnectTimeouts.current[id as number]) {
+          clearTimeout(reconnectTimeouts.current[id as number])
+          delete reconnectTimeouts.current[id as number]
+        }
         await deleteSensor(id as number)
         setSensors(sensors.filter((sensor) => sensor.gpio_pin_number !== id))
       }
@@ -185,6 +260,29 @@ export default function Component({ permissions }: DeviceProps) {
     } catch (error) {
       setErrorMessage(`Failed to ${isCreating ? "create" : "update"} ${deviceType}`)
     }
+  }
+
+  const getStatusDisplay = (gpioPin: number): string => {
+    const status = sensorStatuses[gpioPin]
+    const connection = connectionStatus[gpioPin]
+
+    if (connection === 'connecting') return "Connecting..."
+    if (connection === 'error' && streamErrors[gpioPin] > 3) return "Connection Error"
+    if (!status || status === "UNKNOWN") return "Unknown"
+
+    return status
+  }
+
+  const getStatusColor = (gpioPin: number): string => {
+    const connection = connectionStatus[gpioPin]
+    const status = sensorStatuses[gpioPin]
+
+    if (connection === 'error' && streamErrors[gpioPin] > 3) return "text-red-500"
+    if (connection === 'connecting') return "text-yellow-500"
+    if (!status || status === "UNKNOWN") return "text-gray-500"
+    if (status === "HIGH") return "text-red-500"
+
+    return "text-zinc-300"
   }
 
   return (
@@ -279,12 +377,17 @@ export default function Component({ permissions }: DeviceProps) {
           sensors.map((sensor) => (
             <Card key={sensor.gpio_pin_number} className="bg-zinc-800 border-zinc-700 flex flex-col">
               <CardHeader>
-                <CardTitle className="text-zinc-50">{sensor.name}</CardTitle>
+                <CardTitle className="text-zinc-50 flex justify-between items-center">
+                  <span>{sensor.name}</span>
+                  {streamErrors[sensor.gpio_pin_number] > 3 && (
+                    <span className="text-xs text-yellow-500" title="Connection issues detected">⚠️</span>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
                 <p className="text-zinc-300">GPIO: {sensor.gpio_pin_number}</p>
-                <p className="text-zinc-300 mt-6">
-                  Current Status: {sensorStatuses[sensor.gpio_pin_number] || "Loading..."}
+                <p className={`mt-6 ${getStatusColor(sensor.gpio_pin_number)}`}>
+                  Current Status: {getStatusDisplay(sensor.gpio_pin_number)}
                 </p>
               </CardContent>
               {canModifyDevices && (

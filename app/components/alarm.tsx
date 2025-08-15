@@ -65,32 +65,91 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [groupError, setGroupError] = useState<string | null>(null)
+  const [streamErrors, setStreamErrors] = useState<{ [key: number]: number }>({})
 
   const eventSources = useRef<{ [key: number]: EventSource }>({})
+  const reconnectTimeouts = useRef<{ [key: number]: NodeJS.Timeout }>({})
+
   useEffect(() => {
     // Close event sources for removed groups
     for (const id in eventSources.current) {
       if (!deviceGroups?.some((group) => group.id === Number.parseInt(id))) {
         eventSources.current[id].close()
         delete eventSources.current[id]
-      }
-    }
-    // Start event sources for new groups
-    for (const group of deviceGroups || []) {
-      if (!eventSources.current[group.id]) {
-        const stream = getDeviceGroupStatusStream(group.id)
-        eventSources.current[group.id] = stream
-        stream.onmessage = (event) => {
-          const status = event.data
-          setDeviceGroups(
-            (prevGroups) => prevGroups?.map((g) => (g.id === group.id ? { ...g, status: status } : g)) || [],
-          )
+
+        // Clear any pending reconnect timeouts
+        if (reconnectTimeouts.current[id]) {
+          clearTimeout(reconnectTimeouts.current[id])
+          delete reconnectTimeouts.current[id]
         }
       }
     }
 
-    return () => {}
-  }, [deviceGroups])
+    // Start event sources for new groups
+    for (const group of deviceGroups || []) {
+      if (!eventSources.current[group.id]) {
+        const createEventSource = () => {
+          const stream = getDeviceGroupStatusStream(group.id)
+          eventSources.current[group.id] = stream
+
+          stream.onmessage = (event) => {
+            const status = event.data
+            setDeviceGroups(
+              (prevGroups) => prevGroups?.map((g) => (g.id === group.id ? { ...g, status: status } : g)) || [],
+            )
+            // Reset error count on successful message
+            setStreamErrors((prev) => ({ ...prev, [group.id]: 0 }))
+          }
+
+          stream.onerror = (error) => {
+            console.error(`Error in device group stream for ID ${group.id}:`, error)
+
+            // Increment error count
+            setStreamErrors((prev) => {
+              const errorCount = (prev[group.id] || 0) + 1
+
+              // If too many errors, show a warning
+              if (errorCount > 3) {
+                console.warn(`Device group ${group.id} stream has failed ${errorCount} times`)
+              }
+
+              return { ...prev, [group.id]: errorCount }
+            })
+
+            // EventSource will auto-reconnect, but we can add custom logic
+            // For example, if too many failures, we might want to stop trying
+            if ((streamErrors[group.id] || 0) > 10) {
+              console.error(`Too many failures for device group ${group.id}, stopping reconnection attempts`)
+              stream.close()
+              delete eventSources.current[group.id]
+
+              // Try to reconnect after a longer delay
+              reconnectTimeouts.current[group.id] = setTimeout(() => {
+                console.log(`Attempting to reconnect device group ${group.id} stream`)
+                setStreamErrors((prev) => ({ ...prev, [group.id]: 0 }))
+                createEventSource()
+              }, 30000) // Wait 30 seconds before trying again
+            }
+          }
+
+          stream.onopen = () => {
+            console.log(`Connected to device group stream for ID ${group.id}`)
+            // Reset error count on successful connection
+            setStreamErrors((prev) => ({ ...prev, [group.id]: 0 }))
+          }
+        }
+
+        createEventSource()
+      }
+    }
+
+    return () => {
+      // Cleanup all reconnect timeouts on unmount
+      for (const timeout of Object.values(reconnectTimeouts.current)) {
+        clearTimeout(timeout)
+      }
+    }
+  }, [deviceGroups, streamErrors])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,6 +179,20 @@ export default function Alarm({ permissions }: AlarmProps) {
       }
     }
     fetchData()
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Close all event sources when component unmounts
+      for (const source of Object.values(eventSources.current)) {
+        source.close()
+      }
+      // Clear all timeouts
+      for (const timeout of Object.values(reconnectTimeouts.current)) {
+        clearTimeout(timeout)
+      }
+    }
   }, [])
 
   const fetchAllDevices = async () => {
@@ -356,7 +429,12 @@ export default function Alarm({ permissions }: AlarmProps) {
           {deviceGroups.map((group) => (
             <Card key={group.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
               <CardHeader>
-                <CardTitle className="text-zinc-50">{group.name}</CardTitle>
+                <CardTitle className="text-zinc-50 flex justify-between items-center">
+                  <span>{group.name}</span>
+                  {streamErrors[group.id] > 3 && (
+                    <span className="text-xs text-yellow-500" title="Connection issues detected">⚠️</span>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
                 <p className={`${getStatusColor(group.status)} font-semibold`}>Status: {statusMapping[group.status]}</p>

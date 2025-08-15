@@ -34,6 +34,7 @@ export interface User {
 export enum SensorStatus {
   HIGH = "HIGH",
   LOW = "LOW",
+  UNKNOWN = "UNKNOWN",
 }
 
 export interface Sensor {
