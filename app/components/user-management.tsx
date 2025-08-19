@@ -1,30 +1,33 @@
-'use client'
+"use client"
 
 import { useState, useEffect } from "react"
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { getAllUsers, createUser, updateUser, deleteUser, logout, getPermissions } from "@/lib/api"
-import { User, Permission } from "@/types"
+import { type User, Permission } from "@/types"
 import { useRouter } from "next/navigation"
 
 function formatEmail(email: string): string {
-  if (email.length <= 25) return email;
+  if (email.length <= 25) return email
 
-  const [localPart, domain] = email.split('@');
-  const [domainName, ...tld] = domain.split('.');
-  return `${localPart}@***${tld.length ? '.' + tld.join('.') : ''}`;
+  const [localPart, domain] = email.split("@")
+  const [domainName, ...tld] = domain.split(".")
+  return `${localPart}@***${tld.length ? "." + tld.join(".") : ""}`
 }
 
 type UserManagementProps = {
@@ -40,7 +43,7 @@ const permissionDisplayMap: Record<Permission, string> = {
   [Permission.ACCESS_RECORDINGS]: "Access recordings",
   [Permission.CHANGE_ALARM_SOUND]: "Change alarm sound",
   [Permission.UPDATE_NOTIFICATIONS_CONFIG]: "Update NTFY configuration",
-  [Permission.MODIFY_DEVICES]: "Modify devices"
+  [Permission.MODIFY_DEVICES]: "Modify devices",
 }
 
 export default function UserManagement({ onUserUpdate, currentUser, permissions }: UserManagementProps) {
@@ -78,20 +81,20 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   }
 
   const handleUpdateUser = (user: User) => {
-    setEditingUser({...user, password: ""})
+    setEditingUser({ ...user, password: "" })
     setConfirmPassword("")
     setIsDialogOpen(true)
   }
 
   const handleLogout = () => {
     logout()
-    router.push('/')
+    router.push("/")
   }
 
   const handleDeleteUser = async (userId: number) => {
     try {
       await deleteUser(userId)
-      setUsers(users.filter(user => user.id !== userId))
+      setUsers(users.filter((user) => user.id !== userId))
       if (currentUser && userId === currentUser.id) {
         handleLogout()
       }
@@ -101,36 +104,36 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   }
 
   const handleSaveUser = async (updatedUser: User) => {
-    setValidationError(null);
-    setPinError(null);
+    setValidationError(null)
+    setPinError(null)
 
-    const isNewUser = updatedUser.id === 0;
+    const isNewUser = updatedUser.id === 0
 
     if (isNewUser) {
       if (!updatedUser.password) {
-        setValidationError("Password is required for new users");
-        return;
+        setValidationError("Password is required for new users")
+        return
       }
       if (!updatedUser.pin) {
-        setValidationError("PIN is required for new users");
-        return;
+        setValidationError("PIN is required for new users")
+        return
       }
     }
 
     if (updatedUser.password && updatedUser.password.length < 5) {
-      setValidationError("Password must be at least 5 characters long");
-      return;
+      setValidationError("Password must be at least 5 characters long")
+      return
     }
 
     // Add this check for both new users and password updates
     if (updatedUser.password && updatedUser.password !== confirmPassword) {
-      setValidationError("Passwords do not match");
-      return;
+      setValidationError("Passwords do not match")
+      return
     }
 
     if (updatedUser.pin && (updatedUser.pin.length < 4 || updatedUser.pin.length > 8)) {
-      setValidationError("PIN must be between 4 and 8 digits");
-      return;
+      setValidationError("PIN must be between 4 and 8 digits")
+      return
     }
 
     try {
@@ -138,31 +141,31 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
         ...updatedUser,
         password: updatedUser.password || "", // Send empty string if password is not provided
         pin: updatedUser.pin || "", // Send empty string if PIN is not provided
-      };
+      }
 
       if (isNewUser) {
-        const newUser = await createUser(userToSave);
-        setUsers([...users, newUser]);
+        const newUser = await createUser(userToSave)
+        setUsers([...users, newUser])
       } else {
-        const updatedUserResponse = await updateUser(updatedUser.id, userToSave);
-        setUsers(users.map(user => user.id === updatedUserResponse.id ? updatedUserResponse : user));
+        const updatedUserResponse = await updateUser(updatedUser.id, userToSave)
+        setUsers(users.map((user) => (user.id === updatedUserResponse.id ? updatedUserResponse : user)))
         if (currentUser && updatedUser.id === currentUser.id) {
-          onUserUpdate(updatedUserResponse);
+          onUserUpdate(updatedUserResponse)
         }
       }
-      setIsDialogOpen(false);
-      setConfirmPassword("");
-      setValidationError(null);
-      setPinError(null);
+      setIsDialogOpen(false)
+      setConfirmPassword("")
+      setValidationError(null)
+      setPinError(null)
     } catch (error) {
-      setErrorMessage("Failed to save user");
+      setErrorMessage("Failed to save user")
     }
   }
 
   return (
-    <div className="text-zinc-50">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
-        <h1 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">User management</h1>
+    <div className="text-zinc-50 p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
+        <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">User management</h1>
         {isUserManager && (
           <Button
             variant="outline"
@@ -174,112 +177,138 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
         )}
       </div>
       <ScrollArea className="h-[400px] w-full border border-zinc-700 rounded-md p-4 bg-zinc-800">
-  {currentUser && (
-    <div className="mb-4 pb-4 border-b-2 border-zinc-700">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2">
-        <div className="flex items-center space-x-2 mb-4 sm:mb-0">
-          <Avatar>
-            <AvatarImage src="/avatar.webp" alt={currentUser.email} />
-          </Avatar>
-          <span className="text-zinc-300">{formatEmail(currentUser.email)} (You)</span>
-        </div>
-        <div className="flex w-full sm:w-auto space-x-2">
-          <Button variant="outline" className="flex-1 sm:flex-none bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={() => handleUpdateUser(currentUser)}>Edit</Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="flex-1 sm:flex-none bg-red-900 hover:bg-red-800">Delete</Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="bg-zinc-900 text-zinc-50">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete your account and log you out.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => handleDeleteUser(currentUser.id)} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
-    </div>
-  )}
-  {users.filter(user => user.id !== currentUser?.id).map(user => (
-    <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-zinc-800 last:border-b-0">
-      <div className="flex items-center space-x-2 mb-4 sm:mb-0">
-        <Avatar>
-          <AvatarImage src="/avatar.webp" alt={user.email} />
-        </Avatar>
-        <span className="text-zinc-300">{formatEmail(user.email)}</span>
-      </div>
-      {isUserManager && (
-        <div className="flex w-full sm:w-auto space-x-2">
-          <Button
-            variant="outline"
-            className="flex-1 sm:flex-none bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-            onClick={() => handleUpdateUser(user)}
-          >
-            Edit
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="destructive"
-                className="flex-1 sm:flex-none bg-red-900 hover:bg-red-800"
-              >
-                Delete
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="bg-zinc-900 text-zinc-50">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the user.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-red-900 hover:bg-red-800 text-white">Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      )}
-    </div>
-  ))}
-</ScrollArea>
+        {currentUser && (
+          <div className="mb-4 pb-4 border-b-2 border-zinc-700">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2">
+              <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+                <Avatar>
+                  <AvatarImage src="/ui/avatar.webp" alt={currentUser.email} />
+                </Avatar>
+                <span className="text-zinc-300">{formatEmail(currentUser.email)} (You)</span>
+              </div>
+              <div className="flex w-full sm:w-auto space-x-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-none bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                  onClick={() => handleUpdateUser(currentUser)}
+                >
+                  Edit
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="flex-1 sm:flex-none bg-red-900 hover:bg-red-800">
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-zinc-900 text-zinc-50">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your account and log you out.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDeleteUser(currentUser.id)}
+                        className="bg-red-900 hover:bg-red-800 text-white"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          </div>
+        )}
+        {users
+          .filter((user) => user.id !== currentUser?.id)
+          .map((user) => (
+            <div
+              key={user.id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-zinc-800 last:border-b-0"
+            >
+              <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+                <Avatar>
+                  <AvatarImage src="/ui/avatar.webp" alt={user.email} />
+                </Avatar>
+                <span className="text-zinc-300">{formatEmail(user.email)}</span>
+              </div>
+              {isUserManager && (
+                <div className="flex w-full sm:w-auto space-x-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 sm:flex-none bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                    onClick={() => handleUpdateUser(user)}
+                  >
+                    Edit
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="flex-1 sm:flex-none bg-red-900 hover:bg-red-800">
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-zinc-900 text-zinc-50">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the user.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="bg-red-900 hover:bg-red-800 text-white"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
+            </div>
+          ))}
+      </ScrollArea>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle>{editingUser?.id ? "Update" : "Add"} user</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault()
-            if (editingUser) {
-              handleSaveUser(editingUser)
-            }
-          }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (editingUser) {
+                handleSaveUser(editingUser)
+              }
+            }}
+          >
             <div className="space-y-4">
               <Input
                 type="email"
                 placeholder="Email"
                 value={editingUser?.email || ""}
-                onChange={(e) => setEditingUser(prev => prev ? {...prev, email: e.target.value} : null)}
+                onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, email: e.target.value } : null))}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
               />
               <Input
-                  type="password"
-                  placeholder={editingUser?.id ? "New password" : "Password"}
-                  value={editingUser?.password || ""}
-                  onChange={(e) => {
-                    const newPassword = e.target.value;
-                    setEditingUser(prev => prev ? {...prev, password: newPassword} : null);
-                  }}
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  required={!editingUser?.id}
-                />
+                type="password"
+                placeholder={editingUser?.id ? "New password" : "Password"}
+                value={editingUser?.password || ""}
+                onChange={(e) => {
+                  const newPassword = e.target.value
+                  setEditingUser((prev) => (prev ? { ...prev, password: newPassword } : null))
+                }}
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                required={!editingUser?.id}
+              />
               {(!editingUser?.id || editingUser?.password) && (
                 <Input
                   type="password"
@@ -290,44 +319,44 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
                 />
               )}
               <Input
-                  type="text"
-                  placeholder={editingUser?.id ? "New PIN" : "PIN"}
-                  value={editingUser?.pin || ""}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '')
-                    if (value.length > 8) return
-                    setEditingUser(prev => prev ? {...prev, pin: value} : null)
-                    setPinError(null)
-                  }}
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  required={!editingUser?.id}
-                />
+                type="text"
+                placeholder={editingUser?.id ? "New PIN" : "PIN"}
+                value={editingUser?.pin || ""}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, "")
+                  if (value.length > 8) return
+                  setEditingUser((prev) => (prev ? { ...prev, pin: value } : null))
+                  setPinError(null)
+                }}
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                required={!editingUser?.id}
+              />
               {pinError && <p className="text-red-500">{pinError}</p>}
               <div>
                 <h3 className="mb-2 font-semibold text-zinc-300">Permissions</h3>
-                {availablePermissions.map(permission => (
+                {availablePermissions.map((permission) => (
                   <div key={permission} className="flex items-center space-x-2">
                     <Checkbox
                       id={permission}
                       checked={editingUser?.permissions.includes(permission)}
                       onCheckedChange={(checked) => {
-                        setEditingUser(prev => {
+                        setEditingUser((prev) => {
                           if (!prev) return null
                           const newPermissions = checked
                             ? [...prev.permissions, permission]
-                            : prev.permissions.filter(p => p !== permission)
-                          return {...prev, permissions: newPermissions}
+                            : prev.permissions.filter((p) => p !== permission)
+                          return { ...prev, permissions: newPermissions }
                         })
                       }}
                       className="border-zinc-500"
                     />
-                    <label htmlFor={permission} className="text-zinc-300">{permissionDisplayMap[permission]}</label>
+                    <label htmlFor={permission} className="text-zinc-300">
+                      {permissionDisplayMap[permission]}
+                    </label>
                   </div>
                 ))}
               </div>
-              {validationError && (
-                <p className="text-red-500">{validationError}</p>
-              )}
+              {validationError && <p className="text-red-500">{validationError}</p>}
               <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
                 {editingUser?.id ? "Update" : "Create"} User
               </Button>
@@ -342,11 +371,15 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorMessage(null)} className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">Ok</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => setErrorMessage(null)}
+              className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            >
+              Ok
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   )
 }
-

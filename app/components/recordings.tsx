@@ -230,8 +230,8 @@ export default function Recordings({ permissions }: RecordingsProps) {
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+    <div className="p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Recordings</h1>
         {storageInfo && (
           <p className="text-zinc-300">

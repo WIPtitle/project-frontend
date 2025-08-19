@@ -61,7 +61,9 @@ export default function Component({ permissions }: DeviceProps) {
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingSensors, setIsLoadingSensors] = useState(true)
   const [streamErrors, setStreamErrors] = useState<{ [key: number]: number }>({})
-  const [connectionStatus, setConnectionStatus] = useState<{ [key: number]: 'connected' | 'connecting' | 'error' | 'unknown' }>({})
+  const [connectionStatus, setConnectionStatus] = useState<{
+    [key: number]: "connected" | "connecting" | "error" | "unknown"
+  }>({})
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const eventSources = useRef<{ [key: number]: EventSource }>({})
@@ -105,7 +107,7 @@ export default function Component({ permissions }: DeviceProps) {
     for (const sensor of sensors) {
       if (!eventSources.current[sensor.gpio_pin_number]) {
         const createEventSource = () => {
-          setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'connecting' }))
+          setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "connecting" }))
 
           const stream = getSensorStatusStream(sensor.gpio_pin_number)
           eventSources.current[sensor.gpio_pin_number] = stream
@@ -118,12 +120,12 @@ export default function Component({ permissions }: DeviceProps) {
             }))
             // Reset error count on successful message
             setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
-            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'connected' }))
+            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "connected" }))
           }
 
           stream.onerror = (error) => {
             console.error(`Error in sensor stream for GPIO ${sensor.gpio_pin_number}:`, error)
-            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'error' }))
+            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "error" }))
 
             // Increment error count
             setStreamErrors((prev) => {
@@ -154,7 +156,9 @@ export default function Component({ permissions }: DeviceProps) {
               const backoffTime = Math.min(30000 * Math.pow(2, Math.floor(errorCount / 10) - 1), 300000) // Max 5 minutes
 
               reconnectTimeouts.current[sensor.gpio_pin_number] = setTimeout(() => {
-                console.log(`Attempting to reconnect sensor ${sensor.gpio_pin_number} stream after ${backoffTime}ms backoff`)
+                console.log(
+                  `Attempting to reconnect sensor ${sensor.gpio_pin_number} stream after ${backoffTime}ms backoff`,
+                )
                 setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
                 createEventSource()
               }, backoffTime)
@@ -163,7 +167,7 @@ export default function Component({ permissions }: DeviceProps) {
 
           stream.onopen = () => {
             console.log(`Connected to sensor stream for GPIO ${sensor.gpio_pin_number}`)
-            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: 'connected' }))
+            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "connected" }))
             // Reset error count on successful connection
             setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
           }
@@ -266,8 +270,8 @@ export default function Component({ permissions }: DeviceProps) {
     const status = sensorStatuses[gpioPin]
     const connection = connectionStatus[gpioPin]
 
-    if (connection === 'connecting') return "Connecting..."
-    if (connection === 'error' && streamErrors[gpioPin] > 3) return "Connection Error"
+    if (connection === "connecting") return "Connecting..."
+    if (connection === "error" && streamErrors[gpioPin] > 3) return "Connection Error"
     if (!status || status === "UNKNOWN") return "Unknown"
 
     return status
@@ -277,8 +281,8 @@ export default function Component({ permissions }: DeviceProps) {
     const connection = connectionStatus[gpioPin]
     const status = sensorStatuses[gpioPin]
 
-    if (connection === 'error' && streamErrors[gpioPin] > 3) return "text-red-500"
-    if (connection === 'connecting') return "text-yellow-500"
+    if (connection === "error" && streamErrors[gpioPin] > 3) return "text-red-500"
+    if (connection === "connecting") return "text-yellow-500"
     if (!status || status === "UNKNOWN") return "text-gray-500"
     if (status === "HIGH") return "text-red-500"
 
@@ -286,10 +290,10 @@ export default function Component({ permissions }: DeviceProps) {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-zinc-50 mb-4">Devices</h1>
+    <div className="p-6">
+      <h1 className="text-3xl font-bold text-zinc-50 mb-6">Devices</h1>
 
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">RTSP cameras</h2>
         {canModifyDevices && (
           <Button
@@ -356,7 +360,7 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">Sensors</h2>
         {canModifyDevices && (
           <Button
@@ -380,7 +384,9 @@ export default function Component({ permissions }: DeviceProps) {
                 <CardTitle className="text-zinc-50 flex justify-between items-center">
                   <span>{sensor.name}</span>
                   {streamErrors[sensor.gpio_pin_number] > 3 && (
-                    <span className="text-xs text-yellow-500" title="Connection issues detected">⚠️</span>
+                    <span className="text-xs text-yellow-500" title="Connection issues detected">
+                      ⚠️
+                    </span>
                   )}
                 </CardTitle>
               </CardHeader>

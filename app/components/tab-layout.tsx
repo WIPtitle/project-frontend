@@ -185,7 +185,7 @@ export default function TabLayout() {
                     <div className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
                       <span className="text-zinc-400">{formatEmail(currentUser?.email || "")}</span>
                       <Avatar>
-                        <AvatarImage src="/avatar.webp" alt={currentUser?.email} />
+                        <AvatarImage src="/ui/avatar.webp" alt={currentUser?.email} />
                       </Avatar>
                     </div>
                   </AlertDialogTrigger>

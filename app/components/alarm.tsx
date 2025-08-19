@@ -319,8 +319,8 @@ export default function Alarm({ permissions }: AlarmProps) {
   )
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+    <div className="p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
         <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Alarm dashboard</h1>
         <Dialog
           open={isDialogOpen}
@@ -432,7 +432,9 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <CardTitle className="text-zinc-50 flex justify-between items-center">
                   <span>{group.name}</span>
                   {streamErrors[group.id] > 3 && (
-                    <span className="text-xs text-yellow-500" title="Connection issues detected">⚠️</span>
+                    <span className="text-xs text-yellow-500" title="Connection issues detected">
+                      ⚠️
+                    </span>
                   )}
                 </CardTitle>
               </CardHeader>
