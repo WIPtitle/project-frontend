@@ -669,7 +669,9 @@ export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
 
 export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
   try {
+    // Use HEAD request to get file info without downloading the content
     const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
+      method: 'HEAD',
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -683,16 +685,20 @@ export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> =>
     }
 
     const contentDisposition = response.headers.get("Content-Disposition")
-    let filename = "unknown"
+    let filename = "alarm.mp3" // default fallback
+
     if (contentDisposition) {
-      const match = contentDisposition.match(/filename="?([^"]+)"?/)
+      const match = contentDisposition.match(/filename="?([^";\n]+)"?/)
+
       if (match && match[1]) {
         filename = match[1]
       }
     }
 
-    const blob = await response.blob()
-    return { audio: new File([blob], filename, { type: "audio/mpeg" }) }
+    // Create a placeholder File object with just the name (size 0)
+    // This is sufficient for displaying the filename in the UI
+    // The actual content is never used - only the name is shown
+    return { audio: new File([], filename, { type: "audio/mpeg" }) }
   } catch (error) {
     throw error
   }
