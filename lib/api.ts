@@ -667,52 +667,91 @@ export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
   }
 }
 
-export const downloadAlarmAudio = async (): Promise<void> => {
-  try {
-    // Use GET request to download the actual audio file
-    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
+export const downloadAlarmAudio = async (onProgress?: (progress: number) => void): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
 
-    if (!response.ok) {
-      throw new Error("Failed to download alarm audio file")
-    }
+    xhr.open('GET', `${getApiBaseUrl()}/audio-service/audio/`)
+    xhr.setRequestHeader('Authorization', `Bearer ${getTokenOrThrow()}`)
+    xhr.responseType = 'blob'
 
-    // Get filename from Content-Disposition header
-    const contentDisposition = response.headers.get("Content-Disposition")
-    let filename = "alarm.mp3" // default fallback
-
-    if (contentDisposition) {
-      // First try RFC 5987 format: filename*=utf-8''encoded-filename
-      const rfc5987Match = contentDisposition.match(/filename\*=utf-8''([^;\n]+)/)
-      if (rfc5987Match && rfc5987Match[1]) {
-        // Decode URL-encoded filename
-        filename = decodeURIComponent(rfc5987Match[1])
-      } else {
-        // Fallback to standard format: filename="filename" or filename=filename
-        const standardMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
-        if (standardMatch && standardMatch[1]) {
-          filename = standardMatch[1]
-        }
+    xhr.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        const progress = Math.round((event.loaded / event.total) * 100)
+        onProgress(progress)
       }
     }
 
-    // Create blob and download
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-  } catch (error) {
-    throw error
-  }
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const contentDisposition = xhr.getResponseHeader('Content-Disposition')
+        let filename = 'alarm.mp3'
+
+        if (contentDisposition) {
+          const rfc5987Match = contentDisposition.match(/filename\*=utf-8''([^;\n]+)/)
+          if (rfc5987Match && rfc5987Match[1]) {
+            filename = decodeURIComponent(rfc5987Match[1])
+          } else {
+            const standardMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
+            if (standardMatch && standardMatch[1]) {
+              filename = standardMatch[1]
+            }
+          }
+        }
+
+        const blob = xhr.response
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        resolve()
+      } else {
+        reject(new Error('Failed to download alarm audio file'))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Failed to download alarm audio file'))
+    xhr.send()
+  })
+}
+
+export const createAlarmAudioConfig = async (
+  config: AlarmAudioConfig,
+  onProgress?: (progress: number) => void
+): Promise<AlarmAudioConfig> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const formData = new FormData()
+
+    if (config.audio !== null) {
+      formData.append('audio', config.audio)
+    }
+
+    xhr.open('POST', `${getApiBaseUrl()}/audio-service/audio/`)
+    xhr.setRequestHeader('Authorization', `Bearer ${getTokenOrThrow()}`)
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        const progress = Math.round((event.loaded / event.total) * 100)
+        onProgress(progress)
+      }
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(config)
+      } else {
+        reject(new Error('Failed to create alarm audio configuration'))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Failed to create alarm audio configuration'))
+    xhr.send(formData)
+  })
 }
 
 export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
@@ -759,33 +798,39 @@ export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> =>
   }
 }
 
-export const createAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
-  try {
+export const updateAlarmAudioConfig = async (
+  config: AlarmAudioConfig,
+  onProgress?: (progress: number) => void
+): Promise<AlarmAudioConfig> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
     const formData = new FormData()
+
     if (config.audio !== null) {
-      formData.append("audio", config.audio)
+      formData.append('audio', config.audio)
     }
 
-    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-      body: formData,
-    })
+    xhr.open('POST', `${getApiBaseUrl()}/audio-service/audio/`)
+    xhr.setRequestHeader('Authorization', `Bearer ${getTokenOrThrow()}`)
 
-    if (!response.ok) {
-      throw new Error("Failed to create alarm audio configuration")
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        const progress = Math.round((event.loaded / event.total) * 100)
+        onProgress(progress)
+      }
     }
 
-    return config // Return the original config as the API doesn't return the file
-  } catch (error) {
-    throw error
-  }
-}
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(config)
+      } else {
+        reject(new Error('Failed to create alarm audio configuration'))
+      }
+    }
 
-export const updateAlarmAudioConfig = async (config: AlarmAudioConfig): Promise<AlarmAudioConfig> => {
-  return createAlarmAudioConfig(config)
+    xhr.onerror = () => reject(new Error('Failed to create alarm audio configuration'))
+    xhr.send(formData)
+  })
 }
 
 export const deleteAlarmAudioConfig = async (): Promise<void> => {

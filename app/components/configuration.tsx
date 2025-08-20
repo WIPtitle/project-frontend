@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,8 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   const [editingAudioConfig, setEditingAudioConfig] = useState<AlarmAudioConfig | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
 
   const canChangeNotificationsConfig = permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
   const canChangeAlarmSound = permissions.includes(Permission.CHANGE_ALARM_SOUND)
@@ -113,24 +116,42 @@ export default function Configuration({ permissions }: ConfigurationProps) {
 
   const handleSaveAudioConfig = async (config: AlarmAudioConfig) => {
     try {
+      setUploadProgress(0)
       if (alarmAudioConfig) {
-        const updatedConfig = await updateAlarmAudioConfig(config)
+        const updatedConfig = await updateAlarmAudioConfig(config, (progress) => {
+          setUploadProgress(progress)
+        })
         setAlarmAudioConfig(updatedConfig)
       } else {
-        const newConfig = await createAlarmAudioConfig(config)
+        const newConfig = await createAlarmAudioConfig(config, (progress) => {
+          setUploadProgress(progress)
+        })
         setAlarmAudioConfig(newConfig)
       }
       setIsAudioDialogOpen(false)
+      setUploadProgress(null)
     } catch (error) {
       setErrorMessage("Failed to save alarm audio configuration")
+      setUploadProgress(null)
     }
   }
 
   const handleDownloadAudioConfig = async () => {
     try {
-      await downloadAlarmAudio()
+      setDownloadProgress(0)
+      await downloadAlarmAudio((progress) => {
+        setDownloadProgress(progress)
+      })
+      setDownloadProgress(null)
     } catch (error) {
       setErrorMessage("Failed to download alarm audio file")
+      setDownloadProgress(null)
+    }
+  }
+
+  const handleFormSubmit = () => {
+    if (editingAudioConfig) {
+      handleSaveAudioConfig(editingAudioConfig)
     }
   }
 
@@ -220,7 +241,12 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           </CardHeader>
           <CardContent>
             {alarmAudioConfig?.audio ? (
-              <p className="text-zinc-300">Audio file: {alarmAudioConfig.audio.name}</p>
+              <div className="space-y-2">
+                <p className="text-zinc-300">Audio file: {alarmAudioConfig.audio.name}</p>
+                {downloadProgress !== null && (
+                  <Progress value={downloadProgress} className="w-full" />
+                )}
+              </div>
             ) : (
               <p className="text-zinc-400">No alarm audio configuration saved</p>
             )}
@@ -234,6 +260,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                     size="sm"
                     className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
                     onClick={handleDownloadAudioConfig}
+                    disabled={downloadProgress !== null}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -291,35 +318,33 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           <DialogHeader>
             <DialogTitle>{alarmAudioConfig ? "Edit" : "Add"} Alarm audio</DialogTitle>
           </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (editingAudioConfig) {
-                handleSaveAudioConfig(editingAudioConfig)
-              }
-            }}
-          >
-            <div className="space-y-4">
-              <Input
-                type="file"
-                accept=".mp3"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file && file.name.toLowerCase().endsWith(".mp3")) {
-                    setEditingAudioConfig((prev) => (prev ? { ...prev, audio: file } : null))
-                  } else {
-                    alert("Please select an MP3 file.")
-                    e.target.value = ""
-                  }
-                }}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                required
-              />
-              <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                {alarmAudioConfig ? "Update" : "Create"}
-              </Button>
-            </div>
-          </form>
+          <div className="space-y-4">
+            <Input
+              type="file"
+              accept=".mp3"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file && file.name.toLowerCase().endsWith(".mp3")) {
+                  setEditingAudioConfig((prev) => (prev ? { ...prev, audio: file } : null))
+                } else {
+                  alert("Please select an MP3 file.")
+                  e.target.value = ""
+                }
+              }}
+              className="bg-zinc-700 text-zinc-50 border-zinc-600"
+              required
+            />
+            {uploadProgress !== null && (
+              <Progress value={uploadProgress} className="w-full" />
+            )}
+            <Button
+              onClick={handleFormSubmit}
+              className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+              disabled={!editingAudioConfig?.audio || uploadProgress !== null}
+            >
+              {alarmAudioConfig ? "Update" : "Create"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
