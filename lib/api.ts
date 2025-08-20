@@ -667,11 +667,59 @@ export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
   }
 }
 
+export const downloadAlarmAudio = async (): Promise<void> => {
+  try {
+    // Use GET request to download the actual audio file
+    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to download alarm audio file")
+    }
+
+    // Get filename from Content-Disposition header
+    const contentDisposition = response.headers.get("Content-Disposition")
+    let filename = "alarm.mp3" // default fallback
+
+    if (contentDisposition) {
+      // First try RFC 5987 format: filename*=utf-8''encoded-filename
+      const rfc5987Match = contentDisposition.match(/filename\*=utf-8''([^;\n]+)/)
+      if (rfc5987Match && rfc5987Match[1]) {
+        // Decode URL-encoded filename
+        filename = decodeURIComponent(rfc5987Match[1])
+      } else {
+        // Fallback to standard format: filename="filename" or filename=filename
+        const standardMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
+        if (standardMatch && standardMatch[1]) {
+          filename = standardMatch[1]
+        }
+      }
+    }
+
+    // Create blob and download
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  } catch (error) {
+    throw error
+  }
+}
+
 export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> => {
   try {
     // Use HEAD request to get file info without downloading the content
     const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/`, {
-      method: 'HEAD',
+      method: "HEAD",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -688,10 +736,17 @@ export const getAlarmAudioConfig = async (): Promise<AlarmAudioConfig | null> =>
     let filename = "alarm.mp3" // default fallback
 
     if (contentDisposition) {
-      const match = contentDisposition.match(/filename="?([^";\n]+)"?/)
-
-      if (match && match[1]) {
-        filename = match[1]
+      // First try RFC 5987 format: filename*=utf-8''encoded-filename
+      const rfc5987Match = contentDisposition.match(/filename\*=utf-8''([^;\n]+)/)
+      if (rfc5987Match && rfc5987Match[1]) {
+        // Decode URL-encoded filename
+        filename = decodeURIComponent(rfc5987Match[1])
+      } else {
+        // Fallback to standard format: filename="filename" or filename=filename
+        const standardMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
+        if (standardMatch && standardMatch[1]) {
+          filename = standardMatch[1]
+        }
       }
     }
 

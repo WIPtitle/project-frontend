@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Download } from "lucide-react"
 import {
   getNtfyCredentials,
   updateNtfyCredentials,
@@ -24,6 +25,7 @@ import {
   createAlarmAudioConfig,
   updateAlarmAudioConfig,
   deleteAlarmAudioConfig,
+  downloadAlarmAudio,
 } from "@/lib/api"
 import { type NtfyCredentials, type AlarmAudioConfig, Permission } from "@/types"
 
@@ -44,12 +46,36 @@ export default function Configuration({ permissions }: ConfigurationProps) {
 
   useEffect(() => {
     const fetchConfigs = async () => {
+      let ntfyError = false
+      let audioError = false
+
       try {
-        const [credentials, audio] = await Promise.all([getNtfyCredentials(), getAlarmAudioConfig()])
-        setNtfyCredentials(credentials)
-        setAlarmAudioConfig(audio)
-      } catch (error) {
-        setErrorMessage("Failed to fetch configurations")
+        // Fetch Ntfy credentials independently
+        try {
+          const credentials = await getNtfyCredentials()
+          setNtfyCredentials(credentials)
+        } catch (error) {
+          ntfyError = true
+          console.error("Failed to fetch Ntfy credentials:", error)
+        }
+
+        // Fetch audio config independently
+        try {
+          const audio = await getAlarmAudioConfig()
+          setAlarmAudioConfig(audio)
+        } catch (error) {
+          audioError = true
+          console.error("Failed to fetch audio configuration:", error)
+        }
+
+        // Show error message if any of the calls failed
+        if (ntfyError && audioError) {
+          setErrorMessage("Failed to fetch configurations")
+        } else if (ntfyError) {
+          setErrorMessage("Failed to fetch Ntfy configuration")
+        } else if (audioError) {
+          setErrorMessage("Failed to fetch audio configuration")
+        }
       } finally {
         setIsLoading(false)
       }
@@ -100,6 +126,14 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     }
   }
 
+  const handleDownloadAudioConfig = async () => {
+    try {
+      await downloadAlarmAudio()
+    } catch (error) {
+      setErrorMessage("Failed to download alarm audio file")
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -111,12 +145,12 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-4 text-zinc-50">Configuration</h1>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
+      <div className="grid gap-4 md:grid-cols-2 items-start">
+        <Card className="bg-zinc-800 border-zinc-700">
           <CardHeader>
             <CardTitle className="text-zinc-50">Ntfy</CardTitle>
           </CardHeader>
-          <CardContent className="flex-grow space-y-4">
+          <CardContent className="space-y-4">
             {ntfyCredentials ? (
               <>
                 <div className="space-y-2">
@@ -169,7 +203,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             )}
           </CardContent>
           {canChangeNotificationsConfig && (
-            <CardFooter className="mt-auto">
+            <CardFooter>
               <Button
                 variant="outline"
                 className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full"
@@ -180,11 +214,11 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             </CardFooter>
           )}
         </Card>
-        <Card className="bg-zinc-800 border-zinc-700 flex flex-col">
+        <Card className="bg-zinc-800 border-zinc-700">
           <CardHeader>
             <CardTitle className="text-zinc-50">Alarm audio</CardTitle>
           </CardHeader>
-          <CardContent className="flex-grow">
+          <CardContent>
             {alarmAudioConfig?.audio ? (
               <p className="text-zinc-300">Audio file: {alarmAudioConfig.audio.name}</p>
             ) : (
@@ -192,42 +226,52 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             )}
           </CardContent>
           {canChangeAlarmSound && (
-            <CardFooter className="mt-auto">
+            <CardFooter>
               {alarmAudioConfig ? (
-                <div className="flex justify-end space-x-2 w-full">
+                <div className="flex justify-between items-center w-full">
                   <Button
                     variant="outline"
+                    size="sm"
                     className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    onClick={handleEditAudioConfig}
+                    onClick={handleDownloadAudioConfig}
                   >
-                    Edit
+                    <Download className="h-4 w-4" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="bg-red-900 hover:bg-red-800">
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-zinc-800 text-zinc-50">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the alarm audio configuration.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDeleteAudioConfig}
-                          className="bg-red-900 hover:bg-red-800  text-white"
-                        >
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={handleEditAudioConfig}
+                    >
+                      Edit
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="bg-red-900 hover:bg-red-800">
                           Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the alarm audio configuration.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDeleteAudioConfig}
+                            className="bg-red-900 hover:bg-red-800  text-white"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               ) : (
                 <Button
@@ -297,4 +341,3 @@ export default function Configuration({ permissions }: ConfigurationProps) {
     </div>
   )
 }
-
