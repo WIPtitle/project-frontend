@@ -83,3 +83,11 @@ export interface RTSPCamera {
   path: string
   always_recording: boolean
 }
+
+export interface AlarmNotification {
+  id: number
+  title: string
+  priority: string
+  message?: string
+  created_at: string
+}

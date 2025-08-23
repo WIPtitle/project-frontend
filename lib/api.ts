@@ -10,6 +10,7 @@ import type {
   StorageInfo,
   SensorStatus,
   RecordingType,
+  AlarmNotification
 } from "@/types"
 
 const getApiBaseUrl = () => {
@@ -990,4 +991,35 @@ export const getRecordingStreamUrl = (recordingId: number): string => {
 export const getRecordingDownloadUrl = (recordingId: number): string => {
   const token = getTokenOrThrow()
   return `${getApiBaseUrl()}/devices-manager-service/recording/${recordingId}/download?auth_token=${encodeURIComponent(token)}`
+}
+
+export const getAllNotifications = async (params?: {
+  offset?: number
+}): Promise<AlarmNotification[]> => {
+  try {
+    let url = `${getApiBaseUrl()}/notifications-service/notification`
+    const queryParams: string[] = []
+
+    if (params?.offset !== undefined) {
+      queryParams.push(`offset=${params.offset}`)
+    }
+
+    if (queryParams.length > 0) {
+      url += `?${queryParams.join("&")}`
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch notifications")
+    }
+
+    return await response.json()
+  } catch (error) {
+    throw error
+  }
 }

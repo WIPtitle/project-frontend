@@ -77,7 +77,7 @@ export default function TabLayout() {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMenuCollapsed(window.innerWidth < 768) // Use 768px as breakpoint for md
+      setIsMenuCollapsed(window.innerWidth < 1060) // Use 1060px as breakpoint for md
     }
 
     // Check on initial load
@@ -139,6 +139,7 @@ export default function TabLayout() {
       : []),
     { value: "users", label: "User management" },
     { value: "configuration", label: "Configuration" }, // Configuration tab is always visible
+    { value: "notifications", label: "Notifications" }
   ]
 
   return (
