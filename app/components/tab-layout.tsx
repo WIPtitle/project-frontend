@@ -11,6 +11,7 @@ import Devices from "./devices"
 import Recordings from "./recordings"
 import Configuration from "./configuration"
 import UserManagement from "./user-management"
+import Notifications from "./notifications"
 import { getUserMyself, logout } from "@/lib/api"
 import { type User, Permission } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -237,6 +238,9 @@ export default function TabLayout() {
             </TabsContent>
             <TabsContent value="configuration">
               <Configuration permissions={currentUser?.permissions || []} />
+            </TabsContent>
+            <TabsContent value="notifications">
+              <Notifications permissions={currentUser?.permissions || []} />
             </TabsContent>
           </div>
         </Tabs>

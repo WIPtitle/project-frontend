@@ -164,8 +164,10 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-4 text-zinc-50">Configuration</h1>
+    <div className="p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Configuration</h1>
+      </div>
       <div className="grid gap-4 md:grid-cols-2 items-start">
         <Card className="bg-zinc-800 border-zinc-700">
           <CardHeader>

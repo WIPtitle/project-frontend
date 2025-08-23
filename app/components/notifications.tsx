@@ -115,9 +115,8 @@ export default function Notifications({ permissions }: NotificationsProps) {
 
   return (
     <div className="p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Notifications</h1>
-        <p className="text-zinc-300">Page {Math.floor(currentOffset / PAGE_SIZE) + 1}</p>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-zinc-50">Notifications</h1>
       </div>
 
       <div className="space-y-4 mb-6">
@@ -155,14 +154,13 @@ export default function Notifications({ permissions }: NotificationsProps) {
             className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 disabled:opacity-50"
           >
             <ChevronLeft className="h-4 w-4 mr-2" />
-            Previous
           </Button>
 
-          <span className="text-zinc-400 text-sm">
+          <span className="text-zinc-400 text-lg font-medium">
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              `Showing ${currentOffset + 1}-${Math.min(currentOffset + notifications.length, currentOffset + PAGE_SIZE)}`
+              Math.floor(currentOffset / PAGE_SIZE) + 1
             )}
           </span>
 
@@ -172,7 +170,6 @@ export default function Notifications({ permissions }: NotificationsProps) {
             disabled={!hasMore || loading}
             className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 disabled:opacity-50"
           >
-            Next
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
