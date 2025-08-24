@@ -25,7 +25,7 @@ export enum Permission {
 
 export interface User {
   id: number
-  email: string
+  username: string
   password?: string
   pin?: string
   permissions: Permission[]
