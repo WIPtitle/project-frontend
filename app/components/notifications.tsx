@@ -78,14 +78,14 @@ export default function Notifications({ permissions }: NotificationsProps) {
   const formatDateTime = (dateString: string) => {
     try {
       const date = new Date(dateString)
-      return date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
+      const hours = date.getUTCHours().toString().padStart(2, "0")
+      const minutes = date.getUTCMinutes().toString().padStart(2, "0")
+      const seconds = date.getUTCSeconds().toString().padStart(2, "0")
+      const day = date.getUTCDate().toString().padStart(2, "0")
+      const month = (date.getUTCMonth() + 1).toString().padStart(2, "0")
+      const year = date.getUTCFullYear()
+
+      return `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`
     } catch (error) {
       return dateString
     }
@@ -131,9 +131,6 @@ export default function Notifications({ permissions }: NotificationsProps) {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-zinc-50 text-lg">{notification.title}</CardTitle>
-                  <span className={`text-sm font-medium ${getPriorityColor(notification.priority)}`}>
-                    {notification.priority.toUpperCase()}
-                  </span>
                 </div>
               </CardHeader>
               <CardContent>
@@ -157,11 +154,7 @@ export default function Notifications({ permissions }: NotificationsProps) {
           </Button>
 
           <span className="text-zinc-400 text-lg font-medium">
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              Math.floor(currentOffset / PAGE_SIZE) + 1
-            )}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : Math.floor(currentOffset / PAGE_SIZE) + 1}
           </span>
 
           <Button
