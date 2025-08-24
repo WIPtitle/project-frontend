@@ -22,12 +22,17 @@ import { getAllUsers, createUser, updateUser, deleteUser, logout, getPermissions
 import { type User, Permission } from "@/types"
 import { useRouter } from "next/navigation"
 
-function formatEmail(email: string): string {
-  if (email.length <= 25) return email
-
-  const [localPart, domain] = email.split("@")
-  const [domainName, ...tld] = domain.split(".")
-  return `${localPart}@***${tld.length ? "." + tld.join(".") : ""}`
+// Validation function for username
+function validateUsername(username: string): string | null {
+  if (username.length <= 3) {
+    return "Username must be more than 3 characters long"
+  }
+  // Allow letters, numbers, dash, underscore, and basic punctuation (no backslash)
+  const usernameRegex = /^[a-zA-Z0-9_\-.,;:'"!? ]+$/
+  if (!usernameRegex.test(username)) {
+    return "Username can only contain letters, numbers, dash, underscore, and basic punctuation (no backslash)"
+  }
+  return null
 }
 
 type UserManagementProps = {
@@ -55,6 +60,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   const [confirmPassword, setConfirmPassword] = useState("")
   const [validationError, setValidationError] = useState<string | null>(null)
   const [pinError, setPinError] = useState<string | null>(null)
+  const [usernameError, setUsernameError] = useState<string | null>(null)
 
   const router = useRouter()
 
@@ -75,7 +81,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   }, [])
 
   const handleAddUser = () => {
-    setEditingUser({ id: 0, email: "", password: "", permissions: [] })
+    setEditingUser({ id: 0, username: "", password: "", permissions: [] })
     setConfirmPassword("")
     setIsDialogOpen(true)
   }
@@ -106,8 +112,16 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
   const handleSaveUser = async (updatedUser: User) => {
     setValidationError(null)
     setPinError(null)
+    setUsernameError(null)
 
     const isNewUser = updatedUser.id === 0
+
+    // Validate username
+    const usernameValidation = validateUsername(updatedUser.username)
+    if (usernameValidation) {
+      setUsernameError(usernameValidation)
+      return
+    }
 
     if (isNewUser) {
       if (!updatedUser.password) {
@@ -125,7 +139,6 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
       return
     }
 
-    // Add this check for both new users and password updates
     if (updatedUser.password && updatedUser.password !== confirmPassword) {
       setValidationError("Passwords do not match")
       return
@@ -139,8 +152,8 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
     try {
       const userToSave = {
         ...updatedUser,
-        password: updatedUser.password || "", // Send empty string if password is not provided
-        pin: updatedUser.pin || "", // Send empty string if PIN is not provided
+        password: updatedUser.password || "",
+        pin: updatedUser.pin || "",
       }
 
       if (isNewUser) {
@@ -157,6 +170,7 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
       setConfirmPassword("")
       setValidationError(null)
       setPinError(null)
+      setUsernameError(null)
     } catch (error) {
       setErrorMessage("Failed to save user")
     }
@@ -182,9 +196,9 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2">
               <div className="flex items-center space-x-2 mb-4 sm:mb-0">
                 <Avatar>
-                  <AvatarImage src="/ui/avatar.webp" alt={currentUser.email} />
+                  <AvatarImage src="/ui/avatar.webp" alt={currentUser.username} />
                 </Avatar>
-                <span className="text-zinc-300">{formatEmail(currentUser.email)} (You)</span>
+                <span className="text-zinc-300">{currentUser.username} (You)</span>
               </div>
               <div className="flex w-full sm:w-auto space-x-2">
                 <Button
@@ -233,9 +247,9 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
             >
               <div className="flex items-center space-x-2 mb-4 sm:mb-0">
                 <Avatar>
-                  <AvatarImage src="/ui/avatar.webp" alt={user.email} />
+                  <AvatarImage src="/ui/avatar.webp" alt={user.username} />
                 </Avatar>
-                <span className="text-zinc-300">{formatEmail(user.email)}</span>
+                <span className="text-zinc-300">{user.username}</span>
               </div>
               {isUserManager && (
                 <div className="flex w-full sm:w-auto space-x-2">
@@ -292,12 +306,17 @@ export default function UserManagement({ onUserUpdate, currentUser, permissions 
           >
             <div className="space-y-4">
               <Input
-                type="email"
-                placeholder="Email"
-                value={editingUser?.email || ""}
-                onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, email: e.target.value } : null))}
+                type="text"
+                placeholder="Username"
+                value={editingUser?.username || ""}
+                onChange={(e) => {
+                  setEditingUser((prev) => (prev ? { ...prev, username: e.target.value } : null))
+                  setUsernameError(null)
+                }}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                required
               />
+              {usernameError && <p className="text-red-500 text-sm">{usernameError}</p>}
               <Input
                 type="password"
                 placeholder={editingUser?.id ? "New password" : "Password"}

@@ -28,14 +28,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-function formatEmail(email: string): string {
-  if (email.length <= 25) return email
-
-  const [localPart, domain] = email.split("@")
-  const [domainName, ...tld] = domain.split(".")
-  return `${localPart}@***${tld.length ? "." + tld.join(".") : ""}`
-}
-
 export default function TabLayout() {
   const [token, setToken] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
@@ -185,9 +177,9 @@ export default function TabLayout() {
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <div className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
-                      <span className="text-zinc-400">{formatEmail(currentUser?.email || "")}</span>
+                      <span className="text-zinc-400">{currentUser?.username || ""}</span>
                       <Avatar>
-                        <AvatarImage src="/ui/avatar.webp" alt={currentUser?.email} />
+                        <AvatarImage src="/ui/avatar.webp" alt={currentUser?.username} />
                       </Avatar>
                     </div>
                   </AlertDialogTrigger>
@@ -248,4 +240,3 @@ export default function TabLayout() {
     </div>
   )
 }
-

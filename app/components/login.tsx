@@ -7,14 +7,28 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { loginAndSetToken, isFirstUser, registerUser } from "@/lib/api"
 
+// Validation function for username
+function validateUsername(username: string): string | null {
+  if (username.length <= 3) {
+    return "Username must be more than 3 characters long"
+  }
+  // Allow letters, numbers, dash, underscore, and basic punctuation (no backslash)
+  const usernameRegex = /^[a-zA-Z0-9_\-.,;:'"!? ]+$/
+  if (!usernameRegex.test(username)) {
+    return "Username can only contain letters, numbers, dash, underscore, and basic punctuation (no backslash)"
+  }
+  return null
+}
+
 export default function Component({ onLogin }: { onLogin: (token: string) => void }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [pin, setPin] = useState("")
   const [pinError, setPinError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [usernameError, setUsernameError] = useState<string | null>(null)
   const [rememberMe, setRememberMe] = useState(false)
   const [isFirstTimeUser, setIsFirstTimeUser] = useState<boolean | null>(null)
 
@@ -27,6 +41,14 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
     setErrorMessage(null)
     setPinError(null)
     setPasswordError(null)
+    setUsernameError(null)
+
+    // Validate username
+    const usernameValidation = validateUsername(username)
+    if (usernameValidation) {
+      setUsernameError(usernameValidation)
+      return
+    }
 
     if (isFirstTimeUser) {
       if (password.length < 5) {
@@ -47,10 +69,10 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
       let token: string
 
       if (isFirstTimeUser) {
-        await registerUser(email, password, pin)
-        token = await loginAndSetToken(email, password, rememberMe)
+        await registerUser(username, password, pin)
+        token = await loginAndSetToken(username, password, rememberMe)
       } else {
-        token = await loginAndSetToken(email, password, rememberMe)
+        token = await loginAndSetToken(username, password, rememberMe)
       }
 
       onLogin(token)
@@ -74,14 +96,20 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
           {isFirstTimeUser ? "Register" : "Login"}
         </h1>
         <div className="space-y-4">
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
-            required
-          />
+          <div>
+            <Input
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value)
+                setUsernameError(null)
+              }}
+              className="w-full bg-zinc-700 text-zinc-50 border-zinc-600"
+              required
+            />
+            {usernameError && <p className="text-red-500 text-sm mt-1">{usernameError}</p>}
+          </div>
           <Input
             type="password"
             placeholder="Password"
@@ -150,4 +178,3 @@ export default function Component({ onLogin }: { onLogin: (token: string) => voi
     </div>
   )
 }
-
