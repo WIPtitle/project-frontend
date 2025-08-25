@@ -17,7 +17,7 @@ const getApiBaseUrl = () => {
   return "/api"
 }
 
-export const registerUser = async (email: string, password: string, pin: string): Promise<void> => {
+export const registerUser = async (username: string, password: string, pin: string): Promise<void> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/auth-service/users/first`, {
       method: "POST",
@@ -25,7 +25,7 @@ export const registerUser = async (email: string, password: string, pin: string)
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        email,
+        username,
         password,
         pin,
         permissions: [],
@@ -40,7 +40,7 @@ export const registerUser = async (email: string, password: string, pin: string)
   }
 }
 
-export const loginAndSetToken = async (email: string, password: string, rememberMe: boolean): Promise<string> => {
+export const loginAndSetToken = async (username: string, password: string, rememberMe: boolean): Promise<string> => {
   let token: string | null = null
   let tokenExpiry: Date | null = null
   try {
@@ -49,7 +49,7 @@ export const loginAndSetToken = async (email: string, password: string, remember
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
+      body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
     })
 
     if (!response.ok) {
