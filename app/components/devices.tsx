@@ -19,6 +19,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   getAllRtspCameras,
   getAllSensors,
   createRTSPCamera,
@@ -27,6 +34,7 @@ import {
   deleteRTSPCamera,
   deleteSensor,
   getSensorStatusStream,
+  getAvailableGpioServers,
 } from "@/lib/api"
 import { type RTSPCamera, type Sensor, Permission, type SensorStatus } from "@/types"
 
@@ -45,44 +53,54 @@ type CameraInputDto = {
 }
 
 type SensorInputDto = {
+  id?: string
   name: string
   gpio_pin_number: number
+  gpio_server_url: string
 }
 
 export default function Component({ permissions }: DeviceProps) {
   const [rtspCameras, setRtspCameras] = useState<RTSPCamera[]>([])
   const [sensors, setSensors] = useState<Sensor[]>([])
+  const [gpioServers, setGpioServers] = useState<string[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDevice, setEditingDevice] = useState<CameraInputDto | SensorInputDto | null>(null)
   const [deviceType, setDeviceType] = useState<"camera" | "sensor">("camera")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [sensorStatuses, setSensorStatuses] = useState<Record<number, SensorStatus>>({})
+  const [sensorStatuses, setSensorStatuses] = useState<Record<string, SensorStatus>>({})
   const [isCreating, setIsCreating] = useState(false)
   const [isLoadingCameras, setIsLoadingCameras] = useState(true)
   const [isLoadingSensors, setIsLoadingSensors] = useState(true)
-  const [streamErrors, setStreamErrors] = useState<{ [key: number]: number }>({})
+  const [isLoadingServers, setIsLoadingServers] = useState(true)
+  const [streamErrors, setStreamErrors] = useState<{ [key: string]: number }>({})
   const [connectionStatus, setConnectionStatus] = useState<{
-    [key: number]: "connected" | "connecting" | "error" | "unknown"
+    [key: string]: "connected" | "connecting" | "error" | "unknown"
   }>({})
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
-  const eventSources = useRef<{ [key: number]: EventSource }>({})
-  const reconnectTimeouts = useRef<{ [key: number]: NodeJS.Timeout }>({})
+  const eventSources = useRef<{ [key: string]: EventSource }>({})
+  const reconnectTimeouts = useRef<{ [key: string]: NodeJS.Timeout }>({})
 
   useEffect(() => {
     const fetchDevices = async () => {
       try {
         setIsLoadingCameras(true)
         setIsLoadingSensors(true)
-        const cameras = await getAllRtspCameras()
-        const sensorDevices = await getAllSensors()
+        setIsLoadingServers(true)
+        const [cameras, sensorDevices, servers] = await Promise.all([
+          getAllRtspCameras(),
+          getAllSensors(),
+          getAvailableGpioServers(),
+        ])
         setRtspCameras(cameras)
         setSensors(sensorDevices)
+        setGpioServers(servers)
       } catch (error) {
         setErrorMessage("Failed to fetch devices")
       } finally {
         setIsLoadingCameras(false)
         setIsLoadingSensors(false)
+        setIsLoadingServers(false)
       }
     }
     fetchDevices()
@@ -90,86 +108,86 @@ export default function Component({ permissions }: DeviceProps) {
 
   useEffect(() => {
     // Close event sources for removed sensors
-    for (const gpio in eventSources.current) {
-      if (!sensors.some((sensor) => sensor.gpio_pin_number === Number.parseInt(gpio))) {
-        eventSources.current[gpio].close()
-        delete eventSources.current[gpio]
+    for (const sensorId in eventSources.current) {
+      if (!sensors.some((sensor) => sensor.id === sensorId)) {
+        eventSources.current[sensorId].close()
+        delete eventSources.current[sensorId]
 
         // Clear any pending reconnect timeouts
-        if (reconnectTimeouts.current[gpio]) {
-          clearTimeout(reconnectTimeouts.current[gpio])
-          delete reconnectTimeouts.current[gpio]
+        if (reconnectTimeouts.current[sensorId]) {
+          clearTimeout(reconnectTimeouts.current[sensorId])
+          delete reconnectTimeouts.current[sensorId]
         }
       }
     }
 
     // Start event sources for new sensors
     for (const sensor of sensors) {
-      if (!eventSources.current[sensor.gpio_pin_number]) {
+      if (!eventSources.current[sensor.id]) {
         const createEventSource = () => {
-          setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "connecting" }))
+          setConnectionStatus((prev) => ({ ...prev, [sensor.id]: "connecting" }))
 
-          const stream = getSensorStatusStream(sensor.gpio_pin_number)
-          eventSources.current[sensor.gpio_pin_number] = stream
+          const stream = getSensorStatusStream(sensor.id)
+          eventSources.current[sensor.id] = stream
 
           stream.onmessage = (event) => {
             const status = event.data as SensorStatus
             setSensorStatuses((prevStatuses) => ({
               ...prevStatuses,
-              [sensor.gpio_pin_number]: status,
+              [sensor.id]: status,
             }))
             // Reset error count on successful message
-            setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
-            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "connected" }))
+            setStreamErrors((prev) => ({ ...prev, [sensor.id]: 0 }))
+            setConnectionStatus((prev) => ({ ...prev, [sensor.id]: "connected" }))
           }
 
           stream.onerror = (error) => {
-            console.error(`Error in sensor stream for GPIO ${sensor.gpio_pin_number}:`, error)
-            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "error" }))
+            console.error(`Error in sensor stream for sensor ${sensor.id}:`, error)
+            setConnectionStatus((prev) => ({ ...prev, [sensor.id]: "error" }))
 
             // Increment error count
             setStreamErrors((prev) => {
-              const errorCount = (prev[sensor.gpio_pin_number] || 0) + 1
+              const errorCount = (prev[sensor.id] || 0) + 1
 
               // If too many errors, show a warning
               if (errorCount > 3) {
-                console.warn(`Sensor ${sensor.gpio_pin_number} stream has failed ${errorCount} times`)
+                console.warn(`Sensor ${sensor.id} stream has failed ${errorCount} times`)
               }
 
               // Set status to UNKNOWN after errors
               setSensorStatuses((prevStatuses) => ({
                 ...prevStatuses,
-                [sensor.gpio_pin_number]: "UNKNOWN" as SensorStatus,
+                [sensor.id]: "UNKNOWN" as SensorStatus,
               }))
 
-              return { ...prev, [sensor.gpio_pin_number]: errorCount }
+              return { ...prev, [sensor.id]: errorCount }
             })
 
             // If too many failures, implement exponential backoff
-            const errorCount = streamErrors[sensor.gpio_pin_number] || 0
+            const errorCount = streamErrors[sensor.id] || 0
             if (errorCount > 10) {
-              console.error(`Too many failures for sensor ${sensor.gpio_pin_number}, implementing backoff`)
+              console.error(`Too many failures for sensor ${sensor.id}, implementing backoff`)
               stream.close()
-              delete eventSources.current[sensor.gpio_pin_number]
+              delete eventSources.current[sensor.id]
 
               // Exponential backoff: 30s, 60s, 120s, etc.
               const backoffTime = Math.min(30000 * Math.pow(2, Math.floor(errorCount / 10) - 1), 300000) // Max 5 minutes
 
-              reconnectTimeouts.current[sensor.gpio_pin_number] = setTimeout(() => {
+              reconnectTimeouts.current[sensor.id] = setTimeout(() => {
                 console.log(
-                  `Attempting to reconnect sensor ${sensor.gpio_pin_number} stream after ${backoffTime}ms backoff`,
+                  `Attempting to reconnect sensor ${sensor.id} stream after ${backoffTime}ms backoff`,
                 )
-                setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
+                setStreamErrors((prev) => ({ ...prev, [sensor.id]: 0 }))
                 createEventSource()
               }, backoffTime)
             }
           }
 
           stream.onopen = () => {
-            console.log(`Connected to sensor stream for GPIO ${sensor.gpio_pin_number}`)
-            setConnectionStatus((prev) => ({ ...prev, [sensor.gpio_pin_number]: "connected" }))
+            console.log(`Connected to sensor stream for sensor ${sensor.id}`)
+            setConnectionStatus((prev) => ({ ...prev, [sensor.id]: "connected" }))
             // Reset error count on successful connection
-            setStreamErrors((prev) => ({ ...prev, [sensor.gpio_pin_number]: 0 }))
+            setStreamErrors((prev) => ({ ...prev, [sensor.id]: 0 }))
           }
         }
 
@@ -190,8 +208,8 @@ export default function Component({ permissions }: DeviceProps) {
   useEffect(() => {
     return () => {
       // Close all event sources when component unmounts
-      for (const gpio in eventSources.current) {
-        eventSources.current[gpio].close()
+      for (const sensorId in eventSources.current) {
+        eventSources.current[sensorId].close()
       }
       // Clear all timeouts
       for (const timeout of Object.values(reconnectTimeouts.current)) {
@@ -205,7 +223,7 @@ export default function Component({ permissions }: DeviceProps) {
     setEditingDevice(
       type === "camera"
         ? { name: "", ip: "", port: 0, username: "", password: "", path: "", always_recording: false }
-        : { name: "", gpio_pin_number: 0 },
+        : { name: "", gpio_pin_number: 0, gpio_server_url: gpioServers[0] || "" },
     )
     setIsCreating(true)
     setIsDialogOpen(true)
@@ -213,29 +231,35 @@ export default function Component({ permissions }: DeviceProps) {
 
   const handleEditDevice = (device: RTSPCamera | Sensor, type: "camera" | "sensor") => {
     if (type === "sensor") {
+      const sensor = device as Sensor
       setDeviceType(type)
-      setEditingDevice(device)
+      setEditingDevice({
+        id: sensor.id,
+        name: sensor.name,
+        gpio_pin_number: sensor.gpio_pin_number,
+        gpio_server_url: sensor.gpio_server_url,
+      })
       setIsCreating(false)
       setIsDialogOpen(true)
     }
   }
 
-  const handleDeleteDevice = async (id: string | number, type: "camera" | "sensor") => {
+  const handleDeleteDevice = async (id: string, type: "camera" | "sensor") => {
     try {
       if (type === "camera") {
-        await deleteRTSPCamera(id as string)
+        await deleteRTSPCamera(id)
         setRtspCameras(rtspCameras.filter((camera) => camera.ip !== id))
       } else if (type === "sensor") {
-        if (eventSources.current[id as number]) {
-          eventSources.current[id as number].close()
-          delete eventSources.current[id as number]
+        if (eventSources.current[id]) {
+          eventSources.current[id].close()
+          delete eventSources.current[id]
         }
-        if (reconnectTimeouts.current[id as number]) {
-          clearTimeout(reconnectTimeouts.current[id as number])
-          delete reconnectTimeouts.current[id as number]
+        if (reconnectTimeouts.current[id]) {
+          clearTimeout(reconnectTimeouts.current[id])
+          delete reconnectTimeouts.current[id]
         }
-        await deleteSensor(id as number)
-        setSensors(sensors.filter((sensor) => sensor.gpio_pin_number !== id))
+        await deleteSensor(id)
+        setSensors(sensors.filter((sensor) => sensor.id !== id))
       }
     } catch (error) {
       setErrorMessage(`Failed to delete ${type}`)
@@ -253,11 +277,12 @@ export default function Component({ permissions }: DeviceProps) {
       } else if (deviceType === "sensor") {
         const sensor = device as SensorInputDto
         if (isCreating) {
-          const newSensor = await createSensor(sensor)
+          const { id, ...sensorData } = sensor
+          const newSensor = await createSensor(sensorData)
           setSensors([...sensors, newSensor])
-        } else {
-          const updatedSensor = await updateSensor(sensor.gpio_pin_number, sensor)
-          setSensors(sensors.map((s) => (s.gpio_pin_number === updatedSensor.gpio_pin_number ? updatedSensor : s)))
+        } else if (sensor.id) {
+          const updatedSensor = await updateSensor(sensor.id, sensor)
+          setSensors(sensors.map((s) => (s.id === updatedSensor.id ? updatedSensor : s)))
         }
       }
       setIsDialogOpen(false)
@@ -266,22 +291,22 @@ export default function Component({ permissions }: DeviceProps) {
     }
   }
 
-  const getStatusDisplay = (gpioPin: number): string => {
-    const status = sensorStatuses[gpioPin]
-    const connection = connectionStatus[gpioPin]
+  const getStatusDisplay = (sensorId: string): string => {
+    const status = sensorStatuses[sensorId]
+    const connection = connectionStatus[sensorId]
 
     if (connection === "connecting") return "Connecting..."
-    if (connection === "error" && streamErrors[gpioPin] > 3) return "Connection Error"
+    if (connection === "error" && streamErrors[sensorId] > 3) return "Connection Error"
     if (!status || status === "UNKNOWN") return "Unknown"
 
     return status
   }
 
-  const getStatusColor = (gpioPin: number): string => {
-    const connection = connectionStatus[gpioPin]
-    const status = sensorStatuses[gpioPin]
+  const getStatusColor = (sensorId: string): string => {
+    const connection = connectionStatus[sensorId]
+    const status = sensorStatuses[sensorId]
 
-    if (connection === "error" && streamErrors[gpioPin] > 3) return "text-red-500"
+    if (connection === "error" && streamErrors[sensorId] > 3) return "text-red-500"
     if (connection === "connecting") return "text-yellow-500"
     if (!status || status === "UNKNOWN") return "text-gray-500"
     if (status === "HIGH") return "text-red-500"
@@ -367,11 +392,15 @@ export default function Component({ permissions }: DeviceProps) {
             variant="outline"
             className="w-full sm:w-auto bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
             onClick={() => handleAddDevice("sensor")}
+            disabled={!isLoadingServers && gpioServers.length === 0}
           >
             Add sensor
           </Button>
         )}
       </div>
+      {!isLoadingServers && gpioServers.length === 0 && (
+        <p className="text-yellow-500 mb-4">No GPIO servers configured. Please configure GPIO_MONITOR_URLS.</p>
+      )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {isLoadingSensors ? (
           <p className="text-zinc-300">Loading sensors...</p>
@@ -379,11 +408,11 @@ export default function Component({ permissions }: DeviceProps) {
           <p className="text-zinc-300">No sensors found.</p>
         ) : (
           sensors.map((sensor) => (
-            <Card key={sensor.gpio_pin_number} className="bg-zinc-800 border-zinc-700 flex flex-col">
+            <Card key={sensor.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
               <CardHeader>
                 <CardTitle className="text-zinc-50 flex justify-between items-center">
                   <span>{sensor.name}</span>
-                  {streamErrors[sensor.gpio_pin_number] > 3 && (
+                  {streamErrors[sensor.id] > 3 && (
                     <span className="text-xs text-yellow-500" title="Connection issues detected">
                       ⚠️
                     </span>
@@ -391,9 +420,10 @@ export default function Component({ permissions }: DeviceProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
-                <p className="text-zinc-300">GPIO: {sensor.gpio_pin_number}</p>
-                <p className={`mt-6 ${getStatusColor(sensor.gpio_pin_number)}`}>
-                  Current Status: {getStatusDisplay(sensor.gpio_pin_number)}
+                <p className="text-zinc-300">GPIO Pin: {sensor.gpio_pin_number}</p>
+                <p className="text-zinc-300 text-sm">Server: {sensor.gpio_server_url}</p>
+                <p className={`mt-6 ${getStatusColor(sensor.id)}`}>
+                  Current Status: {getStatusDisplay(sensor.id)}
                 </p>
               </CardContent>
               {canModifyDevices && (
@@ -429,7 +459,7 @@ export default function Component({ permissions }: DeviceProps) {
                             Cancel
                           </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDeleteDevice(sensor.gpio_pin_number, "sensor")}
+                            onClick={() => handleDeleteDevice(sensor.id, "sensor")}
                             className="bg-red-900 hover:bg-red-800 text-white"
                           >
                             Delete
@@ -465,6 +495,7 @@ export default function Component({ permissions }: DeviceProps) {
                 value={editingDevice?.name || ""}
                 onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, name: e.target.value } : null))}
                 className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                required
               />
               {deviceType === "camera" ? (
                 <>
@@ -474,6 +505,7 @@ export default function Component({ permissions }: DeviceProps) {
                     onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, ip: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                     disabled={!isCreating}
+                    required
                   />
                   <Input
                     type="number"
@@ -483,12 +515,14 @@ export default function Component({ permissions }: DeviceProps) {
                       setEditingDevice((prev) => (prev ? { ...prev, port: Number.parseInt(e.target.value) } : null))
                     }
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                    required
                   />
                   <Input
                     placeholder="Username"
                     value={(editingDevice as CameraInputDto)?.username || ""}
                     onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, username: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                    required
                   />
                   <Input
                     type="password"
@@ -496,12 +530,14 @@ export default function Component({ permissions }: DeviceProps) {
                     value={(editingDevice as CameraInputDto)?.password || ""}
                     onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, password: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                    required
                   />
                   <Input
                     placeholder="Path"
                     value={(editingDevice as CameraInputDto)?.path || ""}
                     onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, path: e.target.value } : null))}
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                    required
                   />
                   <div className="flex items-center justify-between">
                     <Label htmlFor="always-recording" className="text-zinc-50">
@@ -519,6 +555,29 @@ export default function Component({ permissions }: DeviceProps) {
                 </>
               ) : (
                 <>
+                  <div>
+                    <Label htmlFor="gpio-server" className="text-zinc-50 mb-2 block">
+                      GPIO Server
+                    </Label>
+                    <Select
+                      value={(editingDevice as SensorInputDto)?.gpio_server_url || ""}
+                      onValueChange={(value) =>
+                        setEditingDevice((prev) => (prev ? { ...prev, gpio_server_url: value } : null))
+                      }
+                      disabled={!isCreating}
+                    >
+                      <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
+                        <SelectValue placeholder="Select a GPIO server" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-800 text-zinc-50 border-zinc-700">
+                        {gpioServers.map((server) => (
+                          <SelectItem key={server} value={server}>
+                            {server}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Input
                     type="number"
                     placeholder="GPIO Pin Number"
@@ -530,6 +589,7 @@ export default function Component({ permissions }: DeviceProps) {
                     }
                     className="bg-zinc-700 text-zinc-50 border-zinc-600"
                     disabled={!isCreating}
+                    required
                   />
                 </>
               )}

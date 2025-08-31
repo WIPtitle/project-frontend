@@ -359,7 +359,24 @@ export const deleteUser = async (id: number): Promise<boolean> => {
   }
 }
 
-// API functions
+export const getAvailableGpioServers = async (): Promise<string[]> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/servers`, {
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch GPIO servers")
+    }
+
+    return await response.json()
+  } catch (error) {
+    throw error
+  }
+}
+
 export const getAllSensors = async (): Promise<Sensor[]> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/`, {
@@ -378,7 +395,7 @@ export const getAllSensors = async (): Promise<Sensor[]> => {
   }
 }
 
-export const createSensor = async (sensor: Omit<Sensor, "id" | "group_id" | "listening">): Promise<Sensor> => {
+export const createSensor = async (sensor: Omit<Sensor, "id" | "listening">): Promise<Sensor> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/`, {
       method: "POST",
@@ -399,9 +416,9 @@ export const createSensor = async (sensor: Omit<Sensor, "id" | "group_id" | "lis
   }
 }
 
-export const updateSensor = async (gpioNumber: number, updates: Partial<Sensor>): Promise<Sensor> => {
+export const updateSensor = async (sensorId: string, updates: Partial<Sensor>): Promise<Sensor> => {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${sensorId}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -420,9 +437,9 @@ export const updateSensor = async (gpioNumber: number, updates: Partial<Sensor>)
   }
 }
 
-export const deleteSensor = async (gpioNumber: number): Promise<boolean> => {
+export const deleteSensor = async (sensorId: string): Promise<boolean> => {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${sensorId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
@@ -439,9 +456,9 @@ export const deleteSensor = async (gpioNumber: number): Promise<boolean> => {
   }
 }
 
-export const getSensorCurrentStatus = async (gpioNumber: number): Promise<SensorStatus> => {
+export const getSensorCurrentStatus = async (sensorId: string): Promise<SensorStatus> => {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}/status`, {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/sensor/${sensorId}/status`, {
       headers: {
         Authorization: `Bearer ${getTokenOrThrow()}`,
       },
@@ -458,13 +475,34 @@ export const getSensorCurrentStatus = async (gpioNumber: number): Promise<Sensor
   }
 }
 
-export const getSensorStatusStream = (gpioNumber: number) => {
+export const getSensorStatusStream = (sensorId: string) => {
   const token = getTokenOrThrow()
   const eventSource = new EventSource(
-    `${getApiBaseUrl()}/devices-manager-service/sensor/${gpioNumber}/status/stream?auth_token=${encodeURIComponent(token)}`,
+    `${getApiBaseUrl()}/devices-manager-service/sensor/${sensorId}/status/stream?auth_token=${encodeURIComponent(token)}`,
     {},
   )
   return eventSource
+}
+
+export const updateDeviceGroupSensors = async (groupId: number, sensorIds: string[]): Promise<Sensor[]> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sensorIds),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to update device group sensors")
+    }
+
+    return await response.json()
+  } catch (error) {
+    throw error
+  }
 }
 
 export const getDeviceGroupSensors = async (groupId: number): Promise<Sensor[]> => {
@@ -477,27 +515,6 @@ export const getDeviceGroupSensors = async (groupId: number): Promise<Sensor[]> 
 
     if (!response.ok) {
       throw new Error("Failed to fetch device group sensors")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
-export const updateDeviceGroupSensors = async (groupId: number, sensorPins: number[]): Promise<Sensor[]> => {
-  try {
-    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(sensorPins),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to update device group sensors")
     }
 
     return await response.json()

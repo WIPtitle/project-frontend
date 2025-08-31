@@ -38,10 +38,11 @@ export enum SensorStatus {
 }
 
 export interface Sensor {
+  id: string
   name: string
   gpio_pin_number: number
+  gpio_server_url: string
   listening: boolean
-  group_id: number
 }
 
 export interface AlarmAudioConfig {

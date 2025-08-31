@@ -249,10 +249,10 @@ export default function Alarm({ permissions }: AlarmProps) {
               prevGroups?.map((group) => (group.id === updatedGroupResponse.id ? updatedGroupResponse : group)) || [],
           )
 
-          // Update sensors
+          // Update sensors using sensor IDs
           const updatedSensors = await updateDeviceGroupSensors(
             existingGroup.id,
-            selectedSensors.map((s) => s.gpio_pin_number),
+            selectedSensors.map((s) => s.id),
           )
 
           setGroupSensors((prev) => ({ ...prev, [existingGroup.id]: updatedSensors }))
@@ -260,10 +260,10 @@ export default function Alarm({ permissions }: AlarmProps) {
           const newGroup = await createDeviceGroup(updatedGroup)
           setDeviceGroups((prevGroups) => [...(prevGroups || []), newGroup])
 
-          // Add sensors to the new group
+          // Add sensors to the new group using sensor IDs
           const newSensors = await updateDeviceGroupSensors(
             newGroup.id,
-            selectedSensors.map((s) => s.gpio_pin_number),
+            selectedSensors.map((s) => s.id),
           )
 
           setGroupSensors((prev) => ({ ...prev, [newGroup.id]: newSensors }))
@@ -390,20 +390,20 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Sensors</h3>
                   {getAvailableSensors(allSensors, editingGroup?.id ?? null).map((sensor) => (
-                    <div key={sensor.gpio_pin_number} className="flex items-center space-x-2">
+                    <div key={sensor.id} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`sensor-${sensor.gpio_pin_number}`}
-                        checked={selectedSensors.some((s) => s.gpio_pin_number === sensor.gpio_pin_number)}
+                        id={`sensor-${sensor.id}`}
+                        checked={selectedSensors.some((s) => s.id === sensor.id)}
                         onCheckedChange={(checked) => {
                           setSelectedSensors((prev) =>
                             checked
                               ? [...prev, sensor]
-                              : prev.filter((s) => s.gpio_pin_number !== sensor.gpio_pin_number),
+                              : prev.filter((s) => s.id !== sensor.id),
                           )
                         }}
                         className="border-zinc-500"
                       />
-                      <label htmlFor={`sensor-${sensor.gpio_pin_number}`} className="text-zinc-300">
+                      <label htmlFor={`sensor-${sensor.id}`} className="text-zinc-300">
                         {sensor.name}
                       </label>
                     </div>
@@ -445,7 +445,7 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <h3 className="mt-2 font-semibold text-zinc-300">Sensors:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
                   {groupSensors[group.id]?.map((sensor) => (
-                    <li key={sensor.gpio_pin_number}>{sensor.name}</li>
+                    <li key={sensor.id}>{sensor.name}</li>
                   ))}
                 </ul>
                 {groupSensors[group.id]?.length === 0 && <p className="text-zinc-400">No sensors</p>}
