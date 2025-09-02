@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -25,6 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Camera, Wifi, WifiOff, Loader2 } from "lucide-react"
+
+// Import your actual API functions here
 import {
   getAllRtspCameras,
   getAllSensors,
@@ -35,7 +38,10 @@ import {
   deleteSensor,
   getSensorStatusStream,
   getAvailableGpioServers,
+  getCameraStreamUrl,
+  getCameraSnapshotUrl,
 } from "@/lib/api"
+
 import { type RTSPCamera, type Sensor, Permission, type SensorStatus } from "@/types"
 
 type DeviceProps = {
@@ -77,9 +83,39 @@ export default function Component({ permissions }: DeviceProps) {
     [key: string]: "connected" | "connecting" | "error" | "unknown"
   }>({})
 
+  // State for camera streaming
+  const [selectedStreamCamera, setSelectedStreamCamera] = useState<RTSPCamera | null>(null)
+  const [streamLoading, setStreamLoading] = useState(false)
+  const [cameraSnapshots, setCameraSnapshots] = useState<Record<string, string>>({})
+
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const eventSources = useRef<{ [key: string]: EventSource }>({})
   const reconnectTimeouts = useRef<{ [key: string]: NodeJS.Timeout }>({})
+
+  // Fetch camera snapshots for previews
+  useEffect(() => {
+    const fetchSnapshots = async () => {
+      for (const camera of rtspCameras) {
+        try {
+          const response = await fetch(getCameraSnapshotUrl(camera.ip))
+          if (response.ok) {
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+            setCameraSnapshots(prev => ({ ...prev, [camera.ip]: url }))
+          }
+        } catch (error) {
+          console.error(`Failed to fetch snapshot for camera ${camera.ip}:`, error)
+        }
+      }
+    }
+
+    if (rtspCameras.length > 0) {
+      fetchSnapshots()
+      // Refresh snapshots every 30 seconds
+      const interval = setInterval(fetchSnapshots, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [rtspCameras])
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -106,14 +142,13 @@ export default function Component({ permissions }: DeviceProps) {
     fetchDevices()
   }, [])
 
+  // Sensor event source management (unchanged)
   useEffect(() => {
-    // Close event sources for removed sensors
     for (const sensorId in eventSources.current) {
       if (!sensors.some((sensor) => sensor.id === sensorId)) {
         eventSources.current[sensorId].close()
         delete eventSources.current[sensorId]
 
-        // Clear any pending reconnect timeouts
         if (reconnectTimeouts.current[sensorId]) {
           clearTimeout(reconnectTimeouts.current[sensorId])
           delete reconnectTimeouts.current[sensorId]
@@ -121,7 +156,6 @@ export default function Component({ permissions }: DeviceProps) {
       }
     }
 
-    // Start event sources for new sensors
     for (const sensor of sensors) {
       if (!eventSources.current[sensor.id]) {
         const createEventSource = () => {
@@ -136,7 +170,6 @@ export default function Component({ permissions }: DeviceProps) {
               ...prevStatuses,
               [sensor.id]: status,
             }))
-            // Reset error count on successful message
             setStreamErrors((prev) => ({ ...prev, [sensor.id]: 0 }))
             setConnectionStatus((prev) => ({ ...prev, [sensor.id]: "connected" }))
           }
@@ -145,16 +178,13 @@ export default function Component({ permissions }: DeviceProps) {
             console.error(`Error in sensor stream for sensor ${sensor.id}:`, error)
             setConnectionStatus((prev) => ({ ...prev, [sensor.id]: "error" }))
 
-            // Increment error count
             setStreamErrors((prev) => {
               const errorCount = (prev[sensor.id] || 0) + 1
 
-              // If too many errors, show a warning
               if (errorCount > 3) {
                 console.warn(`Sensor ${sensor.id} stream has failed ${errorCount} times`)
               }
 
-              // Set status to UNKNOWN after errors
               setSensorStatuses((prevStatuses) => ({
                 ...prevStatuses,
                 [sensor.id]: "UNKNOWN" as SensorStatus,
@@ -163,15 +193,13 @@ export default function Component({ permissions }: DeviceProps) {
               return { ...prev, [sensor.id]: errorCount }
             })
 
-            // If too many failures, implement exponential backoff
             const errorCount = streamErrors[sensor.id] || 0
             if (errorCount > 10) {
               console.error(`Too many failures for sensor ${sensor.id}, implementing backoff`)
               stream.close()
               delete eventSources.current[sensor.id]
 
-              // Exponential backoff: 30s, 60s, 120s, etc.
-              const backoffTime = Math.min(30000 * Math.pow(2, Math.floor(errorCount / 10) - 1), 300000) // Max 5 minutes
+              const backoffTime = Math.min(30000 * Math.pow(2, Math.floor(errorCount / 10) - 1), 300000)
 
               reconnectTimeouts.current[sensor.id] = setTimeout(() => {
                 console.log(
@@ -186,7 +214,6 @@ export default function Component({ permissions }: DeviceProps) {
           stream.onopen = () => {
             console.log(`Connected to sensor stream for sensor ${sensor.id}`)
             setConnectionStatus((prev) => ({ ...prev, [sensor.id]: "connected" }))
-            // Reset error count on successful connection
             setStreamErrors((prev) => ({ ...prev, [sensor.id]: 0 }))
           }
         }
@@ -195,9 +222,7 @@ export default function Component({ permissions }: DeviceProps) {
       }
     }
 
-    // Cleanup function
     return () => {
-      // Clear all reconnect timeouts
       for (const timeout of Object.values(reconnectTimeouts.current)) {
         clearTimeout(timeout)
       }
@@ -207,22 +232,21 @@ export default function Component({ permissions }: DeviceProps) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Close all event sources when component unmounts
       for (const sensorId in eventSources.current) {
         eventSources.current[sensorId].close()
       }
-      // Clear all timeouts
       for (const timeout of Object.values(reconnectTimeouts.current)) {
         clearTimeout(timeout)
       }
+      Object.values(cameraSnapshots).forEach(url => URL.revokeObjectURL(url))
     }
-  }, [])
+  }, [cameraSnapshots])
 
   const handleAddDevice = (type: "camera" | "sensor") => {
     setDeviceType(type)
     setEditingDevice(
       type === "camera"
-        ? { name: "", ip: "", port: 0, username: "", password: "", path: "", always_recording: false }
+        ? { name: "", ip: "", port: 554, username: "", password: "", path: "", always_recording: false }
         : { name: "", gpio_pin_number: 0, gpio_server_url: gpioServers[0] || "" },
     )
     setIsCreating(true)
@@ -266,16 +290,18 @@ export default function Component({ permissions }: DeviceProps) {
     }
   }
 
-  const handleSaveDevice = async (device: CameraInputDto | SensorInputDto) => {
+  const handleSaveDevice = async () => {
+    if (!editingDevice) return
+
     try {
       if (deviceType === "camera") {
-        const camera = device as CameraInputDto
+        const camera = editingDevice as CameraInputDto
         if (isCreating) {
           const newCamera = await createRTSPCamera(camera)
           setRtspCameras([...rtspCameras, newCamera])
         }
       } else if (deviceType === "sensor") {
-        const sensor = device as SensorInputDto
+        const sensor = editingDevice as SensorInputDto
         if (isCreating) {
           const { id, ...sensorData } = sensor
           const newSensor = await createSensor(sensorData)
@@ -286,6 +312,7 @@ export default function Component({ permissions }: DeviceProps) {
         }
       }
       setIsDialogOpen(false)
+      setEditingDevice(null)
     } catch (error) {
       setErrorMessage(`Failed to ${isCreating ? "create" : "update"} ${deviceType}`)
     }
@@ -314,10 +341,16 @@ export default function Component({ permissions }: DeviceProps) {
     return "text-zinc-300"
   }
 
+  const handleOpenLiveStream = (camera: RTSPCamera) => {
+    setSelectedStreamCamera(camera)
+    setStreamLoading(true)
+  }
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-zinc-50 mb-6">Devices</h1>
 
+      {/* Cameras Section */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">RTSP cameras</h2>
         {canModifyDevices && (
@@ -342,15 +375,37 @@ export default function Component({ permissions }: DeviceProps) {
                 <CardTitle className="text-zinc-50">{camera.name}</CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
+                {/* Preview snapshot */}
+                {cameraSnapshots[camera.ip] && (
+                  <div className="mb-3 relative group cursor-pointer" onClick={() => handleOpenLiveStream(camera)}>
+                    <img
+                      src={cameraSnapshots[camera.ip]}
+                      alt={`Preview of ${camera.name}`}
+                      className="w-full h-32 object-cover rounded"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                      <Camera className="text-white" size={32} />
+                      <span className="text-white ml-2">View Live</span>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <p className="text-zinc-300">IP: {camera.ip}</p>
                   <p className="text-zinc-300">Path: {camera.path}</p>
                   <p className="text-zinc-300">Always recording: {camera.always_recording ? "Yes" : "No"}</p>
                 </div>
               </CardContent>
-              {canModifyDevices && (
-                <CardFooter className="flex flex-col mt-auto">
-                  <div className="flex w-full">
+              <CardFooter className="flex flex-col mt-auto">
+                <div className="flex w-full">
+                  <Button
+                    variant="outline"
+                    className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                    onClick={() => handleOpenLiveStream(camera)}
+                  >
+                    <Wifi className="mr-2 h-4 w-4" />
+                    Live Stream
+                  </Button>
+                  {canModifyDevices && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">
@@ -377,14 +432,15 @@ export default function Component({ permissions }: DeviceProps) {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                  </div>
-                </CardFooter>
-              )}
+                  )}
+                </div>
+              </CardFooter>
             </Card>
           ))
         )}
       </div>
 
+      {/* Sensors Section */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">Sensors</h2>
         {canModifyDevices && (
@@ -474,6 +530,45 @@ export default function Component({ permissions }: DeviceProps) {
           ))
         )}
       </div>
+
+      {/* Live Streaming Dialog */}
+      <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
+        setSelectedStreamCamera(null)
+        setStreamLoading(false)
+      }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
+          <DialogHeader>
+            <DialogTitle>Live Stream: {selectedStreamCamera?.name}</DialogTitle>
+            <DialogDescription>
+              Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedStreamCamera && (
+            <div className="flex-grow overflow-hidden relative">
+              {streamLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+                  <span className="ml-2 text-zinc-400">Connecting to camera...</span>
+                </div>
+              )}
+              <img
+                src={getCameraStreamUrl(selectedStreamCamera.ip)}
+                alt={`Live stream from ${selectedStreamCamera.name}`}
+                className="w-full h-full object-contain"
+                onLoad={() => setStreamLoading(false)}
+                onError={() => {
+                  setStreamLoading(false)
+                  setErrorMessage("Failed to connect to camera stream. Make sure the camera is online and accessible.")
+                  setSelectedStreamCamera(null)
+                }}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Device Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
@@ -481,125 +576,121 @@ export default function Component({ permissions }: DeviceProps) {
               {isCreating ? "Add" : "Edit"} {deviceType === "camera" ? "Camera" : "Sensor"}
             </DialogTitle>
           </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (editingDevice) {
-                handleSaveDevice(editingDevice)
-              }
-            }}
-          >
-            <div className="space-y-4">
-              <Input
-                placeholder="Name"
-                value={editingDevice?.name || ""}
-                onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, name: e.target.value } : null))}
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                required
-              />
-              {deviceType === "camera" ? (
-                <>
-                  <Input
-                    placeholder="IP"
-                    value={(editingDevice as CameraInputDto)?.ip || ""}
-                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, ip: e.target.value } : null))}
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                    disabled={!isCreating}
-                    required
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Port"
-                    value={(editingDevice as CameraInputDto)?.port || ""}
-                    onChange={(e) =>
-                      setEditingDevice((prev) => (prev ? { ...prev, port: Number.parseInt(e.target.value) } : null))
+          <div className="space-y-4">
+            <Input
+              placeholder="Name"
+              value={editingDevice?.name || ""}
+              onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, name: e.target.value } : null))}
+              className="bg-zinc-700 text-zinc-50 border-zinc-600"
+              required
+            />
+            {deviceType === "camera" ? (
+              <>
+                <Input
+                  placeholder="IP"
+                  value={(editingDevice as CameraInputDto)?.ip || ""}
+                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, ip: e.target.value } : null))}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  disabled={!isCreating}
+                  required
+                />
+                <Input
+                  type="number"
+                  placeholder="Port"
+                  value={(editingDevice as CameraInputDto)?.port || ""}
+                  onChange={(e) =>
+                    setEditingDevice((prev) => (prev ? { ...prev, port: Number.parseInt(e.target.value) } : null))
+                  }
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  required
+                />
+                <Input
+                  placeholder="Username"
+                  value={(editingDevice as CameraInputDto)?.username || ""}
+                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, username: e.target.value } : null))}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={(editingDevice as CameraInputDto)?.password || ""}
+                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, password: e.target.value } : null))}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  required
+                />
+                <Input
+                  placeholder="Path"
+                  value={(editingDevice as CameraInputDto)?.path || ""}
+                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, path: e.target.value } : null))}
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  required
+                />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="always-recording" className="text-zinc-50">
+                    Always recording
+                  </Label>
+                  <Switch
+                    id="always-recording"
+                    checked={(editingDevice as CameraInputDto)?.always_recording || false}
+                    onCheckedChange={(checked) =>
+                      setEditingDevice((prev) => (prev ? { ...prev, always_recording: checked } : null))
                     }
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                    required
+                    className="data-[state=unchecked]:bg-zinc-700 data-[state=unchecked]:border-zinc-600"
                   />
-                  <Input
-                    placeholder="Username"
-                    value={(editingDevice as CameraInputDto)?.username || ""}
-                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, username: e.target.value } : null))}
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                    required
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={(editingDevice as CameraInputDto)?.password || ""}
-                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, password: e.target.value } : null))}
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                    required
-                  />
-                  <Input
-                    placeholder="Path"
-                    value={(editingDevice as CameraInputDto)?.path || ""}
-                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, path: e.target.value } : null))}
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                    required
-                  />
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="always-recording" className="text-zinc-50">
-                      Always recording
-                    </Label>
-                    <Switch
-                      id="always-recording"
-                      checked={(editingDevice as CameraInputDto)?.always_recording || false}
-                      onCheckedChange={(checked) =>
-                        setEditingDevice((prev) => (prev ? { ...prev, always_recording: checked } : null))
-                      }
-                      className="data-[state=unchecked]:bg-zinc-700 data-[state=unchecked]:border-zinc-600"
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <Label htmlFor="gpio-server" className="text-zinc-50 mb-2 block">
-                      GPIO Server
-                    </Label>
-                    <Select
-                      value={(editingDevice as SensorInputDto)?.gpio_server_url || ""}
-                      onValueChange={(value) =>
-                        setEditingDevice((prev) => (prev ? { ...prev, gpio_server_url: value } : null))
-                      }
-                      disabled={!isCreating}
-                    >
-                      <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
-                        <SelectValue placeholder="Select a GPIO server" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-zinc-800 text-zinc-50 border-zinc-700">
-                        {gpioServers.map((server) => (
-                          <SelectItem key={server} value={server}>
-                            {server}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Input
-                    type="number"
-                    placeholder="GPIO Pin Number"
-                    value={(editingDevice as SensorInputDto)?.gpio_pin_number || ""}
-                    onChange={(e) =>
-                      setEditingDevice((prev) =>
-                        prev ? { ...prev, gpio_pin_number: Number.parseInt(e.target.value) } : null,
-                      )
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label htmlFor="gpio-server" className="text-zinc-50 mb-2 block">
+                    GPIO Server
+                  </Label>
+                  <Select
+                    value={(editingDevice as SensorInputDto)?.gpio_server_url || ""}
+                    onValueChange={(value) =>
+                      setEditingDevice((prev) => (prev ? { ...prev, gpio_server_url: value } : null))
                     }
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
                     disabled={!isCreating}
-                    required
-                  />
-                </>
-              )}
-              <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
-                {isCreating ? "Create" : "Update"}
-              </Button>
-            </div>
-          </form>
+                  >
+                    <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
+                      <SelectValue placeholder="Select a GPIO server" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-800 text-zinc-50 border-zinc-700">
+                      {gpioServers.map((server) => (
+                        <SelectItem key={server} value={server}>
+                          {server}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Input
+                  type="number"
+                  placeholder="GPIO Pin Number"
+                  value={(editingDevice as SensorInputDto)?.gpio_pin_number || ""}
+                  onChange={(e) =>
+                    setEditingDevice((prev) =>
+                      prev ? { ...prev, gpio_pin_number: Number.parseInt(e.target.value) } : null,
+                    )
+                  }
+                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  disabled={!isCreating}
+                  required
+                />
+              </>
+            )}
+            <Button
+              onClick={handleSaveDevice}
+              className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            >
+              {isCreating ? "Create" : "Update"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Error Dialog */}
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
         <AlertDialogContent className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>

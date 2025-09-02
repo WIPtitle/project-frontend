@@ -1040,3 +1040,8 @@ export const getAllNotifications = async (params?: {
     throw error
   }
 }
+
+export const getCameraStreamUrl = (cameraIp: string): string => {
+  const token = getTokenOrThrow()
+  return `${getApiBaseUrl()}/devices-manager-service/camera/${cameraIp}/stream?auth_token=${encodeURIComponent(token)}`
+}
