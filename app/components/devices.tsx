@@ -39,7 +39,6 @@ import {
   getSensorStatusStream,
   getAvailableGpioServers,
   getCameraStreamUrl,
-  getCameraSnapshotUrl,
 } from "@/lib/api"
 
 import { type RTSPCamera, type Sensor, Permission, type SensorStatus } from "@/types"
@@ -86,36 +85,10 @@ export default function Component({ permissions }: DeviceProps) {
   // State for camera streaming
   const [selectedStreamCamera, setSelectedStreamCamera] = useState<RTSPCamera | null>(null)
   const [streamLoading, setStreamLoading] = useState(false)
-  const [cameraSnapshots, setCameraSnapshots] = useState<Record<string, string>>({})
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const eventSources = useRef<{ [key: string]: EventSource }>({})
   const reconnectTimeouts = useRef<{ [key: string]: NodeJS.Timeout }>({})
-
-  // Fetch camera snapshots for previews
-  useEffect(() => {
-    const fetchSnapshots = async () => {
-      for (const camera of rtspCameras) {
-        try {
-          const response = await fetch(getCameraSnapshotUrl(camera.ip))
-          if (response.ok) {
-            const blob = await response.blob()
-            const url = URL.createObjectURL(blob)
-            setCameraSnapshots(prev => ({ ...prev, [camera.ip]: url }))
-          }
-        } catch (error) {
-          console.error(`Failed to fetch snapshot for camera ${camera.ip}:`, error)
-        }
-      }
-    }
-
-    if (rtspCameras.length > 0) {
-      fetchSnapshots()
-      // Refresh snapshots every 30 seconds
-      const interval = setInterval(fetchSnapshots, 30000)
-      return () => clearInterval(interval)
-    }
-  }, [rtspCameras])
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -238,9 +211,8 @@ export default function Component({ permissions }: DeviceProps) {
       for (const timeout of Object.values(reconnectTimeouts.current)) {
         clearTimeout(timeout)
       }
-      Object.values(cameraSnapshots).forEach(url => URL.revokeObjectURL(url))
     }
-  }, [cameraSnapshots])
+  }, [])
 
   const handleAddDevice = (type: "camera" | "sensor") => {
     setDeviceType(type)
@@ -375,20 +347,6 @@ export default function Component({ permissions }: DeviceProps) {
                 <CardTitle className="text-zinc-50">{camera.name}</CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
-                {/* Preview snapshot */}
-                {cameraSnapshots[camera.ip] && (
-                  <div className="mb-3 relative group cursor-pointer" onClick={() => handleOpenLiveStream(camera)}>
-                    <img
-                      src={cameraSnapshots[camera.ip]}
-                      alt={`Preview of ${camera.name}`}
-                      className="w-full h-32 object-cover rounded"
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded">
-                      <Camera className="text-white" size={32} />
-                      <span className="text-white ml-2">View Live</span>
-                    </div>
-                  </div>
-                )}
                 <div>
                   <p className="text-zinc-300">IP: {camera.ip}</p>
                   <p className="text-zinc-300">Path: {camera.path}</p>
@@ -531,42 +489,44 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
 
-      {/* Live Streaming Dialog */}
-      <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
-        setSelectedStreamCamera(null)
-        setStreamLoading(false)
-      }}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
-          <DialogHeader>
-            <DialogTitle>Live Stream: {selectedStreamCamera?.name}</DialogTitle>
-            <DialogDescription>
-              Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
-            </DialogDescription>
-          </DialogHeader>
+        {/* Live Streaming Dialog */}
+        <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
+          setSelectedStreamCamera(null)
+          setStreamLoading(false)
+        }}>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
+            <DialogHeader>
+              <DialogTitle>Live Stream: {selectedStreamCamera?.name}</DialogTitle>
+              <DialogDescription>
+                Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
+              </DialogDescription>
+            </DialogHeader>
 
-          {selectedStreamCamera && (
-            <div className="flex-grow overflow-hidden relative">
-              {streamLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
-                  <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
-                  <span className="ml-2 text-zinc-400">Connecting to camera...</span>
-                </div>
-              )}
-              <img
-                src={getCameraStreamUrl(selectedStreamCamera.ip)}
-                alt={`Live stream from ${selectedStreamCamera.name}`}
-                className="w-full h-full object-contain"
-                onLoad={() => setStreamLoading(false)}
-                onError={() => {
-                  setStreamLoading(false)
-                  setErrorMessage("Failed to connect to camera stream. Make sure the camera is online and accessible.")
-                  setSelectedStreamCamera(null)
-                }}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            {selectedStreamCamera && (
+              <div className="flex-grow overflow-hidden relative">
+                <video
+                  autoPlay
+                  muted
+                  className="w-full h-full object-contain"
+                  src={getCameraStreamUrl(selectedStreamCamera.ip)}
+                  onLoadedData={() => setStreamLoading(false)}
+                  onError={() => {
+                    setStreamLoading(false)
+                    setErrorMessage("Failed to connect to camera stream. Make sure the camera is online and accessible.")
+                    setSelectedStreamCamera(null)
+                  }}
+                  controlsList="nodownload noplaybackrate"
+                  onSeeking={(e) => {
+                    e.preventDefault()
+                    e.currentTarget.currentTime = 0
+                  }}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
       {/* Device Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
