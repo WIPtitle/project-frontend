@@ -25,9 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Camera, Wifi, WifiOff, Loader2 } from "lucide-react"
+import { Camera, Wifi, WifiOff, Loader2, RefreshCw, Download } from "lucide-react"
 
-// Import your actual API functions here
 import {
   getAllRtspCameras,
   getAllSensors,
@@ -82,9 +81,10 @@ export default function Component({ permissions }: DeviceProps) {
     [key: string]: "connected" | "connecting" | "error" | "unknown"
   }>({})
 
-  // State for camera streaming
   const [selectedStreamCamera, setSelectedStreamCamera] = useState<RTSPCamera | null>(null)
   const [streamLoading, setStreamLoading] = useState(false)
+  const [streamError, setStreamError] = useState(false)
+  const streamImageRef = useRef<HTMLImageElement>(null)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const eventSources = useRef<{ [key: string]: EventSource }>({})
@@ -115,7 +115,6 @@ export default function Component({ permissions }: DeviceProps) {
     fetchDevices()
   }, [])
 
-  // Sensor event source management (unchanged)
   useEffect(() => {
     for (const sensorId in eventSources.current) {
       if (!sensors.some((sensor) => sensor.id === sensorId)) {
@@ -202,7 +201,6 @@ export default function Component({ permissions }: DeviceProps) {
     }
   }, [sensors, streamErrors])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       for (const sensorId in eventSources.current) {
@@ -316,13 +314,13 @@ export default function Component({ permissions }: DeviceProps) {
   const handleOpenLiveStream = (camera: RTSPCamera) => {
     setSelectedStreamCamera(camera)
     setStreamLoading(true)
+    setStreamError(false)
   }
 
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-zinc-50 mb-6">Devices</h1>
 
-      {/* Cameras Section */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">RTSP cameras</h2>
         {canModifyDevices && (
@@ -405,7 +403,6 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
 
-      {/* Sensors Section */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-zinc-50 mb-2 sm:mb-0">Sensors</h2>
         {canModifyDevices && (
@@ -496,46 +493,73 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
 
-        {/* Live Streaming Dialog */}
-        <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
-          setSelectedStreamCamera(null)
-          setStreamLoading(false)
-        }}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
-            <DialogHeader>
-              <DialogTitle>Live Stream: {selectedStreamCamera?.name}</DialogTitle>
-              <DialogDescription>
-                Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
-              </DialogDescription>
-            </DialogHeader>
+      <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
+        setSelectedStreamCamera(null)
+        setStreamLoading(false)
+        setStreamError(false)
+      }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Live Stream: {selectedStreamCamera?.name}</span>
+            </DialogTitle>
+            <DialogDescription>
+              Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
+            </DialogDescription>
+          </DialogHeader>
 
-            {selectedStreamCamera && (
-              <div className="flex-grow overflow-hidden relative">
-                <video
-                  autoPlay
-                  muted
-                  className="w-full h-full object-contain"
-                  src={getCameraStreamUrl(selectedStreamCamera.ip)}
-                  onLoadedData={() => setStreamLoading(false)}
-                  onError={() => {
-                    setStreamLoading(false)
-                    setErrorMessage("Failed to connect to camera stream. Make sure the camera is online and accessible.")
-                    setSelectedStreamCamera(null)
-                  }}
-                  controlsList="nodownload noplaybackrate"
-                  onSeeking={(e) => {
-                    e.preventDefault()
-                    e.currentTarget.currentTime = 0
-                  }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+          {selectedStreamCamera && (
+            <div className="flex-grow overflow-hidden relative bg-black rounded-lg">
+              {streamLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                  <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+                </div>
+              )}
+              {streamError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 z-10">
+                  <WifiOff className="h-12 w-12 text-red-500 mb-4" />
+                  <p className="text-zinc-300">Camera stream unavailable</p>
+                  <Button
+                    onClick={() => {
+                      if (streamImageRef.current && selectedStreamCamera) {
+                        setStreamLoading(true)
+                        setStreamError(false)
+                        const currentSrc = streamImageRef.current.src
+                        streamImageRef.current.src = ""
+                        setTimeout(() => {
+                          if (streamImageRef.current) {
+                            streamImageRef.current.src = currentSrc
+                          }
+                        }, 100)
+                      }
+                    }}
+                    className="mt-4 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                  >
+                    Retry Connection
+                  </Button>
+                </div>
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                ref={streamImageRef}
+                className="w-full h-full object-contain"
+                src={getCameraStreamUrl(selectedStreamCamera.ip)}
+                alt={`Live stream from ${selectedStreamCamera.name}`}
+                onLoad={() => {
+                  setStreamLoading(false)
+                  setStreamError(false)
+                }}
+                onError={() => {
+                  setStreamLoading(false)
+                  setStreamError(true)
+                }}
+                style={{ display: streamError ? 'none' : 'block' }}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
-      {/* Device Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
@@ -657,7 +681,6 @@ export default function Component({ permissions }: DeviceProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Error Dialog */}
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
         <AlertDialogContent className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>
