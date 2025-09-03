@@ -353,20 +353,27 @@ export default function Component({ permissions }: DeviceProps) {
                   <p className="text-zinc-300">Always recording: {camera.always_recording ? "Yes" : "No"}</p>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col mt-auto">
-                <div className="flex w-full">
-                  <Button
-                    variant="outline"
-                    className="flex-1 mr-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    onClick={() => handleOpenLiveStream(camera)}
-                  >
-                    <Wifi className="mr-2 h-4 w-4" />
-                    Live Stream
-                  </Button>
-                  {canModifyDevices && (
+              <CardFooter className="flex flex-col mt-auto space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                  onClick={() => handleOpenLiveStream(camera)}
+                >
+                  <Wifi className="mr-2 h-4 w-4" />
+                  Live Stream
+                </Button>
+                {canModifyDevices && (
+                  <div className="flex w-full gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => handleEditDevice(camera, "camera")}
+                    >
+                      Edit
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="flex-1 ml-1 bg-red-900 hover:bg-red-800">
+                        <Button variant="destructive" className="flex-1 bg-red-900 hover:bg-red-800">
                           Delete
                         </Button>
                       </AlertDialogTrigger>
@@ -390,8 +397,8 @@ export default function Component({ permissions }: DeviceProps) {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                  )}
-                </div>
+                  </div>
+                )}
               </CardFooter>
             </Card>
           ))

@@ -227,27 +227,6 @@ export const getDeviceGroupCameras = async (groupId: number): Promise<RTSPCamera
   }
 }
 
-export const updateDeviceGroupCameras = async (groupId: number, cameraIps: string[]): Promise<RTSPCamera[]> => {
-  try {
-    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(cameraIps),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to update device group cameras")
-    }
-
-    return await response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
 export const updateDeviceGroup = async (id: number, group: DeviceGroup): Promise<DeviceGroup> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${id}`, {
