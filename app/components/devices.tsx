@@ -33,6 +33,7 @@ import {
   createRTSPCamera,
   createSensor,
   updateSensor,
+  updateRTSPCamera,
   deleteRTSPCamera,
   deleteSensor,
   getSensorStatusStream,
@@ -223,7 +224,21 @@ export default function Component({ permissions }: DeviceProps) {
   }
 
   const handleEditDevice = (device: RTSPCamera | Sensor, type: "camera" | "sensor") => {
-    if (type === "sensor") {
+    if (type === "camera") {
+      const camera = device as RTSPCamera
+      setDeviceType(type)
+      setEditingDevice({
+        name: camera.name,
+        ip: camera.ip,
+        port: camera.port,
+        username: camera.username,
+        password: camera.password,
+        path: camera.path,
+        always_recording: camera.always_recording,
+      })
+      setIsCreating(false)
+      setIsDialogOpen(true)
+    } else if (type === "sensor") {
       const sensor = device as Sensor
       setDeviceType(type)
       setEditingDevice({
@@ -268,6 +283,9 @@ export default function Component({ permissions }: DeviceProps) {
         if (isCreating) {
           const newCamera = await createRTSPCamera(camera)
           setRtspCameras([...rtspCameras, newCamera])
+        } else {
+          const updatedCamera = await updateRTSPCamera(camera.ip, camera)
+          setRtspCameras(rtspCameras.map((c) => (c.ip === updatedCamera.ip ? updatedCamera : c)))
         }
       } else if (deviceType === "sensor") {
         const sensor = editingDevice as SensorInputDto
@@ -492,80 +510,81 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
 
-        {/* Video Streaming Dialog */}
-        <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
-          setSelectedStreamCamera(null)
-          setStreamLoading(false)
-          setStreamError(false)
-        }}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
-            <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
-                <span>Live Stream: {selectedStreamCamera?.name}</span>
-              </DialogTitle>
-              <DialogDescription>
-                Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
-              </DialogDescription>
-            </DialogHeader>
+      {/* Video Streaming Dialog */}
+      <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
+        setSelectedStreamCamera(null)
+        setStreamLoading(false)
+        setStreamError(false)
+      }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Live Stream: {selectedStreamCamera?.name}</span>
+            </DialogTitle>
+            <DialogDescription>
+              Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
+            </DialogDescription>
+          </DialogHeader>
 
-            {selectedStreamCamera && (
-              <div className="flex-grow overflow-hidden relative bg-black rounded-lg">
-                {streamLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
-                  </div>
-                )}
-                {streamError && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 z-10">
-                    <WifiOff className="h-12 w-12 text-red-500 mb-4" />
-                    <p className="text-zinc-300">Camera stream unavailable</p>
-                    <Button
-                      onClick={() => {
-                        setStreamLoading(true)
-                        setStreamError(false)
-                        // Forza reload del video
-                        const videoElement = document.querySelector('video')
-                        if (videoElement) {
-                          videoElement.load()
-                        }
-                      }}
-                      className="mt-4 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    >
-                      Retry Connection
-                    </Button>
-                  </div>
-                )}
-                <video
-                  className="w-full h-full object-contain"
-                  autoPlay
-                  muted
-                  playsInline
-                  onLoadStart={() => setStreamLoading(true)}
-                  onLoadedData={() => {
-                    setStreamLoading(false)
-                    setStreamError(false)
-                  }}
-                  onError={() => {
-                    setStreamLoading(false)
-                    setStreamError(true)
-                  }}
-                  style={{
-                    display: streamError ? 'none' : 'block',
-                    pointerEvents: 'none',
-                    userSelect: 'none'
-                  }}
-                >
-                  <source
-                    src={getCameraStreamUrl(selectedStreamCamera.ip)}
-                    type="video/mp4"
-                  />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+          {selectedStreamCamera && (
+            <div className="flex-grow overflow-hidden relative bg-black rounded-lg">
+              {streamLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+                </div>
+              )}
+              {streamError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 z-10">
+                  <WifiOff className="h-12 w-12 text-red-500 mb-4" />
+                  <p className="text-zinc-300">Camera stream unavailable</p>
+                  <Button
+                    onClick={() => {
+                      setStreamLoading(true)
+                      setStreamError(false)
+                      // Forza reload del video
+                      const videoElement = document.querySelector('video')
+                      if (videoElement) {
+                        videoElement.load()
+                      }
+                    }}
+                    className="mt-4 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                  >
+                    Retry Connection
+                  </Button>
+                </div>
+              )}
+              <video
+                className="w-full h-full object-contain"
+                autoPlay
+                muted
+                playsInline
+                onLoadStart={() => setStreamLoading(true)}
+                onLoadedData={() => {
+                  setStreamLoading(false)
+                  setStreamError(false)
+                }}
+                onError={() => {
+                  setStreamLoading(false)
+                  setStreamError(true)
+                }}
+                style={{
+                  display: streamError ? 'none' : 'block',
+                  pointerEvents: 'none',
+                  userSelect: 'none'
+                }}
+              >
+                <source
+                  src={getCameraStreamUrl(selectedStreamCamera.ip)}
+                  type="video/mp4"
+                />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
+      {/* Add/Edit Device Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
@@ -574,55 +593,95 @@ export default function Component({ permissions }: DeviceProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input
-              placeholder="Name"
-              value={editingDevice?.name || ""}
-              onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, name: e.target.value } : null))}
-              className="bg-zinc-700 text-zinc-50 border-zinc-600"
-              required
-            />
+            <div>
+              <Label htmlFor="device-name" className="text-zinc-50 mb-2 block">
+                Name
+              </Label>
+              <Input
+                id="device-name"
+                placeholder="Name"
+                value={editingDevice?.name || ""}
+                onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, name: e.target.value } : null))}
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                required
+              />
+            </div>
             {deviceType === "camera" ? (
               <>
-                <Input
-                  placeholder="IP"
-                  value={(editingDevice as CameraInputDto)?.ip || ""}
-                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, ip: e.target.value } : null))}
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  disabled={!isCreating}
-                  required
-                />
-                <Input
-                  type="number"
-                  placeholder="Port"
-                  value={(editingDevice as CameraInputDto)?.port || ""}
-                  onChange={(e) =>
-                    setEditingDevice((prev) => (prev ? { ...prev, port: Number.parseInt(e.target.value) } : null))
-                  }
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  required
-                />
-                <Input
-                  placeholder="Username"
-                  value={(editingDevice as CameraInputDto)?.username || ""}
-                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, username: e.target.value } : null))}
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  required
-                />
-                <Input
-                  type="password"
-                  placeholder="Password"
-                  value={(editingDevice as CameraInputDto)?.password || ""}
-                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, password: e.target.value } : null))}
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  required
-                />
-                <Input
-                  placeholder="Path"
-                  value={(editingDevice as CameraInputDto)?.path || ""}
-                  onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, path: e.target.value } : null))}
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                  required
-                />
+                <div>
+                  <Label htmlFor="camera-ip" className="text-zinc-50 mb-2 block">
+                    IP Address
+                  </Label>
+                  <Input
+                    id="camera-ip"
+                    placeholder="IP"
+                    value={(editingDevice as CameraInputDto)?.ip || ""}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, ip: e.target.value } : null))}
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 disabled:opacity-50"
+                    disabled={!isCreating}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="camera-port" className="text-zinc-50 mb-2 block">
+                    Port
+                  </Label>
+                  <Input
+                    id="camera-port"
+                    type="number"
+                    placeholder="Port"
+                    value={(editingDevice as CameraInputDto)?.port || ""}
+                    onChange={(e) =>
+                      setEditingDevice((prev) => (prev ? { ...prev, port: Number.parseInt(e.target.value) } : null))
+                    }
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 disabled:opacity-50"
+                    disabled={!isCreating}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="camera-username" className="text-zinc-50 mb-2 block">
+                    Username
+                  </Label>
+                  <Input
+                    id="camera-username"
+                    placeholder="Username"
+                    value={(editingDevice as CameraInputDto)?.username || ""}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, username: e.target.value } : null))}
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 disabled:opacity-50"
+                    disabled={!isCreating}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="camera-password" className="text-zinc-50 mb-2 block">
+                    Password
+                  </Label>
+                  <Input
+                    id="camera-password"
+                    type={isCreating ? "password" : "text"}
+                    placeholder="Password"
+                    value={(editingDevice as CameraInputDto)?.password || ""}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, password: e.target.value } : null))}
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 disabled:opacity-50"
+                    disabled={!isCreating}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="camera-path" className="text-zinc-50 mb-2 block">
+                    Path
+                  </Label>
+                  <Input
+                    id="camera-path"
+                    placeholder="Path"
+                    value={(editingDevice as CameraInputDto)?.path || ""}
+                    onChange={(e) => setEditingDevice((prev) => (prev ? { ...prev, path: e.target.value } : null))}
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600 disabled:opacity-50"
+                    disabled={!isCreating}
+                    required
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="always-recording" className="text-zinc-50">
                     Always recording
@@ -633,7 +692,8 @@ export default function Component({ permissions }: DeviceProps) {
                     onCheckedChange={(checked) =>
                       setEditingDevice((prev) => (prev ? { ...prev, always_recording: checked } : null))
                     }
-                    className="data-[state=unchecked]:bg-zinc-700 data-[state=unchecked]:border-zinc-600"
+                    className="data-[state=unchecked]:bg-zinc-700 data-[state=unchecked]:border-zinc-600 disabled:opacity-50"
+                    disabled={!isCreating}
                   />
                 </div>
               </>
@@ -681,7 +741,7 @@ export default function Component({ permissions }: DeviceProps) {
               onClick={handleSaveDevice}
               className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
             >
-              {isCreating ? "Create" : "Update"}
+              {isCreating ? "Create" : "Save Changes"}
             </Button>
           </div>
         </DialogContent>
