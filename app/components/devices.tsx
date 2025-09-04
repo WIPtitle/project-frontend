@@ -84,7 +84,6 @@ export default function Component({ permissions }: DeviceProps) {
   const [selectedStreamCamera, setSelectedStreamCamera] = useState<RTSPCamera | null>(null)
   const [streamLoading, setStreamLoading] = useState(false)
   const [streamError, setStreamError] = useState(false)
-  const streamImageRef = useRef<HTMLImageElement>(null)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const eventSources = useRef<{ [key: string]: EventSource }>({})
@@ -493,72 +492,79 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
 
-      <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
-        setSelectedStreamCamera(null)
-        setStreamLoading(false)
-        setStreamError(false)
-      }}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Live Stream: {selectedStreamCamera?.name}</span>
-            </DialogTitle>
-            <DialogDescription>
-              Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
-            </DialogDescription>
-          </DialogHeader>
+        {/* Video Streaming Dialog */}
+        <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
+          setSelectedStreamCamera(null)
+          setStreamLoading(false)
+          setStreamError(false)
+        }}>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Live Stream: {selectedStreamCamera?.name}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Camera IP: {selectedStreamCamera?.ip} | Port: {selectedStreamCamera?.port}
+              </DialogDescription>
+            </DialogHeader>
 
-          {selectedStreamCamera && (
-            <div className="flex-grow overflow-hidden relative bg-black rounded-lg">
-              {streamLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-                  <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
-                </div>
-              )}
-              {streamError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 z-10">
-                  <WifiOff className="h-12 w-12 text-red-500 mb-4" />
-                  <p className="text-zinc-300">Camera stream unavailable</p>
-                  <Button
-                    onClick={() => {
-                      if (streamImageRef.current && selectedStreamCamera) {
+            {selectedStreamCamera && (
+              <div className="flex-grow overflow-hidden relative bg-black rounded-lg">
+                {streamLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+                  </div>
+                )}
+                {streamError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 z-10">
+                    <WifiOff className="h-12 w-12 text-red-500 mb-4" />
+                    <p className="text-zinc-300">Camera stream unavailable</p>
+                    <Button
+                      onClick={() => {
                         setStreamLoading(true)
                         setStreamError(false)
-                        const currentSrc = streamImageRef.current.src
-                        streamImageRef.current.src = ""
-                        setTimeout(() => {
-                          if (streamImageRef.current) {
-                            streamImageRef.current.src = currentSrc
-                          }
-                        }, 100)
-                      }
-                    }}
-                    className="mt-4 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                  >
-                    Retry Connection
-                  </Button>
-                </div>
-              )}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                ref={streamImageRef}
-                className="w-full h-full object-contain"
-                src={getCameraStreamUrl(selectedStreamCamera.ip)}
-                alt={`Live stream from ${selectedStreamCamera.name}`}
-                onLoad={() => {
-                  setStreamLoading(false)
-                  setStreamError(false)
-                }}
-                onError={() => {
-                  setStreamLoading(false)
-                  setStreamError(true)
-                }}
-                style={{ display: streamError ? 'none' : 'block' }}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+                        // Forza reload del video
+                        const videoElement = document.querySelector('video')
+                        if (videoElement) {
+                          videoElement.load()
+                        }
+                      }}
+                      className="mt-4 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                    >
+                      Retry Connection
+                    </Button>
+                  </div>
+                )}
+                <video
+                  className="w-full h-full object-contain"
+                  autoPlay
+                  muted
+                  playsInline
+                  onLoadStart={() => setStreamLoading(true)}
+                  onLoadedData={() => {
+                    setStreamLoading(false)
+                    setStreamError(false)
+                  }}
+                  onError={() => {
+                    setStreamLoading(false)
+                    setStreamError(true)
+                  }}
+                  style={{
+                    display: streamError ? 'none' : 'block',
+                    pointerEvents: 'none',
+                    userSelect: 'none'
+                  }}
+                >
+                  <source
+                    src={getCameraStreamUrl(selectedStreamCamera.ip)}
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
