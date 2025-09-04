@@ -212,6 +212,19 @@ export default function Component({ permissions }: DeviceProps) {
     }
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (!selectedStreamCamera) return
+
+      const videoElement = document.querySelector('video') as HTMLVideoElement
+      if (videoElement) {
+        videoElement.pause()
+        videoElement.removeAttribute('src')
+        videoElement.load()
+      }
+    }
+  }, [selectedStreamCamera])
+
   const handleAddDevice = (type: "camera" | "sensor") => {
     setDeviceType(type)
     setEditingDevice(
@@ -510,12 +523,25 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
 
-      {/* Video Streaming Dialog */}
-      <Dialog open={!!selectedStreamCamera} onOpenChange={() => {
-        setSelectedStreamCamera(null)
-        setStreamLoading(false)
-        setStreamError(false)
-      }}>
+      <Dialog
+        open={!!selectedStreamCamera}
+        onOpenChange={(open) => {
+          if (!open) {
+            const videoElement = document.querySelector('video') as HTMLVideoElement
+            if (videoElement) {
+              videoElement.pause()
+              videoElement.removeAttribute('src')
+              const sources = videoElement.querySelectorAll('source')
+              sources.forEach(source => source.remove())
+              videoElement.load()
+            }
+
+            setSelectedStreamCamera(null)
+            setStreamLoading(false)
+            setStreamError(false)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
@@ -541,8 +567,7 @@ export default function Component({ permissions }: DeviceProps) {
                     onClick={() => {
                       setStreamLoading(true)
                       setStreamError(false)
-                      // Forza reload del video
-                      const videoElement = document.querySelector('video')
+                      const videoElement = document.querySelector('video') as HTMLVideoElement
                       if (videoElement) {
                         videoElement.load()
                       }
@@ -553,38 +578,39 @@ export default function Component({ permissions }: DeviceProps) {
                   </Button>
                 </div>
               )}
-              <video
-                className="w-full h-full object-contain"
-                autoPlay
-                muted
-                playsInline
-                onLoadStart={() => setStreamLoading(true)}
-                onLoadedData={() => {
-                  setStreamLoading(false)
-                  setStreamError(false)
-                }}
-                onError={() => {
-                  setStreamLoading(false)
-                  setStreamError(true)
-                }}
-                style={{
-                  display: streamError ? 'none' : 'block',
-                  pointerEvents: 'none',
-                  userSelect: 'none'
-                }}
-              >
-                <source
-                  src={getCameraStreamUrl(selectedStreamCamera.ip)}
-                  type="video/mp4"
-                />
-                Your browser does not support the video tag.
-              </video>
+              {selectedStreamCamera && (
+                <video
+                  className="w-full h-full object-contain"
+                  autoPlay
+                  muted
+                  playsInline
+                  onLoadStart={() => setStreamLoading(true)}
+                  onLoadedData={() => {
+                    setStreamLoading(false)
+                    setStreamError(false)
+                  }}
+                  onError={() => {
+                    setStreamLoading(false)
+                    setStreamError(true)
+                  }}
+                  style={{
+                    display: streamError ? 'none' : 'block',
+                    pointerEvents: 'none',
+                    userSelect: 'none'
+                  }}
+                >
+                  <source
+                    src={getCameraStreamUrl(selectedStreamCamera.ip)}
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Device Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
