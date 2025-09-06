@@ -620,10 +620,6 @@ export const getRTSPCameraStatus = async (ip: string): Promise<string> => {
   }
 }
 
-export const getRTSPCameraStreamUrl = (ip: string): string => {
-  return `${getApiBaseUrl()}/devices-manager-service/static/${ip}.m3u8?auth_token=${getTokenOrThrow()}`
-}
-
 export const getNtfyCredentials = async (): Promise<NtfyCredentials> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/notifications-service/ntfy-config/credentials`, {
