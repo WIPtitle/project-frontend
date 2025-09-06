@@ -87,6 +87,7 @@ export default function Component({ permissions }: DeviceProps) {
   const [streamError, setStreamError] = useState(false)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
+  const canAccessRecordings = permissions.includes(Permission.ACCESS_RECORDINGS)
   const eventSources = useRef<{ [key: string]: EventSource }>({})
   const reconnectTimeouts = useRef<{ [key: string]: NodeJS.Timeout }>({})
 
@@ -382,14 +383,16 @@ export default function Component({ permissions }: DeviceProps) {
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col mt-auto space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                  onClick={() => handleOpenLiveStream(camera)}
-                >
-                  <Wifi className="mr-2 h-4 w-4" />
-                  Live Stream
-                </Button>
+                {canAccessRecordings && (
+                  <Button
+                    variant="outline"
+                    className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                    onClick={() => handleOpenLiveStream(camera)}
+                  >
+                    <Wifi className="mr-2 h-4 w-4" />
+                    Live Stream
+                  </Button>
+                )}
                 {canModifyDevices && (
                   <div className="flex w-full gap-2">
                     <Button
