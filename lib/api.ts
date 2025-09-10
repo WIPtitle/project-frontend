@@ -17,6 +17,14 @@ const getApiBaseUrl = () => {
   return "/api"
 }
 
+export async function getHealthStatus(): Promise<Record<string, string>> {
+  const response = await fetch('/health')
+  if (!response.ok) {
+    throw new Error('Failed to fetch health status')
+  }
+  return response.json()
+}
+
 export const registerUser = async (username: string, password: string, pin: string): Promise<void> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/auth-service/users/first`, {

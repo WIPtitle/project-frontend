@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Download } from "lucide-react"
+import { Download, Activity } from "lucide-react"
 import {
   getNtfyCredentials,
   updateNtfyCredentials,
@@ -27,6 +27,7 @@ import {
   updateAlarmAudioConfig,
   deleteAlarmAudioConfig,
   downloadAlarmAudio,
+  getHealthStatus,
 } from "@/lib/api"
 import { type NtfyCredentials, type AlarmAudioConfig, Permission } from "@/types"
 
@@ -37,6 +38,7 @@ type ConfigurationProps = {
 export default function Configuration({ permissions }: ConfigurationProps) {
   const [ntfyCredentials, setNtfyCredentials] = useState<NtfyCredentials | null>(null)
   const [alarmAudioConfig, setAlarmAudioConfig] = useState<AlarmAudioConfig | null>(null)
+  const [healthStatus, setHealthStatus] = useState<Record<string, string>>({})
   const [isAudioDialogOpen, setIsAudioDialogOpen] = useState(false)
   const [editingAudioConfig, setEditingAudioConfig] = useState<AlarmAudioConfig | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -53,7 +55,6 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       let audioError = false
 
       try {
-        // Fetch Ntfy credentials independently
         try {
           const credentials = await getNtfyCredentials()
           setNtfyCredentials(credentials)
@@ -62,7 +63,6 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           console.error("Failed to fetch Ntfy credentials:", error)
         }
 
-        // Fetch audio config independently
         try {
           const audio = await getAlarmAudioConfig()
           setAlarmAudioConfig(audio)
@@ -71,7 +71,13 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           console.error("Failed to fetch audio configuration:", error)
         }
 
-        // Show error message if any of the calls failed
+        try {
+          const health = await getHealthStatus()
+          setHealthStatus(health)
+        } catch (error) {
+          console.error("Failed to fetch health status:", error)
+        }
+
         if (ntfyError && audioError) {
           setErrorMessage("Failed to fetch configurations")
         } else if (ntfyError) {
@@ -84,6 +90,19 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       }
     }
     fetchConfigs()
+  }, [])
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const health = await getHealthStatus()
+        setHealthStatus(health)
+      } catch (error) {
+        console.error("Failed to fetch health status:", error)
+      }
+    }, 30000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const handleRefreshNotificationsConfig = async () => {
@@ -168,6 +187,32 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Configuration</h1>
       </div>
+
+      {Object.keys(healthStatus).length > 0 && (
+        <div className="mb-6 p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="h-5 w-5 text-zinc-400" />
+            <span className="text-sm font-medium text-zinc-300">Server Status</span>
+          </div>
+          <div className="grid gap-2">
+            {Object.entries(healthStatus).map(([url, status]) => (
+              <div key={url} className="flex items-center justify-between">
+                <span className="text-sm text-zinc-400 font-mono truncate mr-4">{url}</span>
+                <span
+                  className={`text-sm font-medium px-2 py-1 rounded ${
+                    status === "healthy"
+                      ? "bg-green-900/30 text-green-400"
+                      : "bg-red-900/30 text-red-400"
+                  }`}
+                >
+                  {status === "healthy" ? "● Healthy" : "● Unreachable"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 items-start">
         <Card className="bg-zinc-800 border-zinc-700">
           <CardHeader>
