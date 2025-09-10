@@ -196,10 +196,10 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           </div>
           <div className="grid gap-2">
             {Object.entries(healthStatus).map(([url, status]) => (
-              <div key={url} className="flex items-center justify-between">
-                <span className="text-sm text-zinc-400 font-mono truncate mr-4">{url}</span>
+              <div key={url} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                <span className="text-sm text-zinc-400 font-mono truncate sm:mr-4">{url}</span>
                 <span
-                  className={`text-sm font-medium px-2 py-1 rounded ${
+                  className={`text-sm font-medium px-2 py-1 rounded inline-block ${
                     status === "healthy"
                       ? "bg-green-900/30 text-green-400"
                       : "bg-red-900/30 text-red-400"
