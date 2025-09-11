@@ -366,24 +366,32 @@ export default function Alarm({ permissions }: AlarmProps) {
                 />
                 <Input
                   type="number"
-                  placeholder="Wait to start alarm (seconds)"
+                  placeholder="Wait to start alarm (seconds, max 120)"
                   value={editingGroup?.wait_to_start_alarm || ""}
-                  onChange={(e) =>
+                  min="0"
+                  max="120"
+                  onChange={(e) => {
+                    const value = Number.parseInt(e.target.value)
+                    if (value > 120) return
                     setEditingGroup((prev) =>
-                      prev ? { ...prev, wait_to_start_alarm: Number.parseInt(e.target.value) } : null,
+                      prev ? { ...prev, wait_to_start_alarm: value } : null,
                     )
-                  }
+                  }}
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
                 <Input
                   type="number"
-                  placeholder="Wait to fire alarm (seconds)"
+                  placeholder="Wait to fire alarm (seconds, max 120)"
                   value={editingGroup?.wait_to_fire_alarm || ""}
-                  onChange={(e) =>
+                  min="0"
+                  max="120"
+                  onChange={(e) => {
+                    const value = Number.parseInt(e.target.value)
+                    if (value > 120) return
                     setEditingGroup((prev) =>
-                      prev ? { ...prev, wait_to_fire_alarm: Number.parseInt(e.target.value) } : null,
+                      prev ? { ...prev, wait_to_fire_alarm: value } : null,
                     )
-                  }
+                  }}
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
                 {groupError && <p className="text-red-500 text-sm mt-2">{groupError}</p>}
