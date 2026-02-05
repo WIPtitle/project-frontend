@@ -22,7 +22,7 @@ import {
   getStorageInfo,
   getRecordingStreamUrl,
   getRecordingDownloadUrl,
-  getRTSPCamera,
+  getAllRtspCameras,
 } from "@/lib/api"
 import type { Recording, RTSPCamera, StorageInfo, Permission } from "@/types"
 import { FileVideo2, Loader2, Filter } from "lucide-react"
@@ -68,8 +68,10 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
   // Callback ref that handles observer attachment
   const setLoadingRef = useCallback((node: HTMLDivElement | null) => {
+    console.log("[Recordings] setLoadingRef called with node:", node ? "element" : "null")
     // Disconnect from previous node
     if (loadingNodeRef.current && observerRef.current) {
+      console.log("[Recordings] Unobserving previous node")
       observerRef.current.unobserve(loadingNodeRef.current)
     }
 
@@ -77,120 +79,51 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
     // Observe new node
     if (node && observerRef.current) {
+      console.log("[Recordings] Observing new node")
       observerRef.current.observe(node)
+    } else if (node && !observerRef.current) {
+      console.log("[Recordings] WARNING: Node exists but observer is null!")
     }
   }, [])
 
   const fetchRecordings = useCallback(async (type: RecordingType, offset: number) => {
+    console.log(`[Recordings] Fetching ${type} recordings with offset ${offset}`)
     try {
       const recordings = await getAllRecordings({ offset, type })
+      console.log(`[Recordings] Got ${recordings.length} recordings from API`)
       const completedRecordings = recordings
         .filter((recording) => recording.is_completed)
         .sort((a, b) => b.name.localeCompare(a.name))
 
+      console.log(`[Recordings] After filtering completed: ${completedRecordings.length} recordings`)
       return completedRecordings
     } catch (error) {
-      console.error(`Failed to fetch ${type} recordings:`, error)
+      console.error(`[Recordings] Failed to fetch ${type} recordings:`, error)
       throw error
     }
-  }, []) // Remove all dependencies
+  }, [])
 
-  const fetchCameraInfo = useCallback(async (recordings: Recording[]) => {
-    const uniqueCameraIps = Array.from(new Set(recordings.map((r) => r.camera_ip)))
-
-    setCameras((prevCameras) => {
-      const newCameraIps = uniqueCameraIps.filter((ip) => !(ip in prevCameras))
-
-      if (newCameraIps.length === 0) return prevCameras
-
-      // Fetch new camera info asynchronously
-      const fetchNewCameras = async () => {
-        const cameraPromises = newCameraIps.map(async (ip) => {
-          try {
-            return await getRTSPCamera(ip)
-          } catch (error) {
-            return null
-          }
-        })
-
-        const cameraResults = await Promise.all(cameraPromises)
-        const newCameraMap = cameraResults.reduce((acc: { [key: string]: RTSPCamera | null }, camera) => {
-          if (camera) {
-            acc[camera.ip] = camera
-          }
-          return acc
-        }, {})
-
-        setCameras((currentCameras) => ({ ...currentCameras, ...newCameraMap }))
-      }
-
-      fetchNewCameras()
-      return prevCameras
-    })
-  }, []) // Remove cameras dependency
-
-  // Track ALL camera IPs ever seen (persists across type changes)
-  const [allKnownCameraIps, setAllKnownCameraIps] = useState<Set<string>>(new Set())
-
-  // Track if we've done initial setup
-  const hasInitializedFilters = useRef(false)
-
-  // Update allKnownCameraIps when recordings change, and auto-select new cameras
-  useEffect(() => {
-    if (recordings.length === 0) return
-
-    const currentIps = new Set(recordings.map((r) => r.camera_ip).filter(Boolean))
-
-    // Add new IPs to allKnownCameraIps
-    setAllKnownCameraIps((prev) => {
-      const newSet = new Set(prev)
-      let changed = false
-      currentIps.forEach((ip) => {
-        if (!newSet.has(ip)) {
-          newSet.add(ip)
-          changed = true
-        }
-      })
-      return changed ? newSet : prev
-    })
-
-    // Initialize or update selectedCameras
-    if (!hasInitializedFilters.current) {
-      // First time: select all cameras + unknown
-      const allCameras = new Set([...Array.from(currentIps), UNKNOWN_CAMERA])
-      setSelectedCameras(allCameras)
-      setTempSelectedCameras(allCameras)
-      hasInitializedFilters.current = true
+  // Get cameras relevant to the current recording type
+  // always_recording=true → NORMAL recordings
+  // always_recording=false → ALARM recordings (motion detection)
+  const relevantCameras = useMemo(() => {
+    const cameraList = Object.values(cameras).filter((c): c is RTSPCamera => c !== null)
+    if (showAlarmRecordings) {
+      // Alarm recordings come from cameras with always_recording=false
+      return cameraList.filter((c) => !c.always_recording)
     } else {
-      // Add any new camera IPs to selectedCameras (auto-select new cameras)
-      currentIps.forEach((ip) => {
-        setSelectedCameras((prev) => {
-          if (prev.has(ip)) return prev
-          const newSet = new Set(prev)
-          newSet.add(ip)
-          return newSet
-        })
-        setTempSelectedCameras((prev) => {
-          if (prev.has(ip)) return prev
-          const newSet = new Set(prev)
-          newSet.add(ip)
-          return newSet
-        })
-      })
+      // Normal recordings come from cameras with always_recording=true
+      return cameraList.filter((c) => c.always_recording)
     }
-  }, [recordings])
+  }, [cameras, showAlarmRecordings])
 
-  // Get sorted list of all known camera IPs for display
-  const sortedKnownCameraIps = useMemo(() => {
-    return Array.from(allKnownCameraIps).sort()
-  }, [allKnownCameraIps])
+  // Get sorted list of relevant camera IPs for the filter modal
+  const sortedRelevantCameraIps = useMemo(() => {
+    return relevantCameras.map((c) => c.ip).sort()
+  }, [relevantCameras])
 
   // Filter recordings based on selected cameras (frontend-only filtering)
   const filteredRecordings = useMemo(() => {
-    // If no filter initialized yet or all cameras selected, show all
-    if (!hasInitializedFilters.current) {
-      return recordings
-    }
     return recordings.filter((recording) => {
       const cameraIp = recording.camera_ip
       // Check if camera exists in our cameras map (to determine if it's "unknown")
@@ -203,8 +136,42 @@ export default function Recordings({ permissions }: RecordingsProps) {
     })
   }, [recordings, selectedCameras, cameras])
 
-  // Load initial data (first page)
+  // Track if cameras have been loaded
+  const camerasLoadedRef = useRef(false)
+
+  // Load all cameras on mount
+  useEffect(() => {
+    if (camerasLoadedRef.current) return
+    camerasLoadedRef.current = true
+
+    const loadCameras = async () => {
+      console.log("[Recordings] Loading all cameras...")
+      try {
+        const allCameras = await getAllRtspCameras()
+        console.log(`[Recordings] Got ${allCameras.length} cameras`)
+        const cameraMap: { [key: string]: RTSPCamera } = {}
+        allCameras.forEach((camera) => {
+          cameraMap[camera.ip] = camera
+        })
+        setCameras(cameraMap)
+
+        // Initialize selectedCameras with all camera IPs + unknown
+        const allIps = allCameras.map((c) => c.ip)
+        const initialSelection = new Set([...allIps, UNKNOWN_CAMERA])
+        setSelectedCameras(initialSelection)
+        setTempSelectedCameras(initialSelection)
+        console.log("[Recordings] Initialized camera filters:", initialSelection)
+      } catch (error) {
+        console.error("[Recordings] Failed to load cameras:", error)
+      }
+    }
+
+    loadCameras()
+  }, [])
+
+  // Load initial data (first page of recordings)
   const loadInitialData = useCallback(async () => {
+    console.log("[Recordings] loadInitialData called, showAlarmRecordings:", showAlarmRecordings)
     setInitialLoading(true)
     try {
       const currentType = showAlarmRecordings ? RecordingType.ALARM : RecordingType.NORMAL
@@ -216,21 +183,24 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
       // Set pagination state
       setCurrentOffset(PAGE_SIZE)
-      setHasMore(initialRecordings.length === PAGE_SIZE)
-
-      // Fetch camera info
-      await fetchCameraInfo(initialRecordings)
+      const hasMoreData = initialRecordings.length === PAGE_SIZE
+      setHasMore(hasMoreData)
+      console.log(`[Recordings] Initial load complete. ${initialRecordings.length} recordings, hasMore: ${hasMoreData}`)
     } catch (error) {
-      console.error("Failed to load initial data:", error)
+      console.error("[Recordings] Failed to load initial data:", error)
       setErrorMessage("Failed to fetch recordings and storage information")
     } finally {
       setInitialLoading(false)
     }
-  }, [showAlarmRecordings]) // Only depend on showAlarmRecordings
+  }, [showAlarmRecordings, fetchRecordings])
 
   // Load more recordings (pagination)
   const loadMoreRecordings = useCallback(async () => {
-    if (loading || !hasMore) return
+    console.log(`[Recordings] loadMoreRecordings called. loading: ${loading}, hasMore: ${hasMore}, offset: ${currentOffset}`)
+    if (loading || !hasMore) {
+      console.log("[Recordings] Skipping loadMore - already loading or no more data")
+      return
+    }
 
     setLoading(true)
     try {
@@ -238,20 +208,22 @@ export default function Recordings({ permissions }: RecordingsProps) {
       const newRecordings = await fetchRecordings(currentType, currentOffset)
 
       if (newRecordings.length === 0) {
+        console.log("[Recordings] No more recordings, setting hasMore=false")
         setHasMore(false)
       } else {
         setRecordings((prev) => [...prev, ...newRecordings])
         setCurrentOffset((prev) => prev + PAGE_SIZE)
-        setHasMore(newRecordings.length === PAGE_SIZE)
-        await fetchCameraInfo(newRecordings)
+        const hasMoreData = newRecordings.length === PAGE_SIZE
+        setHasMore(hasMoreData)
+        console.log(`[Recordings] Loaded ${newRecordings.length} more recordings, hasMore: ${hasMoreData}`)
       }
     } catch (error) {
-      console.error("Failed to load more recordings:", error)
+      console.error("[Recordings] Failed to load more recordings:", error)
       setErrorMessage(`Failed to fetch more ${showAlarmRecordings ? "alarm" : "normal"} recordings`)
     } finally {
       setLoading(false)
     }
-  }, [loading, hasMore, showAlarmRecordings, currentOffset]) // Keep necessary dependencies only
+  }, [loading, hasMore, showAlarmRecordings, currentOffset, fetchRecordings])
 
   // Reset and load data when switching between alarm/normal
   useEffect(() => {
@@ -264,16 +236,22 @@ export default function Recordings({ permissions }: RecordingsProps) {
   // Keep loadMoreCallbackRef in sync with latest loadMoreRecordings
   useEffect(() => {
     loadMoreCallbackRef.current = () => {
+      console.log(`[Recordings] Callback ref triggered. loading: ${loading}, initialLoading: ${initialLoading}, hasMore: ${hasMore}`)
       if (!loading && !initialLoading && hasMore) {
+        console.log("[Recordings] Calling loadMoreRecordings from callback ref")
         loadMoreRecordings()
+      } else {
+        console.log("[Recordings] Skipping loadMoreRecordings from callback ref")
       }
     }
   }, [loadMoreRecordings, loading, initialLoading, hasMore])
 
   // Set up intersection observer for infinite scroll
   useEffect(() => {
+    console.log("[Recordings] Setting up IntersectionObserver")
     const observer = new IntersectionObserver(
       (entries) => {
+        console.log("[Recordings] IntersectionObserver callback, isIntersecting:", entries[0].isIntersecting)
         if (entries[0].isIntersecting) {
           loadMoreCallbackRef.current()
         }
@@ -284,10 +262,14 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
     // If we already have a node (from callback ref), start observing
     if (loadingNodeRef.current) {
+      console.log("[Recordings] Node already exists, observing it")
       observer.observe(loadingNodeRef.current)
+    } else {
+      console.log("[Recordings] No node yet when observer created")
     }
 
     return () => {
+      console.log("[Recordings] Cleaning up IntersectionObserver")
       observer.disconnect()
     }
   }, [])
@@ -343,7 +325,9 @@ export default function Recordings({ permissions }: RecordingsProps) {
   }
 
   const handleSelectAllCameras = () => {
-    const allCameras = new Set([...sortedKnownCameraIps, UNKNOWN_CAMERA])
+    // Select all cameras (from all loaded cameras, not just current type)
+    const allIps = Object.keys(cameras)
+    const allCameras = new Set([...allIps, UNKNOWN_CAMERA])
     setTempSelectedCameras(allCameras)
   }
 
@@ -417,7 +401,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
         >
           <Filter className="h-4 w-4 mr-2" />
           Filter
-          {selectedCameras.size < sortedKnownCameraIps.length + 1 && (
+          {selectedCameras.size < Object.keys(cameras).length + 1 && (
             <span className="ml-2 text-xs bg-zinc-500 px-1.5 py-0.5 rounded">
               {selectedCameras.size}
             </span>
@@ -587,22 +571,27 @@ export default function Recordings({ permissions }: RecordingsProps) {
               </div>
               <ScrollArea className="h-48 rounded-lg border border-zinc-700 bg-zinc-900">
                 <div className="p-3 space-y-2">
-                  {sortedKnownCameraIps.map((cameraIp) => (
-                    <div key={cameraIp} className="flex items-center space-x-3">
-                      <Checkbox
-                        id={`camera-${cameraIp}`}
-                        checked={tempSelectedCameras.has(cameraIp)}
-                        onCheckedChange={() => handleToggleCameraFilter(cameraIp)}
-                        className="border-zinc-600 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
-                      />
-                      <Label
-                        htmlFor={`camera-${cameraIp}`}
-                        className="text-sm text-zinc-300 cursor-pointer flex-1"
-                      >
-                        {cameras[cameraIp]?.name || cameraIp}
-                      </Label>
-                    </div>
-                  ))}
+                  {/* Show cameras based on selected recording type in modal */}
+                  {Object.values(cameras)
+                    .filter((c): c is RTSPCamera => c !== null)
+                    .filter((c) => tempShowAlarmRecordings ? !c.always_recording : c.always_recording)
+                    .sort((a, b) => a.ip.localeCompare(b.ip))
+                    .map((camera) => (
+                      <div key={camera.ip} className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`camera-${camera.ip}`}
+                          checked={tempSelectedCameras.has(camera.ip)}
+                          onCheckedChange={() => handleToggleCameraFilter(camera.ip)}
+                          className="border-zinc-600 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
+                        />
+                        <Label
+                          htmlFor={`camera-${camera.ip}`}
+                          className="text-sm text-zinc-300 cursor-pointer flex-1"
+                        >
+                          {camera.name || camera.ip}
+                        </Label>
+                      </div>
+                    ))}
                   {/* Unknown Camera option */}
                   <div className="flex items-center space-x-3">
                     <Checkbox
