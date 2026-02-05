@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +25,11 @@ import {
   getRTSPCamera,
 } from "@/lib/api"
 import type { Recording, RTSPCamera, StorageInfo, Permission } from "@/types"
-import { FileVideo2, Loader2 } from "lucide-react"
+import { FileVideo2, Loader2, Filter } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Label } from "@/components/ui/label"
 
 export enum RecordingType {
   ALARM = "ALARM",
@@ -39,20 +42,38 @@ type RecordingsProps = {
 
 const PAGE_SIZE = 20
 
+const UNKNOWN_CAMERA = "__unknown__"
+
 export default function Recordings({ permissions }: RecordingsProps) {
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [cameras, setCameras] = useState<{ [key: string]: RTSPCamera | null }>({})
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
-  const [showAlarmRecordings, setShowAlarmRecordings] = useState(true)
+  const [showAlarmRecordings, setShowAlarmRecordings] = useState(false)
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
   const [currentOffset, setCurrentOffset] = useState(0)
 
+  // Filter modal state
+  const [filterModalOpen, setFilterModalOpen] = useState(false)
+  const [tempShowAlarmRecordings, setTempShowAlarmRecordings] = useState(false)
+  const [selectedCameras, setSelectedCameras] = useState<Set<string>>(new Set())
+  const [tempSelectedCameras, setTempSelectedCameras] = useState<Set<string>>(new Set())
+
   const observerRef = useRef<IntersectionObserver | null>(null)
-  const loadingRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreCallbackRef = useRef<() => void>(() => {})
+
+  // Callback ref for the loading element - re-observes when element appears/disappears
+  const loadingRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect()
+    }
+    if (node) {
+      observerRef.current?.observe(node)
+    }
+  }, [])
 
   const fetchRecordings = useCallback(async (type: RecordingType, offset: number) => {
     try {
@@ -101,6 +122,43 @@ export default function Recordings({ permissions }: RecordingsProps) {
       return prevCameras
     })
   }, []) // Remove cameras dependency
+
+  // Derive unique camera IPs from all loaded recordings
+  const uniqueCameraIps = useMemo(() => {
+    const ips = new Set<string>()
+    recordings.forEach((r) => {
+      if (r.camera_ip) {
+        ips.add(r.camera_ip)
+      }
+    })
+    return Array.from(ips).sort()
+  }, [recordings])
+
+  // Filter recordings based on selected cameras (frontend-only filtering)
+  const filteredRecordings = useMemo(() => {
+    if (selectedCameras.size === 0) {
+      // No filter applied, show all
+      return recordings
+    }
+    return recordings.filter((recording) => {
+      const cameraIp = recording.camera_ip
+      // Check if camera exists in our cameras map
+      const cameraExists = cameras[cameraIp] !== undefined && cameras[cameraIp] !== null
+      if (!cameraExists && selectedCameras.has(UNKNOWN_CAMERA)) {
+        return true
+      }
+      return selectedCameras.has(cameraIp)
+    })
+  }, [recordings, selectedCameras, cameras])
+
+  // Initialize selectedCameras when cameras are first loaded
+  useEffect(() => {
+    if (uniqueCameraIps.length > 0 && selectedCameras.size === 0) {
+      const allCameras = new Set([...uniqueCameraIps, UNKNOWN_CAMERA])
+      setSelectedCameras(allCameras)
+      setTempSelectedCameras(allCameras)
+    }
+  }, [uniqueCameraIps, selectedCameras.size])
 
   // Load initial data (first page)
   const loadInitialData = useCallback(async () => {
@@ -160,31 +218,32 @@ export default function Recordings({ permissions }: RecordingsProps) {
     loadInitialData()
   }, [showAlarmRecordings, loadInitialData])
 
-  // Set up intersection observer for infinite scroll
+  // Keep loadMoreCallbackRef in sync with latest loadMoreRecordings
   useEffect(() => {
-    if (observerRef.current) {
-      observerRef.current.disconnect()
+    loadMoreCallbackRef.current = () => {
+      if (!loading && !initialLoading && hasMore) {
+        loadMoreRecordings()
+      }
     }
+  }, [loadMoreRecordings, loading, initialLoading, hasMore])
 
+  // Set up intersection observer for infinite scroll (stable observer)
+  useEffect(() => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loading && !initialLoading && hasMore) {
-          loadMoreRecordings()
+        if (entries[0].isIntersecting) {
+          loadMoreCallbackRef.current()
         }
       },
-      { threshold: 0.1 },
+      { threshold: 0.1, rootMargin: "100px" },
     )
-
-    if (loadingRef.current) {
-      observerRef.current.observe(loadingRef.current)
-    }
 
     return () => {
       if (observerRef.current) {
         observerRef.current.disconnect()
       }
     }
-  }, [loadMoreRecordings, loading, initialLoading, hasMore])
+  }, []) // Empty deps - observer is stable, callback ref handles observing
 
   const handleDelete = async (id: number) => {
     try {
@@ -204,6 +263,45 @@ export default function Recordings({ permissions }: RecordingsProps) {
     } catch (error) {
       setErrorMessage("Failed to delete all recordings")
     }
+  }
+
+  const openFilterModal = () => {
+    setTempShowAlarmRecordings(showAlarmRecordings)
+    setTempSelectedCameras(new Set(selectedCameras))
+    setFilterModalOpen(true)
+  }
+
+  const handleApplyFilters = () => {
+    const typeChanged = tempShowAlarmRecordings !== showAlarmRecordings
+    setSelectedCameras(new Set(tempSelectedCameras))
+
+    if (typeChanged) {
+      // Type changed, need to reload from API
+      setShowAlarmRecordings(tempShowAlarmRecordings)
+    }
+
+    setFilterModalOpen(false)
+  }
+
+  const handleToggleCameraFilter = (cameraIp: string) => {
+    setTempSelectedCameras((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(cameraIp)) {
+        newSet.delete(cameraIp)
+      } else {
+        newSet.add(cameraIp)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAllCameras = () => {
+    const allCameras = new Set([...uniqueCameraIps, UNKNOWN_CAMERA])
+    setTempSelectedCameras(allCameras)
+  }
+
+  const handleDeselectAllCameras = () => {
+    setTempSelectedCameras(new Set())
   }
 
   const formatBytes = (bytes: number, decimals = 2) => {
@@ -265,20 +363,33 @@ export default function Recordings({ permissions }: RecordingsProps) {
       )}
 
       <div className="flex items-center justify-center gap-2 mb-4">
-        <span className="text-zinc-300">Normal recordings</span>
-        <Switch
-          checked={showAlarmRecordings}
-          onCheckedChange={setShowAlarmRecordings}
-          className="data-[state=unchecked]:bg-zinc-800 data-[state=unchecked]:border-zinc-700"
-        />
-        <span className="text-zinc-300">Alarm recordings</span>
+        <Button
+          variant="outline"
+          onClick={openFilterModal}
+          className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 border-zinc-600"
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filter
+          {selectedCameras.size < uniqueCameraIps.length + 1 && (
+            <span className="ml-2 text-xs bg-zinc-500 px-1.5 py-0.5 rounded">
+              {selectedCameras.size}
+            </span>
+          )}
+        </Button>
+        <span className="text-zinc-400 text-sm">
+          Showing {showAlarmRecordings ? "alarm" : "normal"} recordings
+        </span>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {recordings.length === 0 ? (
-          <p className="text-zinc-400 col-span-full">No {showAlarmRecordings ? "alarm" : "normal"} recordings found.</p>
+        {filteredRecordings.length === 0 ? (
+          <p className="text-zinc-400 col-span-full">
+            {recordings.length === 0
+              ? `No ${showAlarmRecordings ? "alarm" : "normal"} recordings found.`
+              : "No recordings match the current filter."}
+          </p>
         ) : (
-          recordings.map((recording) => (
+          filteredRecordings.map((recording) => (
             <Card key={recording.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
               <CardContent className="flex flex-col items-center justify-center pt-6">
                 <FileVideo2 size={48} className="text-zinc-400 mb-2" />
@@ -372,6 +483,114 @@ export default function Recordings({ permissions }: RecordingsProps) {
               </video>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Filter Modal */}
+      <Dialog open={filterModalOpen} onOpenChange={setFilterModalOpen}>
+        <DialogContent className="sm:max-w-md bg-zinc-800 text-zinc-50">
+          <DialogHeader>
+            <DialogTitle>Filter Recordings</DialogTitle>
+            <DialogDescription>
+              Filter recordings by type and camera
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Recording Type Toggle */}
+            <div className="space-y-2">
+              <Label className="text-zinc-300">Recording Type</Label>
+              <div className="flex items-center gap-3 p-3 bg-zinc-900 rounded-lg">
+                <span className={`text-sm ${!tempShowAlarmRecordings ? "text-zinc-50" : "text-zinc-400"}`}>
+                  Normal
+                </span>
+                <Switch
+                  checked={tempShowAlarmRecordings}
+                  onCheckedChange={setTempShowAlarmRecordings}
+                  className="data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-red-600"
+                />
+                <span className={`text-sm ${tempShowAlarmRecordings ? "text-zinc-50" : "text-zinc-400"}`}>
+                  Alarm
+                </span>
+              </div>
+            </div>
+
+            {/* Camera Filter */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-zinc-300">Cameras</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSelectAllCameras}
+                    className="text-xs text-zinc-400 hover:text-zinc-50 h-6 px-2"
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDeselectAllCameras}
+                    className="text-xs text-zinc-400 hover:text-zinc-50 h-6 px-2"
+                  >
+                    Deselect All
+                  </Button>
+                </div>
+              </div>
+              <ScrollArea className="h-48 rounded-lg border border-zinc-700 bg-zinc-900">
+                <div className="p-3 space-y-2">
+                  {uniqueCameraIps.map((cameraIp) => (
+                    <div key={cameraIp} className="flex items-center space-x-3">
+                      <Checkbox
+                        id={`camera-${cameraIp}`}
+                        checked={tempSelectedCameras.has(cameraIp)}
+                        onCheckedChange={() => handleToggleCameraFilter(cameraIp)}
+                        className="border-zinc-600 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
+                      />
+                      <Label
+                        htmlFor={`camera-${cameraIp}`}
+                        className="text-sm text-zinc-300 cursor-pointer flex-1"
+                      >
+                        {cameras[cameraIp]?.name || cameraIp}
+                      </Label>
+                    </div>
+                  ))}
+                  {/* Unknown Camera option */}
+                  <div className="flex items-center space-x-3">
+                    <Checkbox
+                      id="camera-unknown"
+                      checked={tempSelectedCameras.has(UNKNOWN_CAMERA)}
+                      onCheckedChange={() => handleToggleCameraFilter(UNKNOWN_CAMERA)}
+                      className="border-zinc-600 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
+                    />
+                    <Label
+                      htmlFor="camera-unknown"
+                      className="text-sm text-zinc-400 cursor-pointer flex-1 italic"
+                    >
+                      Unknown Camera
+                    </Label>
+                  </div>
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setFilterModalOpen(false)}
+              className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 border-zinc-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApplyFilters}
+              className="bg-zinc-600 text-zinc-50 hover:bg-zinc-500"
+            >
+              Apply
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
