@@ -90,13 +90,15 @@ export default function Recordings({ permissions }: RecordingsProps) {
     console.log(`[Recordings] Fetching ${type} recordings with offset ${offset}`)
     try {
       const recordings = await getAllRecordings({ offset, type })
-      console.log(`[Recordings] Got ${recordings.length} recordings from API`)
+      const apiCount = recordings.length
+      console.log(`[Recordings] Got ${apiCount} recordings from API`)
       const completedRecordings = recordings
         .filter((recording) => recording.is_completed)
         .sort((a, b) => b.name.localeCompare(a.name))
 
       console.log(`[Recordings] After filtering completed: ${completedRecordings.length} recordings`)
-      return completedRecordings
+      // Return both the filtered recordings AND the original API count for pagination
+      return { recordings: completedRecordings, apiCount }
     } catch (error) {
       console.error(`[Recordings] Failed to fetch ${type} recordings:`, error)
       throw error
@@ -176,16 +178,16 @@ export default function Recordings({ permissions }: RecordingsProps) {
     try {
       const currentType = showAlarmRecordings ? RecordingType.ALARM : RecordingType.NORMAL
 
-      const [initialRecordings, storage] = await Promise.all([fetchRecordings(currentType, 0), getStorageInfo()])
+      const [result, storage] = await Promise.all([fetchRecordings(currentType, 0), getStorageInfo()])
 
-      setRecordings(initialRecordings)
+      setRecordings(result.recordings)
       setStorageInfo(storage)
 
-      // Set pagination state
+      // Set pagination state - use API count (before filtering) for hasMore check
       setCurrentOffset(PAGE_SIZE)
-      const hasMoreData = initialRecordings.length === PAGE_SIZE
+      const hasMoreData = result.apiCount === PAGE_SIZE
       setHasMore(hasMoreData)
-      console.log(`[Recordings] Initial load complete. ${initialRecordings.length} recordings, hasMore: ${hasMoreData}`)
+      console.log(`[Recordings] Initial load complete. ${result.recordings.length} filtered (${result.apiCount} from API), hasMore: ${hasMoreData}`)
     } catch (error) {
       console.error("[Recordings] Failed to load initial data:", error)
       setErrorMessage("Failed to fetch recordings and storage information")
@@ -205,17 +207,17 @@ export default function Recordings({ permissions }: RecordingsProps) {
     setLoading(true)
     try {
       const currentType = showAlarmRecordings ? RecordingType.ALARM : RecordingType.NORMAL
-      const newRecordings = await fetchRecordings(currentType, currentOffset)
+      const result = await fetchRecordings(currentType, currentOffset)
 
-      if (newRecordings.length === 0) {
+      if (result.apiCount === 0) {
         console.log("[Recordings] No more recordings, setting hasMore=false")
         setHasMore(false)
       } else {
-        setRecordings((prev) => [...prev, ...newRecordings])
+        setRecordings((prev) => [...prev, ...result.recordings])
         setCurrentOffset((prev) => prev + PAGE_SIZE)
-        const hasMoreData = newRecordings.length === PAGE_SIZE
+        const hasMoreData = result.apiCount === PAGE_SIZE
         setHasMore(hasMoreData)
-        console.log(`[Recordings] Loaded ${newRecordings.length} more recordings, hasMore: ${hasMoreData}`)
+        console.log(`[Recordings] Loaded ${result.recordings.length} filtered (${result.apiCount} from API), hasMore: ${hasMoreData}`)
       }
     } catch (error) {
       console.error("[Recordings] Failed to load more recordings:", error)
