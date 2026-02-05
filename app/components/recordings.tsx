@@ -64,14 +64,20 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreCallbackRef = useRef<() => void>(() => {})
+  const loadingNodeRef = useRef<HTMLDivElement | null>(null)
 
-  // Callback ref for the loading element - re-observes when element appears/disappears
-  const loadingRef = useCallback((node: HTMLDivElement | null) => {
-    if (observerRef.current) {
-      observerRef.current.disconnect()
+  // Callback ref that handles observer attachment
+  const setLoadingRef = useCallback((node: HTMLDivElement | null) => {
+    // Disconnect from previous node
+    if (loadingNodeRef.current && observerRef.current) {
+      observerRef.current.unobserve(loadingNodeRef.current)
     }
-    if (node) {
-      observerRef.current?.observe(node)
+
+    loadingNodeRef.current = node
+
+    // Observe new node
+    if (node && observerRef.current) {
+      observerRef.current.observe(node)
     }
   }, [])
 
@@ -123,42 +129,79 @@ export default function Recordings({ permissions }: RecordingsProps) {
     })
   }, []) // Remove cameras dependency
 
-  // Derive unique camera IPs from all loaded recordings
-  const uniqueCameraIps = useMemo(() => {
-    const ips = new Set<string>()
-    recordings.forEach((r) => {
-      if (r.camera_ip) {
-        ips.add(r.camera_ip)
-      }
+  // Track ALL camera IPs ever seen (persists across type changes)
+  const [allKnownCameraIps, setAllKnownCameraIps] = useState<Set<string>>(new Set())
+
+  // Track if we've done initial setup
+  const hasInitializedFilters = useRef(false)
+
+  // Update allKnownCameraIps when recordings change, and auto-select new cameras
+  useEffect(() => {
+    if (recordings.length === 0) return
+
+    const currentIps = new Set(recordings.map((r) => r.camera_ip).filter(Boolean))
+
+    // Add new IPs to allKnownCameraIps
+    setAllKnownCameraIps((prev) => {
+      const newSet = new Set(prev)
+      let changed = false
+      currentIps.forEach((ip) => {
+        if (!newSet.has(ip)) {
+          newSet.add(ip)
+          changed = true
+        }
+      })
+      return changed ? newSet : prev
     })
-    return Array.from(ips).sort()
+
+    // Initialize or update selectedCameras
+    if (!hasInitializedFilters.current) {
+      // First time: select all cameras + unknown
+      const allCameras = new Set([...Array.from(currentIps), UNKNOWN_CAMERA])
+      setSelectedCameras(allCameras)
+      setTempSelectedCameras(allCameras)
+      hasInitializedFilters.current = true
+    } else {
+      // Add any new camera IPs to selectedCameras (auto-select new cameras)
+      currentIps.forEach((ip) => {
+        setSelectedCameras((prev) => {
+          if (prev.has(ip)) return prev
+          const newSet = new Set(prev)
+          newSet.add(ip)
+          return newSet
+        })
+        setTempSelectedCameras((prev) => {
+          if (prev.has(ip)) return prev
+          const newSet = new Set(prev)
+          newSet.add(ip)
+          return newSet
+        })
+      })
+    }
   }, [recordings])
+
+  // Get sorted list of all known camera IPs for display
+  const sortedKnownCameraIps = useMemo(() => {
+    return Array.from(allKnownCameraIps).sort()
+  }, [allKnownCameraIps])
 
   // Filter recordings based on selected cameras (frontend-only filtering)
   const filteredRecordings = useMemo(() => {
-    if (selectedCameras.size === 0) {
-      // No filter applied, show all
+    // If no filter initialized yet or all cameras selected, show all
+    if (!hasInitializedFilters.current) {
       return recordings
     }
     return recordings.filter((recording) => {
       const cameraIp = recording.camera_ip
-      // Check if camera exists in our cameras map
-      const cameraExists = cameras[cameraIp] !== undefined && cameras[cameraIp] !== null
-      if (!cameraExists && selectedCameras.has(UNKNOWN_CAMERA)) {
+      // Check if camera exists in our cameras map (to determine if it's "unknown")
+      const cameraInfo = cameras[cameraIp]
+      const isUnknownCamera = cameraInfo === undefined || cameraInfo === null
+      if (isUnknownCamera && selectedCameras.has(UNKNOWN_CAMERA)) {
         return true
       }
       return selectedCameras.has(cameraIp)
     })
   }, [recordings, selectedCameras, cameras])
-
-  // Initialize selectedCameras when cameras are first loaded
-  useEffect(() => {
-    if (uniqueCameraIps.length > 0 && selectedCameras.size === 0) {
-      const allCameras = new Set([...uniqueCameraIps, UNKNOWN_CAMERA])
-      setSelectedCameras(allCameras)
-      setTempSelectedCameras(allCameras)
-    }
-  }, [uniqueCameraIps, selectedCameras.size])
 
   // Load initial data (first page)
   const loadInitialData = useCallback(async () => {
@@ -227,23 +270,27 @@ export default function Recordings({ permissions }: RecordingsProps) {
     }
   }, [loadMoreRecordings, loading, initialLoading, hasMore])
 
-  // Set up intersection observer for infinite scroll (stable observer)
+  // Set up intersection observer for infinite scroll
   useEffect(() => {
-    observerRef.current = new IntersectionObserver(
+    const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
           loadMoreCallbackRef.current()
         }
       },
-      { threshold: 0.1, rootMargin: "100px" },
+      { threshold: 0.1, rootMargin: "200px" },
     )
+    observerRef.current = observer
+
+    // If we already have a node (from callback ref), start observing
+    if (loadingNodeRef.current) {
+      observer.observe(loadingNodeRef.current)
+    }
 
     return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect()
-      }
+      observer.disconnect()
     }
-  }, []) // Empty deps - observer is stable, callback ref handles observing
+  }, [])
 
   const handleDelete = async (id: number) => {
     try {
@@ -296,7 +343,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
   }
 
   const handleSelectAllCameras = () => {
-    const allCameras = new Set([...uniqueCameraIps, UNKNOWN_CAMERA])
+    const allCameras = new Set([...sortedKnownCameraIps, UNKNOWN_CAMERA])
     setTempSelectedCameras(allCameras)
   }
 
@@ -370,7 +417,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
         >
           <Filter className="h-4 w-4 mr-2" />
           Filter
-          {selectedCameras.size < uniqueCameraIps.length + 1 && (
+          {selectedCameras.size < sortedKnownCameraIps.length + 1 && (
             <span className="ml-2 text-xs bg-zinc-500 px-1.5 py-0.5 rounded">
               {selectedCameras.size}
             </span>
@@ -450,7 +497,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
       {/* Loading indicator and intersection observer target */}
       {hasMore && recordings.length > 0 && (
-        <div ref={loadingRef} className="flex items-center justify-center py-8">
+        <div ref={setLoadingRef} className="flex items-center justify-center py-8">
           {loading && (
             <>
               <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
@@ -540,7 +587,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
               </div>
               <ScrollArea className="h-48 rounded-lg border border-zinc-700 bg-zinc-900">
                 <div className="p-3 space-y-2">
-                  {uniqueCameraIps.map((cameraIp) => (
+                  {sortedKnownCameraIps.map((cameraIp) => (
                     <div key={cameraIp} className="flex items-center space-x-3">
                       <Checkbox
                         id={`camera-${cameraIp}`}
