@@ -39,6 +39,7 @@ import {
   getSensorStatusStream,
   getAvailableGpioServers,
   getCameraStreamUrl,
+  getCameraSnapshot,
 } from "@/lib/api"
 
 import { type RTSPCamera, type Sensor, Permission, type SensorStatus } from "@/types"
@@ -55,6 +56,8 @@ type CameraInputDto = {
   password: string
   path: string
   always_recording: boolean
+  detection_mode: string | null
+  detection_roi: string | null
 }
 
 type SensorInputDto = {
@@ -85,6 +88,15 @@ export default function Component({ permissions }: DeviceProps) {
   const [selectedStreamCamera, setSelectedStreamCamera] = useState<RTSPCamera | null>(null)
   const [streamLoading, setStreamLoading] = useState(false)
   const [streamError, setStreamError] = useState(false)
+
+  // ROI drawing state
+  const [isRoiDialogOpen, setIsRoiDialogOpen] = useState(false)
+  const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [roiStart, setRoiStart] = useState<{ x: number; y: number } | null>(null)
+  const [roiEnd, setRoiEnd] = useState<{ x: number; y: number } | null>(null)
+  const [roiRect, setRoiRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
   const canAccessRecordings = permissions.includes(Permission.ACCESS_RECORDINGS)
@@ -230,7 +242,7 @@ export default function Component({ permissions }: DeviceProps) {
     setDeviceType(type)
     setEditingDevice(
       type === "camera"
-        ? { name: "", ip: "", port: 554, username: "", password: "", path: "", always_recording: false }
+        ? { name: "", ip: "", port: 554, username: "", password: "", path: "", always_recording: false, detection_mode: null, detection_roi: null }
         : { name: "", gpio_pin_number: 0, gpio_server_url: gpioServers[0] || "" },
     )
     setIsCreating(true)
@@ -249,7 +261,26 @@ export default function Component({ permissions }: DeviceProps) {
         password: camera.password,
         path: camera.path,
         always_recording: camera.always_recording,
+        detection_mode: camera.detection_mode,
+        detection_roi: camera.detection_roi || null,
       })
+      // Restore ROI rect from existing data
+      if (camera.detection_roi) {
+        try {
+          const points = JSON.parse(camera.detection_roi)
+          if (Array.isArray(points) && points.length === 4) {
+            const x = points[0][0]
+            const y = points[0][1]
+            const w = points[1][0] - points[0][0]
+            const h = points[2][1] - points[0][1]
+            setRoiRect({ x, y, w, h })
+          }
+        } catch {
+          setRoiRect(null)
+        }
+      } else {
+        setRoiRect(null)
+      }
       setIsCreating(false)
       setIsDialogOpen(true)
     } else if (type === "sensor") {
@@ -314,6 +345,8 @@ export default function Component({ permissions }: DeviceProps) {
       }
       setIsDialogOpen(false)
       setEditingDevice(null)
+      setSnapshotUrl(null)
+      setRoiRect(null)
     } catch (error) {
       setErrorMessage(`Failed to ${isCreating ? "create" : "update"} ${deviceType}`)
     }
@@ -340,6 +373,104 @@ export default function Component({ permissions }: DeviceProps) {
     if (status === "HIGH") return "text-red-500"
 
     return "text-zinc-300"
+  }
+
+  const fetchSnapshot = async () => {
+    const cam = editingDevice as CameraInputDto
+    if (!cam?.ip || !cam?.port || !cam?.path) return
+    setSnapshotLoading(true)
+    setSnapshotUrl(null)
+    setRoiStart(null)
+    setRoiEnd(null)
+    try {
+      const url = await getCameraSnapshot(cam)
+      setSnapshotUrl(url)
+    } catch {
+      setSnapshotUrl(null)
+    } finally {
+      setSnapshotLoading(false)
+    }
+  }
+
+  const ROI_CANVAS_W = 640
+  const ROI_CANVAS_H = 360
+
+  const drawCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas || !snapshotUrl) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+    const img = new Image()
+    img.onload = () => {
+      canvas.width = ROI_CANVAS_W
+      canvas.height = ROI_CANVAS_H
+      ctx.drawImage(img, 0, 0, ROI_CANVAS_W, ROI_CANVAS_H)
+      // Draw existing ROI rect
+      const rect = roiRect
+      if (rect) {
+        ctx.strokeStyle = "#00ff00"
+        ctx.lineWidth = 2
+        ctx.strokeRect(rect.x * ROI_CANVAS_W, rect.y * ROI_CANVAS_H, rect.w * ROI_CANVAS_W, rect.h * ROI_CANVAS_H)
+        ctx.fillStyle = "rgba(0, 255, 0, 0.1)"
+        ctx.fillRect(rect.x * ROI_CANVAS_W, rect.y * ROI_CANVAS_H, rect.w * ROI_CANVAS_W, rect.h * ROI_CANVAS_H)
+      }
+      // Draw in-progress drag
+      if (roiStart && roiEnd) {
+        const x = Math.min(roiStart.x, roiEnd.x)
+        const y = Math.min(roiStart.y, roiEnd.y)
+        const w = Math.abs(roiEnd.x - roiStart.x)
+        const h = Math.abs(roiEnd.y - roiStart.y)
+        ctx.strokeStyle = "#ffff00"
+        ctx.lineWidth = 2
+        ctx.strokeRect(x * ROI_CANVAS_W, y * ROI_CANVAS_H, w * ROI_CANVAS_W, h * ROI_CANVAS_H)
+      }
+    }
+    img.src = snapshotUrl
+  }
+
+  // Redraw canvas when snapshot, roi, or drag changes
+  useEffect(() => {
+    drawCanvas()
+  }, [snapshotUrl, roiRect, roiStart, roiEnd])
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+    setRoiStart({ x, y })
+    setRoiEnd({ x, y })
+    setRoiRect(null)
+  }
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!roiStart) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+    setRoiEnd({ x, y })
+  }
+
+  const handleCanvasMouseUp = () => {
+    if (!roiStart || !roiEnd) return
+    const x = Math.min(roiStart.x, roiEnd.x)
+    const y = Math.min(roiStart.y, roiEnd.y)
+    const w = Math.abs(roiEnd.x - roiStart.x)
+    const h = Math.abs(roiEnd.y - roiStart.y)
+    if (w > 0.01 && h > 0.01) {
+      const newRoi = { x, y, w, h }
+      setRoiRect(newRoi)
+      // Store as 4-point polygon (normalized coords)
+      const roiJson = JSON.stringify([
+        [x, y], [x + w, y], [x + w, y + h], [x, y + h]
+      ])
+      setEditingDevice((prev) => prev ? { ...prev, detection_roi: roiJson } : null)
+    }
+    setRoiStart(null)
+    setRoiEnd(null)
   }
 
   const handleOpenLiveStream = (camera: RTSPCamera) => {
@@ -380,6 +511,9 @@ export default function Component({ permissions }: DeviceProps) {
                   <p className="text-zinc-300">IP: {camera.ip}</p>
                   <p className="text-zinc-300">Path: {camera.path}</p>
                   <p className="text-zinc-300">Always recording: {camera.always_recording ? "Yes" : "No"}</p>
+                  {camera.detection_mode && (
+                    <p className="text-zinc-300">Detection: {camera.detection_mode === "motion" ? "Motion" : "Motion + Person"}{camera.detection_roi ? " (ROI)" : ""}</p>
+                  )}
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col mt-auto space-y-2">
@@ -450,7 +584,7 @@ export default function Component({ permissions }: DeviceProps) {
         )}
       </div>
       {!isLoadingServers && gpioServers.length === 0 && (
-        <p className="text-yellow-500 mb-4">No GPIO servers configured. Please configure GPIO_MONITOR_URLS.</p>
+        <p className="text-yellow-500 mb-4">No GPIO servers configured. Add them in the Configuration page.</p>
       )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {isLoadingSensors ? (
@@ -614,7 +748,7 @@ export default function Component({ permissions }: DeviceProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { setSnapshotUrl(null); setRoiRect(null) } }}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle>
@@ -719,12 +853,53 @@ export default function Component({ permissions }: DeviceProps) {
                     id="always-recording"
                     checked={(editingDevice as CameraInputDto)?.always_recording || false}
                     onCheckedChange={(checked) =>
-                      setEditingDevice((prev) => (prev ? { ...prev, always_recording: checked } : null))
+                      setEditingDevice((prev) => (prev ? { ...prev, always_recording: checked, detection_mode: checked ? (prev as CameraInputDto).detection_mode : null, detection_roi: checked ? (prev as CameraInputDto).detection_roi : null } : null))
                     }
                     className="data-[state=unchecked]:bg-zinc-700 data-[state=unchecked]:border-zinc-600 disabled:opacity-50"
                     disabled={!isCreating}
                   />
                 </div>
+                {(editingDevice as CameraInputDto)?.always_recording && (
+                  <div>
+                    <Label htmlFor="detection-mode" className="text-zinc-50 mb-2 block">
+                      Motion detection
+                    </Label>
+                    <Select
+                      value={(editingDevice as CameraInputDto)?.detection_mode || "none"}
+                      onValueChange={(value) => {
+                        setEditingDevice((prev) => (prev ? { ...prev, detection_mode: value === "none" ? null : value, detection_roi: value === "none" ? null : (prev as CameraInputDto).detection_roi } : null))
+                        if (value === "none") { setSnapshotUrl(null); setRoiRect(null) }
+                      }
+                      }
+                    >
+                      <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-800 text-zinc-50 border-zinc-700">
+                        <SelectItem value="none">Disabled</SelectItem>
+                        <SelectItem value="motion">Motion only</SelectItem>
+                        <SelectItem value="motion+person">Motion + Person (YOLO)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {(editingDevice as CameraInputDto)?.detection_mode && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => { setIsRoiDialogOpen(true); if (!snapshotUrl) fetchSnapshot() }}
+                      disabled={!(editingDevice as CameraInputDto)?.ip || !(editingDevice as CameraInputDto)?.path}
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      {roiRect ? "Edit detection area" : "Set detection area"}
+                    </Button>
+                    {roiRect && (
+                      <span className="text-xs text-green-400 whitespace-nowrap">ROI set</span>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -772,6 +947,74 @@ export default function Component({ permissions }: DeviceProps) {
             >
               {isCreating ? "Create" : "Save Changes"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRoiDialogOpen} onOpenChange={setIsRoiDialogOpen}>
+        <DialogContent className="w-auto max-w-[95vw] bg-zinc-800 text-zinc-50">
+          <DialogHeader>
+            <DialogTitle>Detection area</DialogTitle>
+            <DialogDescription>
+              Draw a rectangle on the camera image to limit the detection area. Leave empty for full frame.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-3">
+            {snapshotLoading && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+              </div>
+            )}
+            {!snapshotLoading && !snapshotUrl && (
+              <p className="text-zinc-400 py-12">Could not load camera snapshot.</p>
+            )}
+            {snapshotUrl && (
+              <canvas
+                ref={canvasRef}
+                className="cursor-crosshair rounded border border-zinc-600 w-full max-w-[640px] touch-none"
+                style={{ aspectRatio: "16/9" }}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseUp}
+                onTouchStart={(e) => { e.preventDefault(); const t = e.touches[0]; handleCanvasMouseDown({ clientX: t.clientX, clientY: t.clientY, currentTarget: e.currentTarget } as unknown as React.MouseEvent<HTMLCanvasElement>) }}
+                onTouchMove={(e) => { e.preventDefault(); const t = e.touches[0]; handleCanvasMouseMove({ clientX: t.clientX, clientY: t.clientY, currentTarget: e.currentTarget } as unknown as React.MouseEvent<HTMLCanvasElement>) }}
+                onTouchEnd={(e) => { e.preventDefault(); handleCanvasMouseUp() }}
+              />
+            )}
+            <div className="flex gap-2 w-full">
+              {snapshotUrl && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                  onClick={fetchSnapshot}
+                  disabled={snapshotLoading}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" /> Reload
+                </Button>
+              )}
+              {roiRect && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                  onClick={() => {
+                    setRoiRect(null)
+                    setEditingDevice((prev) => prev ? { ...prev, detection_roi: null } : null)
+                  }}
+                >
+                  Clear ROI
+                </Button>
+              )}
+              <div className="flex-1" />
+              <Button
+                className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                onClick={() => setIsRoiDialogOpen(false)}
+              >
+                Done
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

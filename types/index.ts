@@ -49,6 +49,10 @@ export interface AlarmAudioConfig {
   audio: File | null
 }
 
+export interface WarningAudioConfig {
+  audio: File | null
+}
+
 export enum RecordingType {
   ALARM = "ALARM",
   NORMAL = "NORMAL",
@@ -83,6 +87,8 @@ export interface RTSPCamera {
   password: string
   path: string
   always_recording: boolean
+  detection_mode: string | null
+  detection_roi: string | null
 }
 
 export interface AlarmNotification {
@@ -91,4 +97,23 @@ export interface AlarmNotification {
   priority: string
   message?: string
   created_at: string
+  snapshot_filename?: string | null
 }
+
+export interface GpioServerConfig {
+  id?: number
+  url: string
+}
+
+export interface Mp3ServerConfig {
+  id?: number
+  url: string
+  audio_type_alarm: boolean
+  audio_type_waiting: boolean
+  audio_type_warning: boolean
+  volume_alarm: number
+  volume_waiting: number
+  volume_warning: number
+}
+
+export type SystemConfig = Record<string, string>

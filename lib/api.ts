@@ -6,11 +6,15 @@ import type {
   Sensor,
   RTSPCamera,
   AlarmAudioConfig,
+  WarningAudioConfig,
   Recording,
   StorageInfo,
   SensorStatus,
   RecordingType,
-  AlarmNotification
+  AlarmNotification,
+  SystemConfig,
+  GpioServerConfig,
+  Mp3ServerConfig
 } from "@/types"
 
 const getApiBaseUrl = () => {
@@ -471,6 +475,27 @@ export const getSensorStatusStream = (sensorId: string) => {
   return eventSource
 }
 
+export const updateDeviceGroupCameras = async (groupId: number, cameraIps: string[]): Promise<RTSPCamera[]> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/cameras`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(cameraIps),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to update device group cameras")
+    }
+
+    return await response.json()
+  } catch (error) {
+    throw error
+  }
+}
+
 export const updateDeviceGroupSensors = async (groupId: number, sensorIds: string[]): Promise<Sensor[]> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
@@ -851,6 +876,141 @@ export const deleteAlarmAudioConfig = async (): Promise<void> => {
   }
 }
 
+// --- Warning audio ---
+
+export const getWarningAudioConfig = async (): Promise<WarningAudioConfig | null> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/warning`, {
+      method: "HEAD",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null
+      }
+      throw new Error("Failed to fetch warning audio configuration")
+    }
+
+    const contentDisposition = response.headers.get("Content-Disposition")
+    let filename = "warning.mp3"
+
+    if (contentDisposition) {
+      const rfc5987Match = contentDisposition.match(/filename\*=utf-8''([^;\n]+)/)
+      if (rfc5987Match && rfc5987Match[1]) {
+        filename = decodeURIComponent(rfc5987Match[1])
+      } else {
+        const standardMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
+        if (standardMatch && standardMatch[1]) {
+          filename = standardMatch[1]
+        }
+      }
+    }
+
+    return { audio: new File([], filename, { type: "audio/mpeg" }) }
+  } catch (error) {
+    throw error
+  }
+}
+
+export const createWarningAudioConfig = async (
+  config: WarningAudioConfig,
+  onProgress?: (progress: number) => void
+): Promise<WarningAudioConfig> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const formData = new FormData()
+
+    if (config.audio !== null) {
+      formData.append('audio', config.audio)
+    }
+
+    xhr.open('POST', `${getApiBaseUrl()}/audio-service/audio/warning`)
+    xhr.setRequestHeader('Authorization', `Bearer ${getTokenOrThrow()}`)
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        const progress = Math.round((event.loaded / event.total) * 100)
+        onProgress(progress)
+      }
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(config)
+      } else {
+        reject(new Error('Failed to save warning audio configuration'))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Failed to save warning audio configuration'))
+    xhr.send(formData)
+  })
+}
+
+export const updateWarningAudioConfig = async (
+  config: WarningAudioConfig,
+  onProgress?: (progress: number) => void
+): Promise<WarningAudioConfig> => {
+  return createWarningAudioConfig(config, onProgress)
+}
+
+export const deleteWarningAudioConfig = async (): Promise<void> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/audio-service/audio/warning`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to delete warning audio configuration")
+    }
+  } catch (error) {
+    throw error
+  }
+}
+
+export const downloadWarningAudio = async (onProgress?: (progress: number) => void): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+
+    xhr.open('GET', `${getApiBaseUrl()}/audio-service/audio/warning`)
+    xhr.setRequestHeader('Authorization', `Bearer ${getTokenOrThrow()}`)
+    xhr.responseType = 'blob'
+
+    xhr.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        const progress = Math.round((event.loaded / event.total) * 100)
+        onProgress(progress)
+      }
+    }
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const blob = xhr.response
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'warning.mp3'
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        resolve()
+      } else {
+        reject(new Error('Failed to download warning audio file'))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Failed to download warning audio file'))
+    xhr.send()
+  })
+}
+
 export const startListening = async (groupId: number, pin: string): Promise<void> => {
   try {
     const response = await fetch(
@@ -1024,7 +1184,153 @@ export const getAllNotifications = async (params?: {
   }
 }
 
+export const getSnapshotUrl = (filename: string): string => {
+  return `${getApiBaseUrl()}/notifications-service/notification/snapshot/${encodeURIComponent(filename)}`
+}
+
 export const getCameraStreamUrl = (cameraIp: string): string => {
   const token = getTokenOrThrow()
   return `${getApiBaseUrl()}/devices-manager-service/camera/${cameraIp}/stream?auth_token=${encodeURIComponent(token)}`
+}
+
+export const getCameraSnapshot = async (camera: { ip: string; port: number; username: string; password: string; path: string; name: string; always_recording: boolean; detection_mode: string | null }): Promise<string> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/camera/snapshot`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(camera),
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.message || "Failed to get camera snapshot")
+  }
+  const blob = await response.blob()
+  return URL.createObjectURL(blob)
+}
+
+// --- System Config ---
+
+export const getSystemConfig = async (): Promise<SystemConfig> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/`, {
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+    },
+  })
+  if (!response.ok) throw new Error("Failed to fetch system config")
+  return response.json()
+}
+
+export const updateSystemConfig = async (key: string, value: string): Promise<void> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/${key}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ value }),
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.detail || "Failed to update config")
+  }
+}
+
+// --- GPIO Servers ---
+
+export const getGpioServers = async (): Promise<GpioServerConfig[]> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/gpio-servers`, {
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+    },
+  })
+  if (!response.ok) throw new Error("Failed to fetch GPIO servers")
+  return response.json()
+}
+
+export const createGpioServer = async (url: string): Promise<GpioServerConfig> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/gpio-servers`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url }),
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.detail || "Failed to create GPIO server")
+  }
+  return response.json()
+}
+
+export const deleteGpioServer = async (id: number): Promise<void> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/gpio-servers/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+    },
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.detail || "Failed to delete GPIO server")
+  }
+}
+
+// --- MP3 Servers ---
+
+export const getMp3Servers = async (): Promise<Mp3ServerConfig[]> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/mp3-servers`, {
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+    },
+  })
+  if (!response.ok) throw new Error("Failed to fetch MP3 servers")
+  return response.json()
+}
+
+export const createMp3Server = async (server: Omit<Mp3ServerConfig, "id">): Promise<Mp3ServerConfig> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/mp3-servers`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(server),
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.detail || "Failed to create MP3 server")
+  }
+  return response.json()
+}
+
+export const updateMp3Server = async (id: number, server: Mp3ServerConfig): Promise<Mp3ServerConfig> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/mp3-servers/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(server),
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.detail || "Failed to update MP3 server")
+  }
+  return response.json()
+}
+
+export const deleteMp3Server = async (id: number): Promise<void> => {
+  const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/config/mp3-servers/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+    },
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.detail || "Failed to delete MP3 server")
+  }
 }

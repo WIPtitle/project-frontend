@@ -24,12 +24,15 @@ import {
   updateDeviceGroup,
   deleteDeviceGroup,
   getAllSensors,
+  getAllRtspCameras,
   getDeviceGroupSensors,
   updateDeviceGroupSensors,
+  getDeviceGroupCameras,
+  updateDeviceGroupCameras,
   startListening,
   stopListening,
 } from "@/lib/api"
-import { type DeviceGroup, type Sensor, Permission, DeviceGroupStatus } from "@/types"
+import { type DeviceGroup, type Sensor, type RTSPCamera, Permission, DeviceGroupStatus } from "@/types"
 
 const statusMapping: Record<DeviceGroupStatus, string> = {
   [DeviceGroupStatus.LISTENING]: "Active",
@@ -53,12 +56,15 @@ export const getAvailableSensors = (sensors: Sensor[], groupId: number | null): 
 export default function Alarm({ permissions }: AlarmProps) {
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[] | null>(null)
   const [allSensors, setAllSensors] = useState<Sensor[]>([])
+  const [allDetectionCameras, setAllDetectionCameras] = useState<RTSPCamera[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<DeviceGroupInputDto | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [groupSensors, setGroupSensors] = useState<{ [key: number]: Sensor[] }>({})
+  const [groupCameras, setGroupCameras] = useState<{ [key: number]: RTSPCamera[] }>({})
   const [selectedSensors, setSelectedSensors] = useState<Sensor[]>([])
+  const [selectedCameraIps, setSelectedCameraIps] = useState<string[]>([])
   const [isActivating, setIsActivating] = useState<{ [key: number]: boolean }>({})
   const [isDeactivating, setIsDeactivating] = useState<{ [key: number]: boolean }>({})
   const [pin, setPin] = useState<string>("")
@@ -158,18 +164,25 @@ export default function Alarm({ permissions }: AlarmProps) {
         const groups = await getDeviceGroups()
         setDeviceGroups(groups)
 
-        // Fetch sensors for each group
+        // Fetch sensors and cameras for each group
         const sensorsPromises = groups.map((group) => getDeviceGroupSensors(group.id))
+        const camerasPromises = groups.map((group) => getDeviceGroupCameras(group.id))
 
-        const groupSensorsData = await Promise.all(sensorsPromises)
+        const [groupSensorsData, groupCamerasData] = await Promise.all([
+          Promise.all(sensorsPromises),
+          Promise.all(camerasPromises),
+        ])
 
         const newGroupSensors: { [key: number]: Sensor[] } = {}
+        const newGroupCameras: { [key: number]: RTSPCamera[] } = {}
 
         groups.forEach((group, index) => {
           newGroupSensors[group.id] = groupSensorsData[index]
+          newGroupCameras[group.id] = groupCamerasData[index]
         })
 
         setGroupSensors(newGroupSensors)
+        setGroupCameras(newGroupCameras)
       } catch (error) {
         console.error("Failed to fetch data:", error)
         setErrorMessage("Failed to fetch device groups and devices. Please try again later.")
@@ -197,8 +210,10 @@ export default function Alarm({ permissions }: AlarmProps) {
 
   const fetchAllDevices = async () => {
     try {
-      const sensors = await getAllSensors()
+      const [sensors, cameras] = await Promise.all([getAllSensors(), getAllRtspCameras()])
       setAllSensors(sensors)
+      // Only show cameras that are always_recording AND have detection enabled
+      setAllDetectionCameras(cameras.filter((c) => c.always_recording && c.detection_mode !== null))
     } catch (error) {
       console.error("Failed to fetch devices:", error)
       setErrorMessage("Failed to fetch devices. Please try again.")
@@ -214,6 +229,11 @@ export default function Alarm({ permissions }: AlarmProps) {
         delete newGroupSensors[id]
         return newGroupSensors
       })
+      setGroupCameras((prev) => {
+        const newGroupCameras = { ...prev }
+        delete newGroupCameras[id]
+        return newGroupCameras
+      })
     } catch (error) {
       setErrorMessage("Failed to delete device group")
     }
@@ -223,6 +243,7 @@ export default function Alarm({ permissions }: AlarmProps) {
     await fetchAllDevices()
     setEditingGroup({ id: 0, name: "", wait_to_start_alarm: 0, wait_to_fire_alarm: 0, status: DeviceGroupStatus.IDLE })
     setSelectedSensors([])
+    setSelectedCameraIps([])
     setIsDialogOpen(true)
   }
 
@@ -232,6 +253,7 @@ export default function Alarm({ permissions }: AlarmProps) {
       ...group,
     })
     setSelectedSensors(groupSensors[group.id] || [])
+    setSelectedCameraIps((groupCameras[group.id] || []).map((c) => c.ip))
     setIsDialogOpen(true)
   }
 
@@ -249,24 +271,24 @@ export default function Alarm({ permissions }: AlarmProps) {
               prevGroups?.map((group) => (group.id === updatedGroupResponse.id ? updatedGroupResponse : group)) || [],
           )
 
-          // Update sensors using sensor IDs
-          const updatedSensors = await updateDeviceGroupSensors(
-            existingGroup.id,
-            selectedSensors.map((s) => s.id),
-          )
+          const [updatedSensors, updatedCameras] = await Promise.all([
+            updateDeviceGroupSensors(existingGroup.id, selectedSensors.map((s) => s.id)),
+            updateDeviceGroupCameras(existingGroup.id, selectedCameraIps),
+          ])
 
           setGroupSensors((prev) => ({ ...prev, [existingGroup.id]: updatedSensors }))
+          setGroupCameras((prev) => ({ ...prev, [existingGroup.id]: updatedCameras }))
         } else {
           const newGroup = await createDeviceGroup(updatedGroup)
           setDeviceGroups((prevGroups) => [...(prevGroups || []), newGroup])
 
-          // Add sensors to the new group using sensor IDs
-          const newSensors = await updateDeviceGroupSensors(
-            newGroup.id,
-            selectedSensors.map((s) => s.id),
-          )
+          const [newSensors, newCameras] = await Promise.all([
+            updateDeviceGroupSensors(newGroup.id, selectedSensors.map((s) => s.id)),
+            updateDeviceGroupCameras(newGroup.id, selectedCameraIps),
+          ])
 
           setGroupSensors((prev) => ({ ...prev, [newGroup.id]: newSensors }))
+          setGroupCameras((prev) => ({ ...prev, [newGroup.id]: newCameras }))
         }
       }
       setIsDialogOpen(false)
@@ -348,11 +370,14 @@ export default function Alarm({ permissions }: AlarmProps) {
               onSubmit={(e) => {
                 e.preventDefault()
                 if (editingGroup) {
-                  if (selectedSensors.length === 0) {
-                    setGroupError("No device set - please set at least one sensor")
+                  if (selectedSensors.length === 0 && selectedCameraIps.length === 0) {
+                    setGroupError("Please set at least one sensor or detection camera")
                   } else {
                     setGroupError(null)
-                    handleSaveGroup(editingGroup)
+                    const groupToSave = selectedSensors.length === 0
+                      ? { ...editingGroup, wait_to_fire_alarm: 0 }
+                      : editingGroup
+                    handleSaveGroup(groupToSave)
                   }
                 }
               }}
@@ -379,21 +404,23 @@ export default function Alarm({ permissions }: AlarmProps) {
                   }}
                   className="bg-zinc-700 text-zinc-50 border-zinc-600"
                 />
-                <Input
-                  type="number"
-                  placeholder="Wait to fire alarm (seconds, max 120)"
-                  value={editingGroup?.wait_to_fire_alarm || ""}
-                  min="0"
-                  max="120"
-                  onChange={(e) => {
-                    const value = Number.parseInt(e.target.value)
-                    if (value > 120) return
-                    setEditingGroup((prev) =>
-                      prev ? { ...prev, wait_to_fire_alarm: value } : null,
-                    )
-                  }}
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                />
+                {selectedSensors.length > 0 && (
+                  <Input
+                    type="number"
+                    placeholder="Wait to fire alarm (seconds, max 120)"
+                    value={editingGroup?.wait_to_fire_alarm || ""}
+                    min="0"
+                    max="120"
+                    onChange={(e) => {
+                      const value = Number.parseInt(e.target.value)
+                      if (value > 120) return
+                      setEditingGroup((prev) =>
+                        prev ? { ...prev, wait_to_fire_alarm: value } : null,
+                      )
+                    }}
+                    className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                  />
+                )}
                 {groupError && <p className="text-red-500 text-sm mt-2">{groupError}</p>}
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Sensors</h3>
@@ -418,6 +445,31 @@ export default function Alarm({ permissions }: AlarmProps) {
                   ))}
                   {getAvailableSensors(allSensors, editingGroup?.id ?? null).length === 0 && (
                     <p className="text-zinc-400">No sensors available</p>
+                  )}
+                </div>
+                <div>
+                  <h3 className="mb-2 font-semibold text-zinc-300">Motion detection cameras</h3>
+                  {allDetectionCameras.map((camera) => (
+                    <div key={camera.ip} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`camera-${camera.ip}`}
+                        checked={selectedCameraIps.includes(camera.ip)}
+                        onCheckedChange={(checked) => {
+                          setSelectedCameraIps((prev) =>
+                            checked
+                              ? [...prev, camera.ip]
+                              : prev.filter((ip) => ip !== camera.ip),
+                          )
+                        }}
+                        className="border-zinc-500"
+                      />
+                      <label htmlFor={`camera-${camera.ip}`} className="text-zinc-300">
+                        {camera.name} <span className="text-zinc-500 text-sm">({camera.detection_mode})</span>
+                      </label>
+                    </div>
+                  ))}
+                  {allDetectionCameras.length === 0 && (
+                    <p className="text-zinc-400">No detection cameras available</p>
                   )}
                 </div>
                 <Button type="submit" className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600">
@@ -449,7 +501,9 @@ export default function Alarm({ permissions }: AlarmProps) {
               <CardContent className="flex-grow">
                 <p className={`${getStatusColor(group.status)} font-semibold`}>Status: {statusMapping[group.status]}</p>
                 <p className="text-zinc-300">Wait to start alarm: {group.wait_to_start_alarm}s</p>
-                <p className="text-zinc-300">Wait to fire alarm: {group.wait_to_fire_alarm}s</p>
+                {groupSensors[group.id]?.length > 0 && (
+                  <p className="text-zinc-300">Wait to fire alarm: {group.wait_to_fire_alarm}s</p>
+                )}
                 <h3 className="mt-2 font-semibold text-zinc-300">Sensors:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
                   {groupSensors[group.id]?.map((sensor) => (
@@ -457,6 +511,16 @@ export default function Alarm({ permissions }: AlarmProps) {
                   ))}
                 </ul>
                 {groupSensors[group.id]?.length === 0 && <p className="text-zinc-400">No sensors</p>}
+                {groupCameras[group.id]?.length > 0 && (
+                  <>
+                    <h3 className="mt-2 font-semibold text-zinc-300">Detection cameras:</h3>
+                    <ul className="list-disc pl-5 text-zinc-300">
+                      {groupCameras[group.id].map((camera) => (
+                        <li key={camera.ip}>{camera.name}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </CardContent>
               <CardFooter className="flex flex-col mt-auto">
                 {permissions.includes(Permission.MODIFY_DEVICES) && (
