@@ -58,21 +58,6 @@ type ConfigurationProps = {
   permissions: Permission[]
 }
 
-const TIMEZONE_OPTIONS = [
-  "Europe/Rome", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Madrid",
-  "Europe/Amsterdam", "Europe/Brussels", "Europe/Zurich", "Europe/Vienna", "Europe/Warsaw",
-  "Europe/Prague", "Europe/Budapest", "Europe/Bucharest", "Europe/Athens", "Europe/Helsinki",
-  "Europe/Stockholm", "Europe/Oslo", "Europe/Copenhagen", "Europe/Dublin", "Europe/Lisbon",
-  "Europe/Moscow", "Europe/Istanbul",
-  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
-  "America/Toronto", "America/Vancouver", "America/Sao_Paulo", "America/Argentina/Buenos_Aires",
-  "Asia/Tokyo", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore", "Asia/Seoul",
-  "Asia/Kolkata", "Asia/Dubai",
-  "Australia/Sydney", "Australia/Melbourne",
-  "Pacific/Auckland",
-  "Africa/Cairo", "Africa/Johannesburg",
-  "UTC",
-]
 
 export default function Configuration({ permissions }: ConfigurationProps) {
   const [ntfyCredentials, setNtfyCredentials] = useState<NtfyCredentials | null>(null)
@@ -735,30 +720,6 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Timezone Card */}
-        <Card className="bg-zinc-800 border-zinc-700">
-          <CardHeader>
-            <CardTitle className="text-zinc-50">Timezone</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <select
-              value={editedConfig.timezone || ""}
-              onChange={(e) => setEditedConfig((prev) => ({ ...prev, timezone: e.target.value }))}
-              className="w-full bg-zinc-700 text-zinc-50 border border-zinc-600 rounded-md px-3 py-2 text-sm"
-              disabled={!canModifyDevices}
-            >
-              {TIMEZONE_OPTIONS.map((tz) => (
-                <option key={tz} value={tz}>{tz}</option>
-              ))}
-            </select>
-            {canModifyDevices && configChanged("timezone") && (
-              <Button size="sm" className="bg-zinc-700 hover:bg-zinc-600 w-full" onClick={() => handleSaveConfigKey("timezone")} disabled={savingConfig === "timezone"}>
-                <Save className="h-4 w-4 text-white" />
-              </Button>
-            )}
           </CardContent>
         </Card>
 

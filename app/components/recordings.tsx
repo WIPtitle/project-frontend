@@ -347,8 +347,17 @@ export default function Recordings({ permissions }: RecordingsProps) {
   }
 
   const formatRecordingName = (filename: string) => {
-    const [year, month, day, hour, minute, second] = filename.split("_").slice(0, 6)
-    return `${hour}:${minute}:${second} ${day}/${month}/${year}`
+    try {
+      const [year, month, day, hour, minute, second] = filename.split("_").slice(0, 6)
+      // Filename timestamps are UTC — convert to local time for display
+      const date = new Date(Date.UTC(+year, +month - 1, +day, +hour, +minute, +second))
+      return date.toLocaleString(undefined, {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      })
+    } catch {
+      return filename
+    }
   }
 
   if (initialLoading) {

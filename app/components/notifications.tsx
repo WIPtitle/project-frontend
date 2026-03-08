@@ -112,13 +112,14 @@ export default function Notifications({ permissions }: NotificationsProps) {
 
   const formatDateTime = (dateString: string) => {
     try {
-      const [datePart, timePart] = dateString.split('T')
-      const [year, month, day] = datePart.split('-')
-      const [time] = timePart.split('.')
-      const [hours, minutes, seconds] = time.split(':')
-
-       return `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`
-    } catch (error) {
+      // Backend stores UTC timestamps — append Z if missing so the browser converts to local time
+      const isoString = dateString.endsWith("Z") ? dateString : dateString + "Z"
+      const date = new Date(isoString)
+      return date.toLocaleString(undefined, {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      })
+    } catch {
       return dateString
     }
   }
