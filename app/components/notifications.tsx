@@ -139,7 +139,7 @@ export default function Notifications({ permissions }: NotificationsProps) {
         <h1 className="text-3xl font-bold text-zinc-50">Notifications</h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start mb-6">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 col-span-full">
             <Bell className="h-12 w-12 text-zinc-600 mb-4" />
