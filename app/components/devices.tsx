@@ -90,12 +90,14 @@ export default function Component({ permissions }: DeviceProps) {
   const [streamError, setStreamError] = useState(false)
 
   // ROI drawing state
+  const MAX_ROI_RECTS = 3
   const [isRoiDialogOpen, setIsRoiDialogOpen] = useState(false)
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [roiStart, setRoiStart] = useState<{ x: number; y: number } | null>(null)
   const [roiEnd, setRoiEnd] = useState<{ x: number; y: number } | null>(null)
-  const [roiRect, setRoiRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const [roiRects, setRoiRects] = useState<{ x: number; y: number; w: number; h: number }[]>([])
+  const [selectedRoiIndex, setSelectedRoiIndex] = useState<number | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
@@ -264,23 +266,28 @@ export default function Component({ permissions }: DeviceProps) {
         detection_mode: camera.detection_mode,
         detection_roi: camera.detection_roi || null,
       })
-      // Restore ROI rect from existing data
+      // Restore ROI rects from existing data (array of polygons)
       if (camera.detection_roi) {
         try {
-          const points = JSON.parse(camera.detection_roi)
-          if (Array.isArray(points) && points.length === 4) {
-            const x = points[0][0]
-            const y = points[0][1]
-            const w = points[1][0] - points[0][0]
-            const h = points[2][1] - points[0][1]
-            setRoiRect({ x, y, w, h })
+          const polygons = JSON.parse(camera.detection_roi)
+          if (Array.isArray(polygons)) {
+            const rects = polygons
+              .filter((poly: number[][]) => Array.isArray(poly) && poly.length === 4)
+              .map((poly: number[][]) => ({
+                x: poly[0][0],
+                y: poly[0][1],
+                w: poly[1][0] - poly[0][0],
+                h: poly[2][1] - poly[0][1],
+              }))
+            setRoiRects(rects)
           }
         } catch {
-          setRoiRect(null)
+          setRoiRects([])
         }
       } else {
-        setRoiRect(null)
+        setRoiRects([])
       }
+      setSelectedRoiIndex(null)
       setIsCreating(false)
       setIsDialogOpen(true)
     } else if (type === "sensor") {
@@ -346,7 +353,8 @@ export default function Component({ permissions }: DeviceProps) {
       setIsDialogOpen(false)
       setEditingDevice(null)
       setSnapshotUrl(null)
-      setRoiRect(null)
+      setRoiRects([])
+      setSelectedRoiIndex(null)
     } catch (error) {
       setErrorMessage(`Failed to ${isCreating ? "create" : "update"} ${deviceType}`)
     }
@@ -395,6 +403,14 @@ export default function Component({ permissions }: DeviceProps) {
   const ROI_CANVAS_W = 640
   const ROI_CANVAS_H = 360
 
+  const rectsToRoiJson = (rects: { x: number; y: number; w: number; h: number }[]): string | null => {
+    if (rects.length === 0) return null
+    const polygons = rects.map(r => [
+      [r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]
+    ])
+    return JSON.stringify(polygons)
+  }
+
   const drawCanvas = () => {
     const canvas = canvasRef.current
     if (!canvas || !snapshotUrl) return
@@ -405,15 +421,23 @@ export default function Component({ permissions }: DeviceProps) {
       canvas.width = ROI_CANVAS_W
       canvas.height = ROI_CANVAS_H
       ctx.drawImage(img, 0, 0, ROI_CANVAS_W, ROI_CANVAS_H)
-      // Draw existing ROI rect
-      const rect = roiRect
-      if (rect) {
-        ctx.strokeStyle = "#00ff00"
-        ctx.lineWidth = 2
-        ctx.strokeRect(rect.x * ROI_CANVAS_W, rect.y * ROI_CANVAS_H, rect.w * ROI_CANVAS_W, rect.h * ROI_CANVAS_H)
-        ctx.fillStyle = "rgba(0, 255, 0, 0.1)"
-        ctx.fillRect(rect.x * ROI_CANVAS_W, rect.y * ROI_CANVAS_H, rect.w * ROI_CANVAS_W, rect.h * ROI_CANVAS_H)
-      }
+      // Draw existing ROI rects
+      roiRects.forEach((rect, i) => {
+        const isSelected = i === selectedRoiIndex
+        const px = rect.x * ROI_CANVAS_W
+        const py = rect.y * ROI_CANVAS_H
+        const pw = rect.w * ROI_CANVAS_W
+        const ph = rect.h * ROI_CANVAS_H
+        ctx.strokeStyle = isSelected ? "#ff6600" : "#00ff00"
+        ctx.lineWidth = isSelected ? 3 : 2
+        ctx.strokeRect(px, py, pw, ph)
+        ctx.fillStyle = isSelected ? "rgba(255, 102, 0, 0.15)" : "rgba(0, 255, 0, 0.1)"
+        ctx.fillRect(px, py, pw, ph)
+        // Draw number label
+        ctx.font = "bold 16px sans-serif"
+        ctx.fillStyle = isSelected ? "#ff6600" : "#00ff00"
+        ctx.fillText(`${i + 1}`, px + 4, py + 16)
+      })
       // Draw in-progress drag
       if (roiStart && roiEnd) {
         const x = Math.min(roiStart.x, roiEnd.x)
@@ -422,7 +446,9 @@ export default function Component({ permissions }: DeviceProps) {
         const h = Math.abs(roiEnd.y - roiStart.y)
         ctx.strokeStyle = "#ffff00"
         ctx.lineWidth = 2
+        ctx.setLineDash([6, 3])
         ctx.strokeRect(x * ROI_CANVAS_W, y * ROI_CANVAS_H, w * ROI_CANVAS_W, h * ROI_CANVAS_H)
+        ctx.setLineDash([])
       }
     }
     img.src = snapshotUrl
@@ -431,26 +457,40 @@ export default function Component({ permissions }: DeviceProps) {
   // Redraw canvas when snapshot, roi, or drag changes
   useEffect(() => {
     drawCanvas()
-  }, [snapshotUrl, roiRect, roiStart, roiEnd])
+  }, [snapshotUrl, roiRects, selectedRoiIndex, roiStart, roiEnd])
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / rect.width
-    const y = (e.clientY - rect.top) / rect.height
+    const bounds = canvas.getBoundingClientRect()
+    const x = (e.clientX - bounds.left) / bounds.width
+    const y = (e.clientY - bounds.top) / bounds.height
+
+    // Check if clicking on an existing rect (select it)
+    for (let i = roiRects.length - 1; i >= 0; i--) {
+      const r = roiRects[i]
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        setSelectedRoiIndex(i)
+        return
+      }
+    }
+
+    // Deselect
+    setSelectedRoiIndex(null)
+
+    // Start new rect if under limit
+    if (roiRects.length >= MAX_ROI_RECTS) return
     setRoiStart({ x, y })
     setRoiEnd({ x, y })
-    setRoiRect(null)
   }
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!roiStart) return
     const canvas = canvasRef.current
     if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+    const bounds = canvas.getBoundingClientRect()
+    const x = Math.max(0, Math.min(1, (e.clientX - bounds.left) / bounds.width))
+    const y = Math.max(0, Math.min(1, (e.clientY - bounds.top) / bounds.height))
     setRoiEnd({ x, y })
   }
 
@@ -461,16 +501,21 @@ export default function Component({ permissions }: DeviceProps) {
     const w = Math.abs(roiEnd.x - roiStart.x)
     const h = Math.abs(roiEnd.y - roiStart.y)
     if (w > 0.01 && h > 0.01) {
-      const newRoi = { x, y, w, h }
-      setRoiRect(newRoi)
-      // Store as 4-point polygon (normalized coords)
-      const roiJson = JSON.stringify([
-        [x, y], [x + w, y], [x + w, y + h], [x, y + h]
-      ])
-      setEditingDevice((prev) => prev ? { ...prev, detection_roi: roiJson } : null)
+      const newRects = [...roiRects, { x, y, w, h }]
+      setRoiRects(newRects)
+      setSelectedRoiIndex(newRects.length - 1)
+      setEditingDevice((prev) => prev ? { ...prev, detection_roi: rectsToRoiJson(newRects) } : null)
     }
     setRoiStart(null)
     setRoiEnd(null)
+  }
+
+  const handleDeleteSelectedRoi = () => {
+    if (selectedRoiIndex === null) return
+    const newRects = roiRects.filter((_, i) => i !== selectedRoiIndex)
+    setRoiRects(newRects)
+    setSelectedRoiIndex(null)
+    setEditingDevice((prev) => prev ? { ...prev, detection_roi: rectsToRoiJson(newRects) } : null)
   }
 
   const handleOpenLiveStream = (camera: RTSPCamera) => {
@@ -512,7 +557,7 @@ export default function Component({ permissions }: DeviceProps) {
                   <p className="text-zinc-300">Path: {camera.path}</p>
                   <p className="text-zinc-300">Always recording: {camera.always_recording ? "Yes" : "No"}</p>
                   {camera.detection_mode && (
-                    <p className="text-zinc-300">Detection: {camera.detection_mode === "motion" ? "Motion" : "Motion + Person"}{camera.detection_roi ? " (ROI)" : ""}</p>
+                    <p className="text-zinc-300">Detection: {camera.detection_mode === "motion" ? "Motion" : "Motion + Person"}{camera.detection_roi ? (() => { try { const p = JSON.parse(camera.detection_roi); return ` (${p.length} ROI)` } catch { return " (ROI)" } })() : ""}</p>
                   )}
                 </div>
               </CardContent>
@@ -748,7 +793,7 @@ export default function Component({ permissions }: DeviceProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { setSnapshotUrl(null); setRoiRect(null) } }}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { setSnapshotUrl(null); setRoiRects([]); setSelectedRoiIndex(null) } }}>
         <DialogContent className="bg-zinc-800 text-zinc-50">
           <DialogHeader>
             <DialogTitle>
@@ -852,9 +897,10 @@ export default function Component({ permissions }: DeviceProps) {
                   <Switch
                     id="always-recording"
                     checked={(editingDevice as CameraInputDto)?.always_recording || false}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked) => {
                       setEditingDevice((prev) => (prev ? { ...prev, always_recording: checked, detection_mode: checked ? (prev as CameraInputDto).detection_mode : null, detection_roi: checked ? (prev as CameraInputDto).detection_roi : null } : null))
-                    }
+                      if (!checked) { setRoiRects([]); setSelectedRoiIndex(null) }
+                    }}
                     className="data-[state=unchecked]:bg-zinc-700 data-[state=unchecked]:border-zinc-600 disabled:opacity-50"
                     disabled={!isCreating}
                   />
@@ -868,7 +914,7 @@ export default function Component({ permissions }: DeviceProps) {
                       value={(editingDevice as CameraInputDto)?.detection_mode || "none"}
                       onValueChange={(value) => {
                         setEditingDevice((prev) => (prev ? { ...prev, detection_mode: value === "none" ? null : value, detection_roi: value === "none" ? null : (prev as CameraInputDto).detection_roi } : null))
-                        if (value === "none") { setSnapshotUrl(null); setRoiRect(null) }
+                        if (value === "none") { setSnapshotUrl(null); setRoiRects([]); setSelectedRoiIndex(null) }
                       }
                       }
                     >
@@ -893,10 +939,10 @@ export default function Component({ permissions }: DeviceProps) {
                       disabled={!(editingDevice as CameraInputDto)?.ip || !(editingDevice as CameraInputDto)?.path}
                     >
                       <Camera className="h-4 w-4 mr-2" />
-                      {roiRect ? "Edit detection area" : "Set detection area"}
+                      {roiRects.length > 0 ? `Edit detection area (${roiRects.length})` : "Set detection area"}
                     </Button>
-                    {roiRect && (
-                      <span className="text-xs text-green-400 whitespace-nowrap">ROI set</span>
+                    {roiRects.length > 0 && (
+                      <span className="text-xs text-green-400 whitespace-nowrap">{roiRects.length} ROI</span>
                     )}
                   </div>
                 )}
@@ -956,7 +1002,7 @@ export default function Component({ permissions }: DeviceProps) {
           <DialogHeader>
             <DialogTitle>Detection area</DialogTitle>
             <DialogDescription>
-              Draw a rectangle on the camera image to limit the detection area. Leave empty for full frame.
+              Draw up to {MAX_ROI_RECTS} rectangles to limit the detection area. Click a rectangle to select it. Leave empty for full frame.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-3">
@@ -982,6 +1028,11 @@ export default function Component({ permissions }: DeviceProps) {
                 onTouchEnd={(e) => { e.preventDefault(); handleCanvasMouseUp() }}
               />
             )}
+            {snapshotUrl && (
+              <p className="text-xs text-zinc-400">
+                {roiRects.length}/{MAX_ROI_RECTS} areas{roiRects.length >= MAX_ROI_RECTS ? " (max reached)" : ""}
+              </p>
+            )}
             <div className="flex gap-2 w-full">
               {snapshotUrl && (
                 <Button
@@ -994,17 +1045,28 @@ export default function Component({ permissions }: DeviceProps) {
                   <RefreshCw className="h-4 w-4 mr-2" /> Reload
                 </Button>
               )}
-              {roiRect && (
+              {selectedRoiIndex !== null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-red-900 text-zinc-50 hover:bg-red-800"
+                  onClick={handleDeleteSelectedRoi}
+                >
+                  Delete #{selectedRoiIndex + 1}
+                </Button>
+              )}
+              {roiRects.length > 0 && (
                 <Button
                   type="button"
                   variant="outline"
                   className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
                   onClick={() => {
-                    setRoiRect(null)
+                    setRoiRects([])
+                    setSelectedRoiIndex(null)
                     setEditingDevice((prev) => prev ? { ...prev, detection_roi: null } : null)
                   }}
                 >
-                  Clear ROI
+                  Clear all
                 </Button>
               )}
               <div className="flex-1" />
