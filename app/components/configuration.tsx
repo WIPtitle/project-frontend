@@ -651,6 +651,22 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                 </Button>
               )}
             </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-zinc-300">Warning notification delay (seconds)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={editedConfig.warning_notification_delay_seconds || ""}
+                onChange={(e) => setEditedConfig((prev) => ({ ...prev, warning_notification_delay_seconds: e.target.value }))}
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                disabled={!canModifyDevices}
+              />
+              {canModifyDevices && configChanged("warning_notification_delay_seconds") && (
+                <Button size="sm" className="bg-zinc-700 hover:bg-zinc-600 w-full" onClick={() => handleSaveConfigKey("warning_notification_delay_seconds")} disabled={savingConfig === "warning_notification_delay_seconds"}>
+                  <Save className="h-4 w-4 text-white" />
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
