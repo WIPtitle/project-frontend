@@ -424,7 +424,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 overflow-hidden">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h1 className="text-3xl font-bold text-zinc-50 mb-2 sm:mb-0">Configuration</h1>
       </div>
@@ -454,7 +454,7 @@ export default function Configuration({ permissions }: ConfigurationProps) {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
         {/* Ntfy Card */}
         <Card className="bg-zinc-800 border-zinc-700">
           <CardHeader>
