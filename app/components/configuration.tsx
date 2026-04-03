@@ -43,6 +43,9 @@ import {
   createMp3Server,
   updateMp3Server,
   deleteMp3Server,
+  getValveServer,
+  setValveServer as saveValveServerApi,
+  deleteValveServer,
 } from "@/lib/api"
 import {
   type NtfyCredentials,
@@ -51,6 +54,7 @@ import {
   type SystemConfig,
   type GpioServerConfig,
   type Mp3ServerConfig,
+  type ValveServerConfig,
   Permission,
 } from "@/types"
 
@@ -92,6 +96,15 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   const [isGpioDialogOpen, setIsGpioDialogOpen] = useState(false)
   const [isMp3DialogOpen, setIsMp3DialogOpen] = useState(false)
   const [savingConfig, setSavingConfig] = useState<string | null>(null)
+
+  // Valve controller server state
+  const [valveServer, setValveServer] = useState<ValveServerConfig | null>(null)
+  const [newValveUrl, setNewValveUrl] = useState("")
+  const [newValveTz, setNewValveTz] = useState("UTC")
+  const [isValveDialogOpen, setIsValveDialogOpen] = useState(false)
+  const [valveError, setValveError] = useState<string | null>(null)
+  const [valveSaving, setValveSaving] = useState(false)
+  const [showTzWarning, setShowTzWarning] = useState(false)
 
   const canChangeNotificationsConfig = permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
   const canChangeAlarmSound = permissions.includes(Permission.CHANGE_ALARM_SOUND)
@@ -154,6 +167,13 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           setSavedMp3Servers(mp3)
         } catch (error) {
           console.error("Failed to fetch MP3 servers:", error)
+        }
+
+        try {
+          const vs = await getValveServer()
+          setValveServer(vs)
+        } catch (error) {
+          console.error("Failed to fetch valve server:", error)
         }
 
         if (ntfyError && audioError) {
@@ -412,6 +432,36 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       setSavedMp3Servers((prev) => prev.filter((s) => s.id !== id))
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message :"Failed to delete MP3 server")
+    }
+  }
+
+  // --- Valve controller server handlers ---
+  const handleSaveValveServer = async () => {
+    const tzChanged = valveServer?.configured && valveServer.timezone !== newValveTz
+    if (tzChanged && !showTzWarning) {
+      setShowTzWarning(true)
+      return
+    }
+    setValveSaving(true)
+    setValveError(null)
+    try {
+      const saved = await saveValveServerApi(newValveUrl, newValveTz)
+      setValveServer(saved)
+      setIsValveDialogOpen(false)
+      setShowTzWarning(false)
+    } catch (e: unknown) {
+      setValveError(e instanceof Error ? e.message : "Failed to save valve server")
+    } finally {
+      setValveSaving(false)
+    }
+  }
+
+  const handleDeleteValveServer = async () => {
+    try {
+      await deleteValveServer()
+      setValveServer({ configured: false })
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete valve server")
     }
   }
 
@@ -866,6 +916,74 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             </CardFooter>
           )}
         </Card>
+
+        {/* Valve Controller Server */}
+        <Card className="bg-zinc-800 border-zinc-700">
+          <CardHeader>
+            <CardTitle className="text-zinc-50">Valve Controller</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {valveServer?.configured ? (
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium text-zinc-300">URL</Label>
+                  <p className="text-sm text-zinc-50 font-mono">{valveServer.url}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium text-zinc-300">Timezone</Label>
+                  <p className="text-sm text-zinc-50">{valveServer.timezone}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-zinc-400 text-sm">No valve controller server configured.</p>
+            )}
+            {valveError && <p className="text-sm text-red-400">{valveError}</p>}
+          </CardContent>
+          {canModifyDevices && (
+            <CardFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 flex-1"
+                onClick={() => {
+                  setNewValveUrl(valveServer?.url ?? "")
+                  setNewValveTz(valveServer?.timezone ?? "UTC")
+                  setValveError(null)
+                  setShowTzWarning(false)
+                  setIsValveDialogOpen(true)
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {valveServer?.configured ? "Update" : "Add Server"}
+              </Button>
+              {valveServer?.configured && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-red-900">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-zinc-800 border-zinc-700">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-zinc-50">Remove Valve Controller?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-zinc-400">
+                        This will remove the valve controller configuration. All irrigation settings will be permanently deleted.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-900 hover:bg-red-800"
+                        onClick={handleDeleteValveServer}
+                      >
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </CardFooter>
+          )}
+        </Card>
       </div>
 
       {/* Audio dialogs */}
@@ -1003,6 +1121,62 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             </div>
             <Button onClick={handleAddMp3Server} className="w-full bg-zinc-700 text-zinc-50 hover:bg-zinc-600" disabled={!newMp3Url.trim()}>
               Add
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Valve Server Dialog */}
+      <Dialog open={isValveDialogOpen} onOpenChange={setIsValveDialogOpen}>
+        <DialogContent className="bg-zinc-800 border-zinc-700">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-50">
+              {valveServer?.configured ? "Update" : "Add"} Valve Controller Server
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium text-zinc-300">Server URL</Label>
+              <Input
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                placeholder="http://192.168.1.x:8686"
+                value={newValveUrl}
+                onChange={(e) => setNewValveUrl(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm font-medium text-zinc-300">Timezone</Label>
+              <Input
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                placeholder="Europe/Rome"
+                value={newValveTz}
+                onChange={(e) => setNewValveTz(e.target.value)}
+              />
+              <p className="text-xs text-zinc-500">
+                e.g. UTC, Europe/Rome, America/New_York
+              </p>
+              {valveServer?.configured && (
+                <p className="text-xs text-amber-400 mt-1">
+                  Changing timezone will delete all irrigation schedules and settings.
+                </p>
+              )}
+            </div>
+            {valveError && <p className="text-sm text-red-400">{valveError}</p>}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              className="bg-zinc-700 text-zinc-50"
+              onClick={() => setIsValveDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-zinc-600 text-zinc-50 hover:bg-zinc-500"
+              disabled={valveSaving || !newValveUrl.trim()}
+              onClick={handleSaveValveServer}
+            >
+              {valveSaving ? "Saving..." : showTzWarning ? "Confirm (deletes schedules)" : "Save"}
             </Button>
           </div>
         </DialogContent>

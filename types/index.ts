@@ -117,3 +117,47 @@ export interface Mp3ServerConfig {
 }
 
 export type SystemConfig = Record<string, string>
+
+export interface ValveServerConfig {
+  configured: boolean
+  id?: number
+  url?: string
+  timezone?: string
+}
+
+export interface IrrigationZone {
+  id: number
+  zone_number: string
+  name: string
+}
+
+export interface IrrigationSetup {
+  id: number
+  name: string
+}
+
+export interface SetupZoneSchedule {
+  id: number
+  setup_id: number
+  zone_id: number
+  day_of_week: number
+  start_time: string
+  end_time: string
+}
+
+export interface SetupDateRange {
+  id: number
+  setup_id: number
+  start_date: string
+  end_date: string
+}
+
+export interface ValveStatus {
+  active: boolean
+  active_zone: string | null
+  zones: string[]
+  remaining_seconds?: number
+  elapsed_seconds?: number
+  duration?: number
+  error?: string
+}

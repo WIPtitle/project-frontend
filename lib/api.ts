@@ -14,7 +14,13 @@ import type {
   AlarmNotification,
   SystemConfig,
   GpioServerConfig,
-  Mp3ServerConfig
+  Mp3ServerConfig,
+  ValveServerConfig,
+  IrrigationZone,
+  IrrigationSetup,
+  SetupZoneSchedule,
+  SetupDateRange,
+  ValveStatus
 } from "@/types"
 
 const getApiBaseUrl = () => {
@@ -1332,5 +1338,237 @@ export const deleteMp3Server = async (id: number): Promise<void> => {
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))
     throw new Error(data.detail || "Failed to delete MP3 server")
+  }
+}
+
+// --- Irrigation ---
+
+const IRRIGATION_BASE = "/api/irrigation-service"
+
+export const getValveServer = async (): Promise<ValveServerConfig> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/config/valve-server`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const setValveServer = async (url: string, timezone: string): Promise<ValveServerConfig> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/config/valve-server`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ url, timezone }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const deleteValveServer = async (): Promise<void> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/config/valve-server`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+}
+
+export const getIrrigationZones = async (): Promise<IrrigationZone[]> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/zones/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const syncIrrigationZones = async (): Promise<IrrigationZone[]> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/zones/sync`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const updateZoneName = async (zoneId: number, name: string): Promise<IrrigationZone> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/zones/${zoneId}/name`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const getZoneStatus = async (): Promise<ValveStatus> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/zones/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const getZoneStatusStream = (): EventSource => {
+  const token = getTokenOrThrow()
+  return new EventSource(`${IRRIGATION_BASE}/zones/status/stream?auth_token=${encodeURIComponent(token)}`)
+}
+
+export const getSetups = async (): Promise<IrrigationSetup[]> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const createSetup = async (name: string): Promise<IrrigationSetup> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const renameSetup = async (setupId: number, name: string): Promise<IrrigationSetup> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const deleteSetup = async (setupId: number): Promise<void> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+}
+
+export const getSchedules = async (setupId: number): Promise<SetupZoneSchedule[]> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}/schedules/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const addSchedule = async (
+  setupId: number,
+  zoneId: number,
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string
+): Promise<SetupZoneSchedule> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}/schedules/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ zone_id: zoneId, day_of_week: dayOfWeek, start_time: startTime, end_time: endTime }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const deleteSchedule = async (setupId: number, scheduleId: number): Promise<void> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}/schedules/${scheduleId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+}
+
+export const getDateRanges = async (setupId: number): Promise<SetupDateRange[]> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}/date-ranges/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const addDateRange = async (setupId: number, startDate: string, endDate: string): Promise<SetupDateRange> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}/date-ranges/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ start_date: startDate, end_date: endDate }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const deleteDateRange = async (setupId: number, rangeId: number): Promise<void> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}/date-ranges/${rangeId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
   }
 }

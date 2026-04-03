@@ -12,6 +12,7 @@ import Recordings from "./recordings"
 import Configuration from "./configuration"
 import UserManagement from "./user-management"
 import Notifications from "./notifications"
+import Irrigation from "./irrigation"
 import { getUserMyself, logout } from "@/lib/api"
 import { type User, Permission } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -132,7 +133,8 @@ export default function TabLayout() {
       : []),
     { value: "users", label: "User management" },
     { value: "configuration", label: "Configuration" }, // Configuration tab is always visible
-    { value: "notifications", label: "Notifications" }
+    { value: "notifications", label: "Notifications" },
+    { value: "irrigation", label: "Irrigation" },
   ]
 
   return (
@@ -233,6 +235,9 @@ export default function TabLayout() {
             </TabsContent>
             <TabsContent value="notifications">
               <Notifications permissions={currentUser?.permissions || []} />
+            </TabsContent>
+            <TabsContent value="irrigation">
+              <Irrigation permissions={currentUser?.permissions || []} />
             </TabsContent>
           </div>
         </Tabs>
