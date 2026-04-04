@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -895,56 +895,56 @@ function SetupsSection({
                   {setup.name}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-2">
+              <CardContent className="px-4 pb-4">
                 <SetupDetail
                   setup={setup}
                   zones={zones}
                   canModify={canModify}
                   onDateRangesChange={(ranges) => handleDateRangesChange(setup.id, ranges)}
                 />
-              </CardContent>
-              {canModify && (
-                <CardFooter className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    onClick={() => handleRenameOpen(setup)}
-                  >
-                    Update
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 bg-red-900 text-zinc-50 hover:bg-red-800"
-                      >
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-zinc-800 border-zinc-700">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-zinc-50">Delete Setup</AlertDialogTitle>
-                        <AlertDialogDescription className="text-zinc-400">
-                          Are you sure you want to delete &quot;{setup.name}&quot;? This will also remove all its schedules and date ranges.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600">
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-red-900 hover:bg-red-800 text-zinc-50"
-                          onClick={() => handleDelete(setup.id)}
+                {canModify && (
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                      onClick={() => handleRenameOpen(setup)}
+                    >
+                      Update
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-red-900 text-zinc-50 hover:bg-red-800"
                         >
                           Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </CardFooter>
-              )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-800 border-zinc-700">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-zinc-50">Delete Setup</AlertDialogTitle>
+                          <AlertDialogDescription className="text-zinc-400">
+                            Are you sure you want to delete &quot;{setup.name}&quot;? This will also remove all its schedules and date ranges.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-red-900 hover:bg-red-800 text-zinc-50"
+                            onClick={() => handleDelete(setup.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
+              </CardContent>
             </Card>
           ))}
         </div>
