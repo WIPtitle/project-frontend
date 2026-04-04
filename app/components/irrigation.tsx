@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Pencil, Trash2 } from "lucide-react"
+import { Pencil } from "lucide-react"
 import {
   getValveServer,
   syncIrrigationZones,
@@ -288,7 +288,7 @@ function ZonesSection({
                   {canStart && (
                     <Button
                       variant="outline"
-                      className="bg-zinc-700 text-green-400 border-green-700 hover:bg-green-900 w-full text-xs mt-1"
+                      className="w-full text-xs mt-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600 border-zinc-600"
                       onClick={async () => {
                         setValveError(null)
                         try {
@@ -304,7 +304,7 @@ function ZonesSection({
                   {canStop && (
                     <Button
                       variant="outline"
-                      className="bg-red-900/30 text-red-400 border-red-700 hover:bg-red-900 w-full text-xs mt-1"
+                      className="w-full text-xs mt-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600 border-zinc-600"
                       onClick={async () => {
                         setValveError(null)
                         try {
@@ -763,7 +763,6 @@ function SetupsSection({
   canModify: boolean
 }) {
   const [setups, setSetups] = useState<IrrigationSetup[]>([])
-  const [selectedSetup, setSelectedSetup] = useState<IrrigationSetup | null>(null)
   const [loading, setLoading] = useState(true)
   // All date ranges from all setups, keyed by setupId
   const [allDateRanges, setAllDateRanges] = useState<Record<number, SetupDateRange[]>>({})
@@ -785,7 +784,6 @@ function SetupsSection({
     getSetups()
       .then((data) => {
         setSetups(data)
-        if (data.length > 0) setSelectedSetup(data[0])
       })
       .catch((e) => console.error("Failed to load setups:", e))
       .finally(() => setLoading(false))
@@ -796,7 +794,6 @@ function SetupsSection({
     try {
       const created = await createSetup(createName, newSetupColor)
       setSetups((prev) => [...prev, created])
-      setSelectedSetup(created)
       setCreateOpen(false)
       setCreateName("")
       setNewSetupColor("#22c55e")
@@ -815,9 +812,6 @@ function SetupsSection({
         delete next[setupId]
         return next
       })
-      if (selectedSetup?.id === setupId) {
-        setSelectedSetup(remaining.length > 0 ? remaining[0] : null)
-      }
     } catch (e: unknown) {
       console.error("Failed to delete setup:", e)
     }
@@ -837,7 +831,6 @@ function SetupsSection({
     try {
       const updated = await updateSetup(renameTarget.id, renameValue, renameColor)
       setSetups((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
-      if (selectedSetup?.id === updated.id) setSelectedSetup(updated)
       setRenameOpen(false)
       setRenameTarget(null)
     } catch (e: unknown) {
@@ -890,87 +883,71 @@ function SetupsSection({
         <p className="text-zinc-400 text-sm">No setups yet. Create one to get started.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {setups.map((setup) => {
-            const isSelected = selectedSetup?.id === setup.id
-            return (
-              <Card
-                key={setup.id}
-                className={`bg-zinc-800 cursor-pointer transition-colors overflow-hidden ${
-                  isSelected ? "border-zinc-500" : "border-zinc-700 hover:border-zinc-600"
-                }`}
-                onClick={() => setSelectedSetup(setup)}
-              >
-                <div className="h-1 rounded-t-lg" style={{ backgroundColor: setup.color || "#22c55e" }} />
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-zinc-50 text-sm font-medium flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full inline-block shrink-0" style={{ backgroundColor: setup.color || "#22c55e" }} />
-                    {setup.name}
-                  </CardTitle>
-                </CardHeader>
-                {canModify && (
-                  <CardFooter className="pt-0 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 flex-1"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRenameOpen(setup)
-                      }}
-                    >
-                      Update
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-zinc-700 text-zinc-50 hover:bg-red-900"
-                          onClick={(e) => e.stopPropagation()}
+          {setups.map((setup) => (
+            <Card
+              key={setup.id}
+              className="bg-zinc-800 border-zinc-700 overflow-hidden"
+            >
+              <div className="h-1 rounded-t-lg" style={{ backgroundColor: setup.color || "#22c55e" }} />
+              <CardHeader className="pb-2">
+                <CardTitle className="text-zinc-50 text-sm font-medium flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full inline-block shrink-0" style={{ backgroundColor: setup.color || "#22c55e" }} />
+                  {setup.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-2">
+                <SetupDetail
+                  setup={setup}
+                  zones={zones}
+                  canModify={canModify}
+                  onDateRangesChange={(ranges) => handleDateRangesChange(setup.id, ranges)}
+                />
+              </CardContent>
+              {canModify && (
+                <CardFooter className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+                    onClick={() => handleRenameOpen(setup)}
+                  >
+                    Update
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-red-900 text-zinc-50 hover:bg-red-800"
+                      >
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-zinc-800 border-zinc-700">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-zinc-50">Delete Setup</AlertDialogTitle>
+                        <AlertDialogDescription className="text-zinc-400">
+                          Are you sure you want to delete &quot;{setup.name}&quot;? This will also remove all its schedules and date ranges.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-900 hover:bg-red-800 text-zinc-50"
+                          onClick={() => handleDelete(setup.id)}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-zinc-800 border-zinc-700">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-zinc-50">Delete Setup</AlertDialogTitle>
-                          <AlertDialogDescription className="text-zinc-400">
-                            Are you sure you want to delete &quot;{setup.name}&quot;? This will also remove all its schedules and date ranges.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600">
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-red-900 hover:bg-red-800 text-zinc-50"
-                            onClick={() => handleDelete(setup.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </CardFooter>
-                )}
-              </Card>
-            )
-          })}
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardFooter>
+              )}
+            </Card>
+          ))}
         </div>
-      )}
-
-      {/* Setup Detail */}
-      {selectedSetup && (
-        <Card className="bg-zinc-800 border-zinc-700">
-          <CardContent className="p-4">
-            <SetupDetail
-              setup={selectedSetup}
-              zones={zones}
-              canModify={canModify}
-              onDateRangesChange={(ranges) => handleDateRangesChange(selectedSetup.id, ranges)}
-            />
-          </CardContent>
-        </Card>
       )}
 
       {/* Create Setup Dialog */}
