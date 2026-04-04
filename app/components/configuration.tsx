@@ -47,9 +47,13 @@ import {
   getValveServer,
   setValveServer as saveValveServerApi,
   deleteValveServer,
+  getFirebaseStatus,
+  setFirebaseCredentials,
+  deleteFirebaseCredentials,
 } from "@/lib/api"
 import {
   type NtfyCredentials,
+  type FirebaseStatus,
   type AlarmAudioConfig,
   type WarningAudioConfig,
   type SystemConfig,
@@ -130,6 +134,11 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   const [valveSaving, setValveSaving] = useState(false)
   const [showTzWarning, setShowTzWarning] = useState(false)
 
+  const [firebaseStatus, setFirebaseStatus] = useState<FirebaseStatus | null>(null)
+  const [firebaseCredentialsInput, setFirebaseCredentialsInput] = useState("")
+  const [firebaseLoading, setFirebaseLoading] = useState(false)
+  const [firebaseError, setFirebaseError] = useState<string | null>(null)
+
   const canChangeNotificationsConfig = permissions.includes(Permission.UPDATE_NOTIFICATIONS_CONFIG)
   const canChangeAlarmSound = permissions.includes(Permission.CHANGE_ALARM_SOUND)
   const canModifyDevices = permissions.includes(Permission.MODIFY_DEVICES)
@@ -200,6 +209,13 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           console.error("Failed to fetch valve server:", error)
         }
 
+        try {
+          const status = await getFirebaseStatus()
+          setFirebaseStatus(status)
+        } catch {
+          // non-blocking
+        }
+
         if (ntfyError && audioError) {
           setErrorMessage("Failed to fetch configurations")
         } else if (ntfyError) {
@@ -233,6 +249,34 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       setNtfyCredentials(updatedCredentials)
     } catch (error) {
       setErrorMessage("Failed to refresh notifications configuration")
+    }
+  }
+
+  const handleSaveFirebaseCredentials = async () => {
+    if (!firebaseCredentialsInput.trim()) return
+    setFirebaseLoading(true)
+    setFirebaseError(null)
+    try {
+      await setFirebaseCredentials(firebaseCredentialsInput)
+      setFirebaseStatus({ configured: true })
+      setFirebaseCredentialsInput("")
+    } catch (e: unknown) {
+      setFirebaseError(e instanceof Error ? e.message : "Failed to save credentials")
+    } finally {
+      setFirebaseLoading(false)
+    }
+  }
+
+  const handleDeleteFirebaseCredentials = async () => {
+    setFirebaseLoading(true)
+    setFirebaseError(null)
+    try {
+      await deleteFirebaseCredentials()
+      setFirebaseStatus({ configured: false })
+    } catch (e: unknown) {
+      setFirebaseError(e instanceof Error ? e.message : "Failed to delete credentials")
+    } finally {
+      setFirebaseLoading(false)
     }
   }
 
@@ -571,6 +615,97 @@ export default function Configuration({ permissions }: ConfigurationProps) {
               >
                 Refresh configuration
               </Button>
+            </CardFooter>
+          )}
+        </Card>
+
+        {/* Firebase Card */}
+        <Card className="bg-zinc-800 border-zinc-700">
+          <CardHeader>
+            <CardTitle className="text-zinc-50 flex items-center gap-2">
+              Firebase
+              {firebaseStatus && (
+                <span
+                  className={`text-xs font-normal px-2 py-0.5 rounded-full ${
+                    firebaseStatus.configured
+                      ? "bg-green-900/40 text-green-400"
+                      : "bg-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  {firebaseStatus.configured ? "● Configured" : "● Not configured"}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-zinc-400 text-sm">
+              {firebaseStatus?.configured
+                ? "Firebase Cloud Messaging is active. Android app will use FCM instead of ntfy."
+                : "Paste your Firebase service account JSON to enable FCM push notifications."}
+            </p>
+            {canChangeNotificationsConfig && !firebaseStatus?.configured && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-zinc-300">
+                  Service Account JSON
+                </Label>
+                <textarea
+                  value={firebaseCredentialsInput}
+                  onChange={(e) => setFirebaseCredentialsInput(e.target.value)}
+                  placeholder='{"type": "service_account", "project_id": "...", ...}'
+                  rows={6}
+                  className="w-full rounded-md border border-zinc-600 bg-zinc-700 px-3 py-2 text-sm text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-400 font-mono resize-none"
+                />
+                {firebaseError && (
+                  <p className="text-red-400 text-xs">{firebaseError}</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+          {canChangeNotificationsConfig && (
+            <CardFooter className="flex gap-2">
+              {!firebaseStatus?.configured ? (
+                <Button
+                  variant="outline"
+                  className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 w-full"
+                  onClick={handleSaveFirebaseCredentials}
+                  disabled={firebaseLoading || !firebaseCredentialsInput.trim()}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {firebaseLoading ? "Saving..." : "Save credentials"}
+                </Button>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="bg-red-900/30 text-red-400 hover:bg-red-900/50 border-red-800 w-full"
+                      disabled={firebaseLoading}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {firebaseLoading ? "Removing..." : "Remove Firebase"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-zinc-800 border-zinc-700">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-zinc-50">Remove Firebase configuration?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-zinc-400">
+                        All registered device tokens will be deleted. Android app will switch back to ntfy on next launch.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 border-zinc-600">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteFirebaseCredentials}
+                        className="bg-red-800 hover:bg-red-700 text-white"
+                      >
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </CardFooter>
           )}
         </Card>
