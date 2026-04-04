@@ -778,6 +778,7 @@ function SetupsSection({
   const [renameTarget, setRenameTarget] = useState<IrrigationSetup | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [renameColor, setRenameColor] = useState("#22c55e")
+  const renameColorRef = useRef("#22c55e")
   const [renameError, setRenameError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -821,6 +822,7 @@ function SetupsSection({
     setRenameTarget(setup)
     setRenameValue(setup.name)
     setRenameColor(setup.color || "#22c55e")
+    renameColorRef.current = setup.color || "#22c55e"
     setRenameError(null)
     setRenameOpen(true)
   }
@@ -829,7 +831,7 @@ function SetupsSection({
     if (!renameTarget) return
     setRenameError(null)
     try {
-      const updated = await updateSetup(renameTarget.id, renameValue, renameColor)
+      const updated = await updateSetup(renameTarget.id, renameValue, renameColorRef.current)
       setSetups((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
       setRenameOpen(false)
       setRenameTarget(null)
@@ -1014,7 +1016,7 @@ function SetupsSection({
                     type="button"
                     className={`w-7 h-7 rounded-full border-2 ${renameColor === c ? "border-zinc-50" : "border-transparent"}`}
                     style={{ backgroundColor: c }}
-                    onClick={() => setRenameColor(c)}
+                    onClick={() => { renameColorRef.current = c; setRenameColor(c) }}
                   />
                 ))}
               </div>
