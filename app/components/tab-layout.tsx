@@ -133,8 +133,8 @@ export default function TabLayout() {
       : []),
     { value: "users", label: "User management" },
     { value: "configuration", label: "Configuration" }, // Configuration tab is always visible
-    { value: "notifications", label: "Notifications" },
     { value: "irrigation", label: "Irrigation" },
+    { value: "notifications", label: "Notifications" },
   ]
 
   return (

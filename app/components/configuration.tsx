@@ -19,6 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Download, Activity, Trash2, Plus, Save } from "lucide-react"
 import {
   getNtfyCredentials,
@@ -57,6 +58,29 @@ import {
   type ValveServerConfig,
   Permission,
 } from "@/types"
+
+const VALVE_TIMEZONES = [
+  "UTC",
+  "Europe/Rome",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Madrid",
+  "Europe/Amsterdam",
+  "Europe/Athens",
+  "Europe/Bucharest",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Sao_Paulo",
+  "Asia/Tokyo",
+  "Asia/Shanghai",
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+]
 
 type ConfigurationProps = {
   permissions: Permission[]
@@ -1146,15 +1170,16 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             </div>
             <div className="space-y-1">
               <Label className="text-sm font-medium text-zinc-300">Timezone</Label>
-              <Input
-                className="bg-zinc-700 text-zinc-50 border-zinc-600"
-                placeholder="Europe/Rome"
-                value={newValveTz}
-                onChange={(e) => setNewValveTz(e.target.value)}
-              />
-              <p className="text-xs text-zinc-500">
-                e.g. UTC, Europe/Rome, America/New_York
-              </p>
+              <Select value={newValveTz} onValueChange={setNewValveTz}>
+                <SelectTrigger className="bg-zinc-700 text-zinc-50 border-zinc-600">
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  {VALVE_TIMEZONES.map(tz => (
+                    <SelectItem key={tz} value={tz} className="text-zinc-50">{tz}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {valveServer?.configured && (
                 <p className="text-xs text-amber-400 mt-1">
                   Changing timezone will delete all irrigation schedules and settings.

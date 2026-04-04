@@ -876,17 +876,7 @@ export default function Irrigation({ permissions }: IrrigationProps) {
   if (!valveServer?.configured) {
     return (
       <div className="p-4">
-        <Card className="bg-zinc-800 border-amber-600">
-          <CardHeader>
-            <CardTitle className="text-amber-400">Valve Controller Not Configured</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-300 text-sm">
-              No valve controller server has been configured. Go to{" "}
-              <strong className="text-zinc-100">Configuration</strong> to add a Valve Controller Server before using irrigation features.
-            </p>
-          </CardContent>
-        </Card>
+        <p className="text-zinc-400">No valve controller server configured. Go to Configuration to add one.</p>
       </div>
     )
   }
