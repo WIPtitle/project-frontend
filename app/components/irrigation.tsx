@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,15 +17,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Pencil } from "lucide-react"
 import {
   getValveServer,
-  getIrrigationZones,
   syncIrrigationZones,
+  getZonesMismatch,
   updateZoneName,
   getZoneStatusStream,
   getSetups,
   createSetup,
   deleteSetup,
+  renameSetup,
   getSchedules,
   addSchedule,
   deleteSchedule,
@@ -40,10 +42,15 @@ import type {
   SetupZoneSchedule,
   SetupDateRange,
   ValveStatus,
+  ZoneMismatch,
 } from "@/types"
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const MONTH_FULL_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
 
 // Days in each month for leap year 2000
 const LEAP_YEAR_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -55,81 +62,71 @@ type IrrigationProps = {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function trimSeconds(time: string): string {
-  // "HH:MM:SS" → "HH:MM"
   if (!time) return time
   const parts = time.split(":")
   return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : time
 }
 
-function formatMonthDay(mmdd: string): string {
-  // "MM-DD" → "Mon Day"
-  if (!mmdd) return mmdd
-  const [mm, dd] = mmdd.split("-")
-  const monthIndex = parseInt(mm, 10) - 1
-  const monthName = MONTH_NAMES[monthIndex] ?? mm
-  return `${monthName} ${parseInt(dd, 10)}`
+// dateStr is "2000-MM-DD" (or "MM-DD" fallback)
+function formatMonthDay(dateStr: string): string {
+  if (!dateStr) return dateStr
+  const parts = dateStr.split("-")
+  let month: number
+  let day: number
+  if (parts.length === 3) {
+    // "2000-MM-DD"
+    month = parseInt(parts[1], 10)
+    day = parseInt(parts[2], 10)
+  } else {
+    // "MM-DD" legacy
+    month = parseInt(parts[0], 10)
+    day = parseInt(parts[1], 10)
+  }
+  const d = new Date(2000, month - 1, day)
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
 // ─── YearCalendar ───────────────────────────────────────────────────────────
 
 function YearCalendar({ dateRanges }: { dateRanges: SetupDateRange[] }) {
-  // Build a Set of "MM-DD" strings that fall inside any range
-  const activeDays = new Set<string>()
-
-  for (const range of dateRanges) {
-    const [startMM, startDD] = range.start_date.split("-").map(Number)
-    const [endMM, endDD] = range.end_date.split("-").map(Number)
-
-    // Iterate through all days of the leap year to find days in range
-    let month = 1
-    for (const daysInMonth of LEAP_YEAR_DAYS) {
-      for (let day = 1; day <= daysInMonth; day++) {
-        const mm = month
-        const dd = day
-
-        // Check if this day is within the range (handles wrap-around across year boundary)
-        const isInRange = (() => {
-          const startVal = startMM * 100 + startDD
-          const endVal = endMM * 100 + endDD
-          const dayVal = mm * 100 + dd
-
-          if (startVal <= endVal) {
-            // Normal range within a year
-            return dayVal >= startVal && dayVal <= endVal
-          } else {
-            // Wrap-around range (e.g., Nov-15 to Mar-10)
-            return dayVal >= startVal || dayVal <= endVal
-          }
-        })()
-
-        if (isInRange) {
-          const key = `${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`
-          activeDays.add(key)
-        }
+  const isInRange = (month: number, day: number): boolean => {
+    // month is 0-indexed (JS Date convention)
+    const checkMonth = month + 1
+    const checkDay = day
+    return dateRanges.some((r) => {
+      // r.start_date and r.end_date are strings like "2000-03-15"
+      const [, sm, sd] = r.start_date.split("-").map(Number)
+      const [, em, ed] = r.end_date.split("-").map(Number)
+      const checkVal = checkMonth * 100 + checkDay
+      const startVal = sm * 100 + sd
+      const endVal = em * 100 + ed
+      if (startVal <= endVal) {
+        return checkVal >= startVal && checkVal <= endVal
+      } else {
+        // Wrap-around range: e.g. Nov–Mar (crosses year boundary)
+        return checkVal >= startVal || checkVal <= endVal
       }
-      month++
-    }
+    })
   }
 
   return (
-    <div className="mt-4">
-      <p className="text-sm font-medium text-zinc-300 mb-2">Year overview (leap year):</p>
-      <div className="space-y-1">
+    <div className="w-full">
+      <p className="text-sm font-medium text-zinc-300 mb-2">Year overview:</p>
+      <div className="space-y-1 w-full">
         {LEAP_YEAR_DAYS.map((daysInMonth, monthIdx) => {
-          const monthNum = monthIdx + 1
           return (
             <div key={monthIdx} className="flex items-center gap-1">
               <span className="text-xs text-zinc-400 w-7 shrink-0">{MONTH_NAMES[monthIdx]}</span>
-              <div className="flex gap-[2px] flex-wrap">
+              <div className="flex gap-[2px] flex-wrap flex-1">
                 {Array.from({ length: daysInMonth }, (_, dayIdx) => {
                   const day = dayIdx + 1
-                  const key = `${String(monthNum).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-                  const isActive = activeDays.has(key)
+                  const active = isInRange(monthIdx, day)
+                  const mmdd = `${String(monthIdx + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                   return (
                     <div
                       key={dayIdx}
-                      className={`w-2 h-2 rounded-sm ${isActive ? "bg-green-500" : "bg-zinc-600"}`}
-                      title={key}
+                      className={`w-3 h-3 rounded-sm ${active ? "bg-green-500" : "bg-zinc-600"}`}
+                      title={mmdd}
                     />
                   )
                 })}
@@ -146,23 +143,37 @@ function YearCalendar({ dateRanges }: { dateRanges: SetupDateRange[] }) {
 
 function ZonesSection({
   canModify,
+  onZonesLoaded,
 }: {
   canModify: boolean
+  onZonesLoaded: (zones: IrrigationZone[]) => void
 }) {
   const [zones, setZones] = useState<IrrigationZone[]>([])
   const [valveStatus, setValveStatus] = useState<ValveStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [mismatch, setMismatch] = useState<ZoneMismatch | null>(null)
   const [renameZone, setRenameZone] = useState<IrrigationZone | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [renameError, setRenameError] = useState<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
-    getIrrigationZones()
-      .then(setZones)
-      .catch((e) => console.error("Failed to load zones:", e))
+    // Auto-sync on load
+    syncIrrigationZones()
+      .then((synced) => {
+        setZones(synced)
+        onZonesLoaded(synced)
+      })
+      .catch((e) => {
+        setSyncError(e instanceof Error ? e.message : "Sync failed")
+      })
       .finally(() => setLoading(false))
+
+    // Check zone mismatch
+    getZonesMismatch()
+      .then(setMismatch)
+      .catch(() => { /* non-critical, ignore */ })
 
     // SSE subscription
     const es = getZoneStatusStream()
@@ -185,17 +196,8 @@ function ZonesSection({
       es.close()
       eventSourceRef.current = null
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const handleSync = async () => {
-    setSyncError(null)
-    try {
-      const updated = await syncIrrigationZones()
-      setZones(updated)
-    } catch (e: unknown) {
-      setSyncError(e instanceof Error ? e.message : "Sync failed")
-    }
-  }
 
   const handleRenameOpen = (zone: IrrigationZone) => {
     setRenameZone(zone)
@@ -228,21 +230,20 @@ function ZonesSection({
     <div>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold text-zinc-100">Zones</h2>
-        <Button
-          size="sm"
-          className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-          onClick={handleSync}
-        >
-          Sync from Controller
-        </Button>
       </div>
 
       {syncError && (
         <p className="text-red-400 text-sm mb-3">{syncError}</p>
       )}
 
+      {mismatch?.has_mismatch && !mismatch?.unreachable && (mismatch.missing_in_controller?.length ?? 0) > 0 && (
+        <p className="text-amber-400 text-sm mb-3">
+          Warning: zone(s) {mismatch.missing_in_controller?.join(", ")} are configured but not found in the valve controller. Their schedules will be skipped.
+        </p>
+      )}
+
       {zones.length === 0 ? (
-        <p className="text-zinc-400 text-sm">No zones found. Try syncing from the controller.</p>
+        <p className="text-zinc-400 text-sm">No zones found.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {zones.map((zone) => {
@@ -266,12 +267,13 @@ function ZonesSection({
                   </p>
                   {canModify && (
                     <Button
-                      size="sm"
+                      size="icon"
                       variant="ghost"
-                      className="text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 px-2 py-1 h-auto"
+                      className="h-7 w-7 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700"
                       onClick={() => handleRenameOpen(zone)}
+                      aria-label="Rename zone"
                     >
-                      Rename
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </CardContent>
@@ -300,8 +302,7 @@ function ZonesSection({
             {renameError && <p className="text-red-400 text-sm">{renameError}</p>}
             <div className="flex gap-2 justify-end">
               <Button
-                variant="ghost"
-                className="text-zinc-300 hover:text-zinc-50 hover:bg-zinc-700"
+                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
                 onClick={() => setRenameZone(null)}
               >
                 Cancel
@@ -326,10 +327,12 @@ function SetupDetail({
   setup,
   zones,
   canModify,
+  onDateRangesChange,
 }: {
   setup: IrrigationSetup
   zones: IrrigationZone[]
   canModify: boolean
+  onDateRangesChange: (ranges: SetupDateRange[]) => void
 }) {
   const [schedules, setSchedules] = useState<SetupZoneSchedule[]>([])
   const [dateRanges, setDateRanges] = useState<SetupDateRange[]>([])
@@ -344,10 +347,12 @@ function SetupDetail({
   const [slotEnd, setSlotEnd] = useState("06:30")
   const [slotError, setSlotError] = useState<string | null>(null)
 
-  // Add range dialog
+  // Add range dialog — using day+month selects
   const [addRangeOpen, setAddRangeOpen] = useState(false)
-  const [rangeFrom, setRangeFrom] = useState("")
-  const [rangeTo, setRangeTo] = useState("")
+  const [rangeStartDay, setRangeStartDay] = useState("01")
+  const [rangeStartMonth, setRangeStartMonth] = useState("01")
+  const [rangeEndDay, setRangeEndDay] = useState("31")
+  const [rangeEndMonth, setRangeEndMonth] = useState("12")
   const [rangeError, setRangeError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -359,9 +364,13 @@ function SetupDetail({
 
     setLoadingRanges(true)
     getDateRanges(setup.id)
-      .then(setDateRanges)
+      .then((ranges) => {
+        setDateRanges(ranges)
+        onDateRangesChange(ranges)
+      })
       .catch((e) => console.error("Failed to load date ranges:", e))
       .finally(() => setLoadingRanges(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setup.id])
 
   const zoneName = (zoneId: number) => {
@@ -392,7 +401,9 @@ function SetupDetail({
   const handleDeleteRange = async (rangeId: number) => {
     try {
       await deleteDateRange(setup.id, rangeId)
-      setDateRanges((prev) => prev.filter((r) => r.id !== rangeId))
+      const updated = dateRanges.filter((r) => r.id !== rangeId)
+      setDateRanges(updated)
+      onDateRangesChange(updated)
     } catch (e: unknown) {
       console.error("Failed to delete date range:", e)
     }
@@ -400,12 +411,15 @@ function SetupDetail({
 
   const handleAddRange = async () => {
     setRangeError(null)
+    // Build MM-DD strings for the API
+    const startMmDd = `${rangeStartMonth}-${rangeStartDay.padStart(2, "0")}`
+    const endMmDd = `${rangeEndMonth}-${rangeEndDay.padStart(2, "0")}`
     try {
-      const created = await addDateRange(setup.id, rangeFrom, rangeTo)
-      setDateRanges((prev) => [...prev, created])
+      const created = await addDateRange(setup.id, startMmDd, endMmDd)
+      const updated = [...dateRanges, created]
+      setDateRanges(updated)
+      onDateRangesChange(updated)
       setAddRangeOpen(false)
-      setRangeFrom("")
-      setRangeTo("")
     } catch (e: unknown) {
       setRangeError(e instanceof Error ? e.message : "Failed to add range")
     }
@@ -492,8 +506,10 @@ function SetupDetail({
               className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
               onClick={() => {
                 setRangeError(null)
-                setRangeFrom("")
-                setRangeTo("")
+                setRangeStartDay("01")
+                setRangeStartMonth("01")
+                setRangeEndDay("31")
+                setRangeEndMonth("12")
                 setAddRangeOpen(true)
               }}
             >
@@ -527,9 +543,6 @@ function SetupDetail({
             ))}
           </div>
         )}
-
-        {/* Year Calendar */}
-        <YearCalendar dateRanges={dateRanges} />
       </div>
 
       {/* Add Slot Dialog */}
@@ -590,14 +603,15 @@ function SetupDetail({
               </div>
             </div>
 
-            <p className="text-xs text-zinc-500">Note: leave a 1-minute gap between overlapping slots on the same zone.</p>
+            <p className="text-xs text-zinc-500">
+              Note: a 1-minute gap is required between any two slots on the same day, across all zones (only one valve can be open at a time).
+            </p>
 
             {slotError && <p className="text-red-400 text-sm">{slotError}</p>}
 
             <div className="flex gap-2 justify-end">
               <Button
-                variant="ghost"
-                className="text-zinc-300 hover:text-zinc-50 hover:bg-zinc-700"
+                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
                 onClick={() => setAddSlotOpen(false)}
               >
                 Cancel
@@ -619,22 +633,58 @@ function SetupDetail({
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-sm font-medium text-zinc-300">From (MM-DD)</Label>
-                <Input
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600 mt-1"
-                  placeholder="03-15"
-                  value={rangeFrom}
-                  onChange={(e) => setRangeFrom(e.target.value)}
-                />
+                <Label className="text-sm font-medium text-zinc-300">From</Label>
+                <div className="flex gap-1 mt-1">
+                  <select
+                    className="w-16 bg-zinc-700 text-zinc-50 border border-zinc-600 rounded-md px-2 py-2 text-sm"
+                    value={rangeStartDay}
+                    onChange={(e) => setRangeStartDay(e.target.value)}
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={String(d).padStart(2, "0")}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="flex-1 bg-zinc-700 text-zinc-50 border border-zinc-600 rounded-md px-2 py-2 text-sm"
+                    value={rangeStartMonth}
+                    onChange={(e) => setRangeStartMonth(e.target.value)}
+                  >
+                    {MONTH_FULL_NAMES.map((name, idx) => (
+                      <option key={idx} value={String(idx + 1).padStart(2, "0")}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-zinc-300">To (MM-DD)</Label>
-                <Input
-                  className="bg-zinc-700 text-zinc-50 border-zinc-600 mt-1"
-                  placeholder="09-30"
-                  value={rangeTo}
-                  onChange={(e) => setRangeTo(e.target.value)}
-                />
+                <Label className="text-sm font-medium text-zinc-300">To</Label>
+                <div className="flex gap-1 mt-1">
+                  <select
+                    className="w-16 bg-zinc-700 text-zinc-50 border border-zinc-600 rounded-md px-2 py-2 text-sm"
+                    value={rangeEndDay}
+                    onChange={(e) => setRangeEndDay(e.target.value)}
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={String(d).padStart(2, "0")}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="flex-1 bg-zinc-700 text-zinc-50 border border-zinc-600 rounded-md px-2 py-2 text-sm"
+                    value={rangeEndMonth}
+                    onChange={(e) => setRangeEndMonth(e.target.value)}
+                  >
+                    {MONTH_FULL_NAMES.map((name, idx) => (
+                      <option key={idx} value={String(idx + 1).padStart(2, "0")}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -642,8 +692,7 @@ function SetupDetail({
 
             <div className="flex gap-2 justify-end">
               <Button
-                variant="ghost"
-                className="text-zinc-300 hover:text-zinc-50 hover:bg-zinc-700"
+                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
                 onClick={() => setAddRangeOpen(false)}
               >
                 Cancel
@@ -671,11 +720,19 @@ function SetupsSection({
   const [setups, setSetups] = useState<IrrigationSetup[]>([])
   const [selectedSetup, setSelectedSetup] = useState<IrrigationSetup | null>(null)
   const [loading, setLoading] = useState(true)
+  // All date ranges from all setups, keyed by setupId
+  const [allDateRanges, setAllDateRanges] = useState<Record<number, SetupDateRange[]>>({})
 
   // Create setup dialog
   const [createOpen, setCreateOpen] = useState(false)
   const [createName, setCreateName] = useState("")
   const [createError, setCreateError] = useState<string | null>(null)
+
+  // Rename setup dialog
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameTarget, setRenameTarget] = useState<IrrigationSetup | null>(null)
+  const [renameValue, setRenameValue] = useState("")
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   useEffect(() => {
     getSetups()
@@ -705,6 +762,11 @@ function SetupsSection({
       await deleteSetup(setupId)
       const remaining = setups.filter((s) => s.id !== setupId)
       setSetups(remaining)
+      setAllDateRanges((prev) => {
+        const next = { ...prev }
+        delete next[setupId]
+        return next
+      })
       if (selectedSetup?.id === setupId) {
         setSelectedSetup(remaining.length > 0 ? remaining[0] : null)
       }
@@ -713,12 +775,47 @@ function SetupsSection({
     }
   }
 
+  const handleRenameOpen = (setup: IrrigationSetup) => {
+    setRenameTarget(setup)
+    setRenameValue(setup.name)
+    setRenameError(null)
+    setRenameOpen(true)
+  }
+
+  const handleRenameSubmit = async () => {
+    if (!renameTarget) return
+    setRenameError(null)
+    try {
+      const updated = await renameSetup(renameTarget.id, renameValue)
+      setSetups((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+      if (selectedSetup?.id === updated.id) setSelectedSetup(updated)
+      setRenameOpen(false)
+      setRenameTarget(null)
+    } catch (e: unknown) {
+      setRenameError(e instanceof Error ? e.message : "Failed to rename")
+    }
+  }
+
+  const handleDateRangesChange = (setupId: number, ranges: SetupDateRange[]) => {
+    setAllDateRanges((prev) => ({ ...prev, [setupId]: ranges }))
+  }
+
+  // Combine all date ranges from all setups for the calendar
+  const combinedDateRanges: SetupDateRange[] = Object.values(allDateRanges).flat()
+
   if (loading) {
     return <p className="text-zinc-400 text-sm">Loading setups...</p>
   }
 
   return (
     <div className="space-y-4">
+      {/* Shared Year Calendar — shows all setups' ranges combined */}
+      <Card className="bg-zinc-800 border-zinc-700">
+        <CardContent className="p-4">
+          <YearCalendar dateRanges={combinedDateRanges} />
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-100">Setups</h2>
         {canModify && (
@@ -736,56 +833,71 @@ function SetupsSection({
         )}
       </div>
 
-      {/* Setup tabs row */}
+      {/* Setup Cards grid */}
       {setups.length === 0 ? (
         <p className="text-zinc-400 text-sm">No setups yet. Create one to get started.</p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {setups.map((setup) => (
-            <div key={setup.id} className="flex items-center gap-1">
-              <button
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  selectedSetup?.id === setup.id
-                    ? "bg-zinc-600 text-zinc-50"
-                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-50 border border-zinc-700"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {setups.map((setup) => {
+            const isSelected = selectedSetup?.id === setup.id
+            return (
+              <Card
+                key={setup.id}
+                className={`bg-zinc-800 cursor-pointer transition-colors ${
+                  isSelected ? "border-zinc-500" : "border-zinc-700 hover:border-zinc-600"
                 }`}
                 onClick={() => setSelectedSetup(setup)}
               >
-                {setup.name}
-              </button>
-              {canModify && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      className="text-zinc-500 hover:text-red-400 text-sm px-1"
-                      aria-label={`Delete setup ${setup.name}`}
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-zinc-50 text-sm font-medium">{setup.name}</CardTitle>
+                </CardHeader>
+                {canModify && (
+                  <CardFooter className="pt-0 flex gap-2 justify-between">
+                    <Button
+                      size="sm"
+                      className="bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-zinc-50"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRenameOpen(setup)
+                      }}
                     >
-                      ×
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="bg-zinc-800 border-zinc-700">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-zinc-50">Delete Setup</AlertDialogTitle>
-                      <AlertDialogDescription className="text-zinc-400">
-                        Are you sure you want to delete &quot;{setup.name}&quot;? This will also remove all its schedules and date ranges.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50 border-zinc-600 hover:bg-zinc-600">
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-red-900 hover:bg-red-800 text-zinc-50"
-                        onClick={() => handleDelete(setup.id)}
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-          ))}
+                      Rename
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="bg-red-900 hover:bg-red-800 text-zinc-50"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-800 border-zinc-700">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-zinc-50">Delete Setup</AlertDialogTitle>
+                          <AlertDialogDescription className="text-zinc-400">
+                            Are you sure you want to delete &quot;{setup.name}&quot;? This will also remove all its schedules and date ranges.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-red-900 hover:bg-red-800 text-zinc-50"
+                            onClick={() => handleDelete(setup.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </CardFooter>
+                )}
+              </Card>
+            )
+          })}
         </div>
       )}
 
@@ -793,7 +905,12 @@ function SetupsSection({
       {selectedSetup && (
         <Card className="bg-zinc-800 border-zinc-700">
           <CardContent className="p-4">
-            <SetupDetail setup={selectedSetup} zones={zones} canModify={canModify} />
+            <SetupDetail
+              setup={selectedSetup}
+              zones={zones}
+              canModify={canModify}
+              onDateRangesChange={(ranges) => handleDateRangesChange(selectedSetup.id, ranges)}
+            />
           </CardContent>
         </Card>
       )}
@@ -818,14 +935,45 @@ function SetupsSection({
             {createError && <p className="text-red-400 text-sm">{createError}</p>}
             <div className="flex gap-2 justify-end">
               <Button
-                variant="ghost"
-                className="text-zinc-300 hover:text-zinc-50 hover:bg-zinc-700"
+                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
                 onClick={() => setCreateOpen(false)}
               >
                 Cancel
               </Button>
               <Button className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleCreate}>
                 Create
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Setup Dialog */}
+      <Dialog open={renameOpen} onOpenChange={(open) => { if (!open) setRenameOpen(false) }}>
+        <DialogContent className="bg-zinc-800 border-zinc-700">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-50">Rename Setup</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm font-medium text-zinc-300">Setup Name</Label>
+              <Input
+                className="bg-zinc-700 text-zinc-50 border-zinc-600 mt-1"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleRenameSubmit() }}
+              />
+            </div>
+            {renameError && <p className="text-red-400 text-sm">{renameError}</p>}
+            <div className="flex gap-2 justify-end">
+              <Button
+                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
+                onClick={() => setRenameOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleRenameSubmit}>
+                Save
               </Button>
             </div>
           </div>
@@ -841,16 +989,9 @@ function IrrigationDashboard({ permissions }: IrrigationProps) {
   const canModify = permissions.includes("MODIFY_DEVICES")
   const [zones, setZones] = useState<IrrigationZone[]>([])
 
-  // Load zones once so SetupsSection can reference zone names
-  useEffect(() => {
-    getIrrigationZones()
-      .then(setZones)
-      .catch((e) => console.error("Failed to load zones for dashboard:", e))
-  }, [])
-
   return (
     <div className="p-4 space-y-8">
-      <ZonesSection canModify={canModify} />
+      <ZonesSection canModify={canModify} onZonesLoaded={setZones} />
       <SetupsSection zones={zones} canModify={canModify} />
     </div>
   )

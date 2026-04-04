@@ -20,7 +20,8 @@ import type {
   IrrigationSetup,
   SetupZoneSchedule,
   SetupDateRange,
-  ValveStatus
+  ValveStatus,
+  ZoneMismatch
 } from "@/types"
 
 const getApiBaseUrl = () => {
@@ -1571,4 +1572,13 @@ export const deleteDateRange = async (setupId: number, rangeId: number): Promise
     const err = await r.json().catch(() => ({ detail: "Unknown error" }))
     throw new Error(err.detail || "Failed")
   }
+}
+
+export async function getZonesMismatch(): Promise<ZoneMismatch> {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/zones/mismatch`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) throw new Error("Failed to check zone mismatch")
+  return r.json()
 }

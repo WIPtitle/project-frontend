@@ -161,3 +161,10 @@ export interface ValveStatus {
   duration?: number
   error?: string
 }
+
+export interface ZoneMismatch {
+  has_mismatch: boolean
+  missing_in_controller?: string[]
+  missing_in_db?: string[]
+  unreachable?: boolean
+}
