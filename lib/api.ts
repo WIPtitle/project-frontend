@@ -1,5 +1,6 @@
 import type {
   NtfyCredentials,
+  FirebaseStatus,
   User,
   DeviceGroup,
   Permission,
@@ -697,6 +698,59 @@ export const updateNtfyCredentials = async (): Promise<NtfyCredentials> => {
     return credentials
   } catch (error) {
     throw error
+  }
+}
+
+export const getFirebaseStatus = async (): Promise<FirebaseStatus> => {
+  try {
+    const response = await fetch(
+      `${getApiBaseUrl()}/notifications-service/firebase-config/status`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${getTokenOrThrow()}`,
+        },
+      }
+    )
+    if (!response.ok) {
+      throw new Error("Failed to fetch Firebase status")
+    }
+    return await response.json()
+  } catch (error) {
+    throw error
+  }
+}
+
+export const setFirebaseCredentials = async (credentialsJson: string): Promise<void> => {
+  const parsed = JSON.parse(credentialsJson)
+  const response = await fetch(
+    `${getApiBaseUrl()}/notifications-service/firebase-config/credentials`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(parsed),
+    }
+  )
+  if (!response.ok) {
+    throw new Error("Failed to set Firebase credentials")
+  }
+}
+
+export const deleteFirebaseCredentials = async (): Promise<void> => {
+  const response = await fetch(
+    `${getApiBaseUrl()}/notifications-service/firebase-config/credentials`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${getTokenOrThrow()}`,
+      },
+    }
+  )
+  if (!response.ok) {
+    throw new Error("Failed to delete Firebase credentials")
   }
 }
 

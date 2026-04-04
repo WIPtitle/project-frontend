@@ -79,6 +79,10 @@ export interface NtfyCredentials {
   topic: string
 }
 
+export interface FirebaseStatus {
+  configured: boolean
+}
+
 export interface RTSPCamera {
   name: string
   ip: string
