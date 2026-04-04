@@ -677,8 +677,8 @@ export default function Configuration({ permissions }: ConfigurationProps) {
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
-                      variant="outline"
-                      className="bg-red-900/30 text-red-400 hover:bg-red-900/50 border-red-800 w-full"
+                      variant="destructive"
+                      className="bg-red-900 hover:bg-red-800 w-full"
                       disabled={firebaseLoading}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
