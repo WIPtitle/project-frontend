@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Pencil } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import {
   getValveServer,
   syncIrrigationZones,
@@ -27,13 +27,15 @@ import {
   getSetups,
   createSetup,
   deleteSetup,
-  renameSetup,
+  updateSetup,
   getSchedules,
   addSchedule,
   deleteSchedule,
   getDateRanges,
   addDateRange,
   deleteDateRange,
+  openValveManual,
+  closeValveManual,
 } from "@/lib/api"
 import type {
   ValveServerConfig,
@@ -88,25 +90,26 @@ function formatMonthDay(dateStr: string): string {
 
 // ─── YearCalendar ───────────────────────────────────────────────────────────
 
-function YearCalendar({ dateRanges }: { dateRanges: SetupDateRange[] }) {
-  const isInRange = (month: number, day: number): boolean => {
+function YearCalendar({ dateRanges }: { dateRanges: DateRangeWithSetup[] }) {
+  const getColor = (month: number, day: number): string | null => {
     // month is 0-indexed (JS Date convention)
     const checkMonth = month + 1
-    const checkDay = day
-    return dateRanges.some((r) => {
-      // r.start_date and r.end_date are strings like "2000-03-15"
+    const checkVal = checkMonth * 100 + day
+    for (const r of dateRanges) {
       const [, sm, sd] = r.start_date.split("-").map(Number)
       const [, em, ed] = r.end_date.split("-").map(Number)
-      const checkVal = checkMonth * 100 + checkDay
       const startVal = sm * 100 + sd
       const endVal = em * 100 + ed
+      let inRange = false
       if (startVal <= endVal) {
-        return checkVal >= startVal && checkVal <= endVal
+        inRange = checkVal >= startVal && checkVal <= endVal
       } else {
         // Wrap-around range: e.g. Nov–Mar (crosses year boundary)
-        return checkVal >= startVal || checkVal <= endVal
+        inRange = checkVal >= startVal || checkVal <= endVal
       }
-    })
+      if (inRange) return r.setupColor || "#22c55e"
+    }
+    return null
   }
 
   return (
@@ -120,12 +123,13 @@ function YearCalendar({ dateRanges }: { dateRanges: SetupDateRange[] }) {
               <div className="flex gap-[2px] flex-wrap flex-1">
                 {Array.from({ length: daysInMonth }, (_, dayIdx) => {
                   const day = dayIdx + 1
-                  const active = isInRange(monthIdx, day)
+                  const color = getColor(monthIdx, day)
                   const mmdd = `${String(monthIdx + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                   return (
                     <div
                       key={dayIdx}
-                      className={`w-3 h-3 rounded-sm ${active ? "bg-green-500" : "bg-zinc-600"}`}
+                      className={`w-3 h-3 rounded-sm ${color ? "" : "bg-zinc-600"}`}
+                      style={color ? { backgroundColor: color } : undefined}
                       title={mmdd}
                     />
                   )
@@ -156,6 +160,7 @@ function ZonesSection({
   const [renameZone, setRenameZone] = useState<IrrigationZone | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [renameError, setRenameError] = useState<string | null>(null)
+  const [valveError, setValveError] = useState<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
@@ -248,6 +253,8 @@ function ZonesSection({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {zones.map((zone) => {
             const open = isZoneOpen(zone)
+            const canStart = !valveStatus?.active
+            const canStop = valveStatus?.active && valveStatus.active_zone === zone.zone_number
             return (
               <Card
                 key={zone.id}
@@ -258,24 +265,59 @@ function ZonesSection({
                     <span
                       className={`w-2.5 h-2.5 rounded-full shrink-0 ${open ? "bg-green-400" : "bg-zinc-500"}`}
                     />
-                    <span className="text-zinc-50 font-medium text-sm truncate">
-                      {zone.name || `Zone ${zone.zone_number}`}
-                    </span>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      {canModify && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-4 w-4 p-0 text-zinc-400 hover:text-zinc-50"
+                          onClick={() => handleRenameOpen(zone)}
+                          aria-label="Rename zone"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <span className="text-zinc-50 font-medium text-sm truncate">
+                        {zone.name || `Zone ${zone.zone_number}`}
+                      </span>
+                    </CardTitle>
                   </div>
                   <p className={`text-xs font-semibold ${open ? "text-green-400" : "text-zinc-400"}`}>
                     {open ? "OPEN" : "CLOSED"}
                   </p>
-                  {canModify && (
+                  {canStart && (
                     <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700"
-                      onClick={() => handleRenameOpen(zone)}
-                      aria-label="Rename zone"
+                      variant="outline"
+                      className="bg-zinc-700 text-green-400 border-green-700 hover:bg-green-900 w-full text-xs mt-1"
+                      onClick={async () => {
+                        setValveError(null)
+                        try {
+                          await openValveManual(zone.zone_number)
+                        } catch (e: unknown) {
+                          setValveError(e instanceof Error ? e.message : "Failed to open valve")
+                        }
+                      }}
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      Start
                     </Button>
                   )}
+                  {canStop && (
+                    <Button
+                      variant="outline"
+                      className="bg-red-900/30 text-red-400 border-red-700 hover:bg-red-900 w-full text-xs mt-1"
+                      onClick={async () => {
+                        setValveError(null)
+                        try {
+                          await closeValveManual()
+                        } catch (e: unknown) {
+                          setValveError(e instanceof Error ? e.message : "Failed to close valve")
+                        }
+                      }}
+                    >
+                      Stop
+                    </Button>
+                  )}
+                  {valveError && <p className="text-red-400 text-xs">{valveError}</p>}
                 </CardContent>
               </Card>
             )
@@ -609,17 +651,9 @@ function SetupDetail({
 
             {slotError && <p className="text-red-400 text-sm">{slotError}</p>}
 
-            <div className="flex gap-2 justify-end">
-              <Button
-                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
-                onClick={() => setAddSlotOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleAddSlot}>
-                Add
-              </Button>
-            </div>
+            <Button className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500" onClick={handleAddSlot}>
+              Add
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -690,22 +724,33 @@ function SetupDetail({
 
             {rangeError && <p className="text-red-400 text-sm">{rangeError}</p>}
 
-            <div className="flex gap-2 justify-end">
-              <Button
-                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
-                onClick={() => setAddRangeOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleAddRange}>
-                Add
-              </Button>
-            </div>
+            <Button className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500" onClick={handleAddRange}>
+              Add
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   )
+}
+
+// ─── Setup color palette ────────────────────────────────────────────────────
+
+const SETUP_COLORS = [
+  "#22c55e", // green
+  "#3b82f6", // blue
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#8b5cf6", // purple
+  "#ec4899", // pink
+  "#14b8a6", // teal
+  "#f97316", // orange
+]
+
+// ─── DateRangeWithSetup ──────────────────────────────────────────────────────
+
+interface DateRangeWithSetup extends SetupDateRange {
+  setupColor: string
 }
 
 // ─── SetupsSection ───────────────────────────────────────────────────────────
@@ -727,11 +772,13 @@ function SetupsSection({
   const [createOpen, setCreateOpen] = useState(false)
   const [createName, setCreateName] = useState("")
   const [createError, setCreateError] = useState<string | null>(null)
+  const [newSetupColor, setNewSetupColor] = useState("#22c55e")
 
-  // Rename setup dialog
+  // Update setup dialog (rename + color)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<IrrigationSetup | null>(null)
   const [renameValue, setRenameValue] = useState("")
+  const [renameColor, setRenameColor] = useState("#22c55e")
   const [renameError, setRenameError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -747,11 +794,12 @@ function SetupsSection({
   const handleCreate = async () => {
     setCreateError(null)
     try {
-      const created = await createSetup(createName)
+      const created = await createSetup(createName, newSetupColor)
       setSetups((prev) => [...prev, created])
       setSelectedSetup(created)
       setCreateOpen(false)
       setCreateName("")
+      setNewSetupColor("#22c55e")
     } catch (e: unknown) {
       setCreateError(e instanceof Error ? e.message : "Failed to create setup")
     }
@@ -778,6 +826,7 @@ function SetupsSection({
   const handleRenameOpen = (setup: IrrigationSetup) => {
     setRenameTarget(setup)
     setRenameValue(setup.name)
+    setRenameColor(setup.color || "#22c55e")
     setRenameError(null)
     setRenameOpen(true)
   }
@@ -786,13 +835,13 @@ function SetupsSection({
     if (!renameTarget) return
     setRenameError(null)
     try {
-      const updated = await renameSetup(renameTarget.id, renameValue)
+      const updated = await updateSetup(renameTarget.id, renameValue, renameColor)
       setSetups((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
       if (selectedSetup?.id === updated.id) setSelectedSetup(updated)
       setRenameOpen(false)
       setRenameTarget(null)
     } catch (e: unknown) {
-      setRenameError(e instanceof Error ? e.message : "Failed to rename")
+      setRenameError(e instanceof Error ? e.message : "Failed to update setup")
     }
   }
 
@@ -800,8 +849,11 @@ function SetupsSection({
     setAllDateRanges((prev) => ({ ...prev, [setupId]: ranges }))
   }
 
-  // Combine all date ranges from all setups for the calendar
-  const combinedDateRanges: SetupDateRange[] = Object.values(allDateRanges).flat()
+  // Combine all date ranges from all setups for the calendar, including setup color
+  const combinedDateRanges: DateRangeWithSetup[] = setups.flatMap((setup) => {
+    const ranges = allDateRanges[setup.id] ?? []
+    return ranges.map((r) => ({ ...r, setupColor: setup.color || "#22c55e" }))
+  })
 
   if (loading) {
     return <p className="text-zinc-400 text-sm">Loading setups...</p>
@@ -843,34 +895,40 @@ function SetupsSection({
             return (
               <Card
                 key={setup.id}
-                className={`bg-zinc-800 cursor-pointer transition-colors ${
+                className={`bg-zinc-800 cursor-pointer transition-colors overflow-hidden ${
                   isSelected ? "border-zinc-500" : "border-zinc-700 hover:border-zinc-600"
                 }`}
                 onClick={() => setSelectedSetup(setup)}
               >
+                <div className="h-1 rounded-t-lg" style={{ backgroundColor: setup.color || "#22c55e" }} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-zinc-50 text-sm font-medium">{setup.name}</CardTitle>
+                  <CardTitle className="text-zinc-50 text-sm font-medium flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full inline-block shrink-0" style={{ backgroundColor: setup.color || "#22c55e" }} />
+                    {setup.name}
+                  </CardTitle>
                 </CardHeader>
                 {canModify && (
-                  <CardFooter className="pt-0 flex gap-2 justify-between">
+                  <CardFooter className="pt-0 flex gap-2">
                     <Button
+                      variant="outline"
                       size="sm"
-                      className="bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-zinc-50"
+                      className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 flex-1"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleRenameOpen(setup)
                       }}
                     >
-                      Rename
+                      Update
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
+                          variant="outline"
                           size="sm"
-                          className="bg-red-900 hover:bg-red-800 text-zinc-50"
+                          className="bg-zinc-700 text-zinc-50 hover:bg-red-900"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          Delete
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent className="bg-zinc-800 border-zinc-700">
@@ -932,27 +990,33 @@ function SetupsSection({
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreate() }}
               />
             </div>
-            {createError && <p className="text-red-400 text-sm">{createError}</p>}
-            <div className="flex gap-2 justify-end">
-              <Button
-                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
-                onClick={() => setCreateOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleCreate}>
-                Create
-              </Button>
+            <div>
+              <Label className="text-sm font-medium text-zinc-300">Color</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {SETUP_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`w-7 h-7 rounded-full border-2 ${newSetupColor === c ? "border-zinc-50" : "border-transparent"}`}
+                    style={{ backgroundColor: c }}
+                    onClick={() => setNewSetupColor(c)}
+                  />
+                ))}
+              </div>
             </div>
+            {createError && <p className="text-red-400 text-sm">{createError}</p>}
+            <Button className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500" onClick={handleCreate}>
+              Create
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Rename Setup Dialog */}
+      {/* Update Setup Dialog (name + color) */}
       <Dialog open={renameOpen} onOpenChange={(open) => { if (!open) setRenameOpen(false) }}>
         <DialogContent className="bg-zinc-800 border-zinc-700">
           <DialogHeader>
-            <DialogTitle className="text-zinc-50">Rename Setup</DialogTitle>
+            <DialogTitle className="text-zinc-50">Update Setup</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -964,18 +1028,24 @@ function SetupsSection({
                 onKeyDown={(e) => { if (e.key === "Enter") handleRenameSubmit() }}
               />
             </div>
-            {renameError && <p className="text-red-400 text-sm">{renameError}</p>}
-            <div className="flex gap-2 justify-end">
-              <Button
-                className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
-                onClick={() => setRenameOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600" onClick={handleRenameSubmit}>
-                Save
-              </Button>
+            <div>
+              <Label className="text-sm font-medium text-zinc-300">Color</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {SETUP_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`w-7 h-7 rounded-full border-2 ${renameColor === c ? "border-zinc-50" : "border-transparent"}`}
+                    style={{ backgroundColor: c }}
+                    onClick={() => setRenameColor(c)}
+                  />
+                ))}
+              </div>
             </div>
+            {renameError && <p className="text-red-400 text-sm">{renameError}</p>}
+            <Button className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500" onClick={handleRenameSubmit}>
+              Save
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

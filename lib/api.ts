@@ -1452,12 +1452,12 @@ export const getSetups = async (): Promise<IrrigationSetup[]> => {
   return r.json()
 }
 
-export const createSetup = async (name: string): Promise<IrrigationSetup> => {
+export const createSetup = async (name: string, color: string = "#22c55e"): Promise<IrrigationSetup> => {
   const token = getTokenOrThrow()
   const r = await fetch(`${IRRIGATION_BASE}/setups/`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, color }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({ detail: "Unknown error" }))
@@ -1466,16 +1466,16 @@ export const createSetup = async (name: string): Promise<IrrigationSetup> => {
   return r.json()
 }
 
-export const renameSetup = async (setupId: number, name: string): Promise<IrrigationSetup> => {
+export const updateSetup = async (setupId: number, name: string, color: string): Promise<IrrigationSetup> => {
   const token = getTokenOrThrow()
   const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, color }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({ detail: "Unknown error" }))
-    throw new Error(err.detail || "Failed")
+    throw new Error(err.detail || "Failed to update setup")
   }
   return r.json()
 }
@@ -1571,6 +1571,30 @@ export const deleteDateRange = async (setupId: number, rangeId: number): Promise
   if (!r.ok) {
     const err = await r.json().catch(() => ({ detail: "Unknown error" }))
     throw new Error(err.detail || "Failed")
+  }
+}
+
+export async function openValveManual(zoneNumber: string): Promise<void> {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/zones/${zoneNumber}/open`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed to open valve")
+  }
+}
+
+export async function closeValveManual(): Promise<void> {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/zones/close`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed to close valve")
   }
 }
 

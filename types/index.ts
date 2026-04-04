@@ -134,6 +134,7 @@ export interface IrrigationZone {
 export interface IrrigationSetup {
   id: number
   name: string
+  color: string  // hex color like "#22c55e"
 }
 
 export interface SetupZoneSchedule {
