@@ -753,6 +753,90 @@ interface DateRangeWithSetup extends SetupDateRange {
   setupColor: string
 }
 
+// ─── SetupUpdateDialog ────────────────────────────────────────────────────────
+// Each setup card owns its own dialog instance with fully isolated local state.
+// This avoids all shared-state / stale-closure issues when multiple setups exist.
+
+function SetupUpdateDialog({
+  setup,
+  onUpdate,
+}: {
+  setup: IrrigationSetup
+  onUpdate: (updated: IrrigationSetup) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(setup.name)
+  const [color, setColor] = useState(setup.color || "#22c55e")
+  const [error, setError] = useState<string | null>(null)
+
+  const handleOpen = () => {
+    setName(setup.name)
+    setColor(setup.color || "#22c55e")
+    setError(null)
+    setOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    setError(null)
+    try {
+      const updated = await updateSetup(setup.id, name, color)
+      onUpdate(updated)
+      setOpen(false)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to update setup")
+    }
+  }
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        className="flex-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+        onClick={handleOpen}
+      >
+        Update
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="bg-zinc-800 border-zinc-700">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-50">Update Setup</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm font-medium text-zinc-300">Setup Name</Label>
+              <Input
+                className="bg-zinc-700 text-zinc-50 border-zinc-600 mt-1"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSubmit() }}
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-zinc-300">Color</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {SETUP_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`w-7 h-7 rounded-full border-2 ${color === c ? "border-zinc-50" : "border-transparent"}`}
+                    style={{ backgroundColor: c }}
+                    onClick={() => setColor(c)}
+                  />
+                ))}
+              </div>
+            </div>
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            <Button className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500" onClick={handleSubmit}>
+              Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 // ─── SetupsSection ───────────────────────────────────────────────────────────
 
 function SetupsSection({
@@ -773,13 +857,6 @@ function SetupsSection({
   const [createError, setCreateError] = useState<string | null>(null)
   const [newSetupColor, setNewSetupColor] = useState("#22c55e")
 
-  // Update setup dialog (rename + color)
-  const [renameOpen, setRenameOpen] = useState(false)
-  const [renameTarget, setRenameTarget] = useState<IrrigationSetup | null>(null)
-  const [renameValue, setRenameValue] = useState("")
-  const [renameColor, setRenameColor] = useState("#22c55e")
-  const renameColorRef = useRef("#22c55e")
-  const [renameError, setRenameError] = useState<string | null>(null)
 
   useEffect(() => {
     getSetups()
@@ -818,27 +895,6 @@ function SetupsSection({
     }
   }
 
-  const handleRenameOpen = (setup: IrrigationSetup) => {
-    setRenameTarget(setup)
-    setRenameValue(setup.name)
-    setRenameColor(setup.color || "#22c55e")
-    renameColorRef.current = setup.color || "#22c55e"
-    setRenameError(null)
-    setRenameOpen(true)
-  }
-
-  const handleRenameSubmit = async () => {
-    if (!renameTarget) return
-    setRenameError(null)
-    try {
-      const updated = await updateSetup(renameTarget.id, renameValue, renameColorRef.current)
-      setSetups((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
-      setRenameOpen(false)
-      setRenameTarget(null)
-    } catch (e: unknown) {
-      setRenameError(e instanceof Error ? e.message : "Failed to update setup")
-    }
-  }
 
   const handleDateRangesChange = (setupId: number, ranges: SetupDateRange[]) => {
     setAllDateRanges((prev) => ({ ...prev, [setupId]: ranges }))
@@ -906,14 +962,10 @@ function SetupsSection({
                 />
                 {canModify && (
                   <div className="flex gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                      onClick={() => handleRenameOpen(setup)}
-                    >
-                      Update
-                    </Button>
+                    <SetupUpdateDialog
+                      setup={setup}
+                      onUpdate={(updated) => setSetups((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))}
+                    />
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
@@ -991,43 +1043,6 @@ function SetupsSection({
         </DialogContent>
       </Dialog>
 
-      {/* Update Setup Dialog (name + color) */}
-      <Dialog open={renameOpen} onOpenChange={(open) => { if (!open) setRenameOpen(false) }}>
-        <DialogContent className="bg-zinc-800 border-zinc-700">
-          <DialogHeader>
-            <DialogTitle className="text-zinc-50">Update Setup</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-sm font-medium text-zinc-300">Setup Name</Label>
-              <Input
-                className="bg-zinc-700 text-zinc-50 border-zinc-600 mt-1"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleRenameSubmit() }}
-              />
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-zinc-300">Color</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {SETUP_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`w-7 h-7 rounded-full border-2 ${renameColor === c ? "border-zinc-50" : "border-transparent"}`}
-                    style={{ backgroundColor: c }}
-                    onClick={() => { renameColorRef.current = c; setRenameColor(c) }}
-                  />
-                ))}
-              </div>
-            </div>
-            {renameError && <p className="text-red-400 text-sm">{renameError}</p>}
-            <Button className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500" onClick={handleRenameSubmit}>
-              Save
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
