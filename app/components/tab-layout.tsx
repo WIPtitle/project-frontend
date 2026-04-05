@@ -49,7 +49,7 @@ export default function TabLayout() {
           setIsLoading(false)
         })
         .catch((error) => {
-          const status = (error as any)?.status
+          const status = (error as Error & { status?: number })?.status
           if (status === 401 || status === 403) {
             handleLogout()
           }
