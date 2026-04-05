@@ -111,21 +111,19 @@ export const getTokenOrThrow = (): string => {
 }
 
 export const getUserMyself = async (): Promise<User> => {
-  try {
-    const response = await fetch(`${getApiBaseUrl()}/auth-service/auth/user`, {
-      headers: {
-        Authorization: `Bearer ${getTokenOrThrow()}`,
-      },
-    })
+  const response = await fetch(`${getApiBaseUrl()}/auth-service/auth/user`, {
+    headers: {
+      Authorization: `Bearer ${getTokenOrThrow()}`,
+    },
+  })
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch user data")
-    }
-
-    return await response.json()
-  } catch (error) {
+  if (!response.ok) {
+    const error = new Error("Failed to fetch user data") as Error & { status: number }
+    error.status = response.status
     throw error
   }
+
+  return await response.json()
 }
 
 export const getPermissions = async (): Promise<Permission[]> => {

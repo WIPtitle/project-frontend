@@ -49,8 +49,10 @@ export default function TabLayout() {
           setIsLoading(false)
         })
         .catch((error) => {
-          // Token is invalid or expired
-          handleLogout()
+          const status = (error as any)?.status
+          if (status === 401 || status === 403) {
+            handleLogout()
+          }
           setIsLoading(false)
         })
 
