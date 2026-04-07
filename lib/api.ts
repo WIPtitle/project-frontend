@@ -1559,15 +1559,15 @@ export const getSchedules = async (setupId: number): Promise<SetupZoneSchedule[]
 export const addSchedule = async (
   setupId: number,
   zoneId: number,
-  dayOfWeek: number,
+  daysOfWeek: number[],
   startTime: string,
   endTime: string
-): Promise<SetupZoneSchedule> => {
+): Promise<SetupZoneSchedule[]> => {
   const token = getTokenOrThrow()
   const r = await fetch(`${IRRIGATION_BASE}/setups/${setupId}/schedules/`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ zone_id: zoneId, day_of_week: dayOfWeek, start_time: startTime, end_time: endTime }),
+    body: JSON.stringify({ zone_id: zoneId, days_of_week: daysOfWeek, start_time: startTime, end_time: endTime }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({ detail: "Unknown error" }))
