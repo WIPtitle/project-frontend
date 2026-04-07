@@ -383,11 +383,12 @@ function SetupDetail({
 
   // Add slot dialog
   const [addSlotOpen, setAddSlotOpen] = useState(false)
-  const [slotZoneId, setSlotZoneId] = useState<number>(zones[0]?.id ?? 0)
-  const [slotDay, setSlotDay] = useState<number>(0)
+  const [slotZoneIds, setSlotZoneIds] = useState<number[]>([])
+  const [slotDays, setSlotDays] = useState<number[]>([])
   const [slotStart, setSlotStart] = useState("06:00")
   const [slotEnd, setSlotEnd] = useState("06:30")
   const [slotError, setSlotError] = useState<string | null>(null)
+  const [slotAdding, setSlotAdding] = useState(false)
 
   // Add range dialog — using day+month selects
   const [addRangeOpen, setAddRangeOpen] = useState(false)
@@ -431,13 +432,32 @@ function SetupDetail({
 
   const handleAddSlot = async () => {
     setSlotError(null)
-    try {
-      const created = await addSchedule(setup.id, slotZoneId, slotDay, slotStart, slotEnd)
-      setSchedules((prev) => [...prev, created])
-      setAddSlotOpen(false)
-    } catch (e: unknown) {
-      setSlotError(e instanceof Error ? e.message : "Failed to add slot")
+    if (slotZoneIds.length === 0 || slotDays.length === 0) {
+      setSlotError("Select at least one zone and one day")
+      return
     }
+    setSlotAdding(true)
+    const created: SetupZoneSchedule[] = []
+    const errors: string[] = []
+    for (const zoneId of slotZoneIds) {
+      for (const day of slotDays) {
+        try {
+          const result = await addSchedule(setup.id, zoneId, day, slotStart, slotEnd)
+          created.push(result)
+        } catch (e: unknown) {
+          errors.push(`${zoneName(zoneId)} / ${DAYS[day]}: ${e instanceof Error ? e.message : "Failed"}`)
+        }
+      }
+    }
+    if (created.length > 0) {
+      setSchedules((prev) => [...prev, ...created])
+    }
+    if (errors.length > 0) {
+      setSlotError(errors.join("\n"))
+    } else {
+      setAddSlotOpen(false)
+    }
+    setSlotAdding(false)
   }
 
   const handleDeleteRange = async (rangeId: number) => {
@@ -487,10 +507,11 @@ function SetupDetail({
               className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
               onClick={() => {
                 setSlotError(null)
-                setSlotZoneId(zones[0]?.id ?? 0)
-                setSlotDay(0)
+                setSlotZoneIds([])
+                setSlotDays([])
                 setSlotStart("06:00")
                 setSlotEnd("06:30")
+                setSlotError(null)
                 setAddSlotOpen(true)
               }}
             >
@@ -595,33 +616,49 @@ function SetupDetail({
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-sm font-medium text-zinc-300">Zone</Label>
-              <select
-                className="mt-1 w-full bg-zinc-700 text-zinc-50 border border-zinc-600 rounded-md px-3 py-2 text-sm"
-                value={slotZoneId}
-                onChange={(e) => setSlotZoneId(Number(e.target.value))}
-              >
-                {zones.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.name || `Zone ${z.zone_number}`}
-                  </option>
-                ))}
-              </select>
+              <Label className="text-sm font-medium text-zinc-300 mb-2 block">Zones</Label>
+              <div className="flex flex-wrap gap-2">
+                {zones.map((z) => {
+                  const checked = slotZoneIds.includes(z.id)
+                  return (
+                    <button
+                      key={z.id}
+                      type="button"
+                      onClick={() => setSlotZoneIds((prev) => checked ? prev.filter((id) => id !== z.id) : [...prev, z.id])}
+                      className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                        checked
+                          ? "bg-zinc-500 text-zinc-50 border-zinc-400"
+                          : "bg-zinc-700 text-zinc-400 border-zinc-600 hover:border-zinc-500"
+                      }`}
+                    >
+                      {z.name || `Zone ${z.zone_number}`}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div>
-              <Label className="text-sm font-medium text-zinc-300">Day of Week</Label>
-              <select
-                className="mt-1 w-full bg-zinc-700 text-zinc-50 border border-zinc-600 rounded-md px-3 py-2 text-sm"
-                value={slotDay}
-                onChange={(e) => setSlotDay(Number(e.target.value))}
-              >
-                {DAYS.map((day, idx) => (
-                  <option key={idx} value={idx}>
-                    {day}
-                  </option>
-                ))}
-              </select>
+              <Label className="text-sm font-medium text-zinc-300 mb-2 block">Days</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAYS.map((day, idx) => {
+                  const checked = slotDays.includes(idx)
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSlotDays((prev) => checked ? prev.filter((d) => d !== idx) : [...prev, idx])}
+                      className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                        checked
+                          ? "bg-zinc-500 text-zinc-50 border-zinc-400"
+                          : "bg-zinc-700 text-zinc-400 border-zinc-600 hover:border-zinc-500"
+                      }`}
+                    >
+                      {day.slice(0, 3)}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -649,10 +686,14 @@ function SetupDetail({
               Note: a 1-minute gap is required between any two slots on the same day, across all zones (only one valve can be open at a time).
             </p>
 
-            {slotError && <p className="text-red-400 text-sm">{slotError}</p>}
+            {slotError && <p className="text-red-400 text-sm whitespace-pre-line">{slotError}</p>}
 
-            <Button className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500" onClick={handleAddSlot}>
-              Add
+            <Button
+              className="w-full bg-zinc-600 text-zinc-50 hover:bg-zinc-500"
+              onClick={handleAddSlot}
+              disabled={slotAdding || slotZoneIds.length === 0 || slotDays.length === 0}
+            >
+              {slotAdding ? "Adding..." : `Add ${slotZoneIds.length * slotDays.length || ""} slot${slotZoneIds.length * slotDays.length !== 1 ? "s" : ""}`}
             </Button>
           </div>
         </DialogContent>
