@@ -104,6 +104,7 @@ export default function Component({ permissions }: DeviceProps) {
   const canAccessRecordings = permissions.includes(Permission.ACCESS_RECORDINGS)
   const eventSources = useRef<{ [key: string]: EventSource }>({})
   const reconnectTimeouts = useRef<{ [key: string]: NodeJS.Timeout }>({})
+  const streamErrorsRef = useRef<{ [key: string]: number }>({})
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -129,6 +130,8 @@ export default function Component({ permissions }: DeviceProps) {
     }
     fetchDevices()
   }, [])
+
+  useEffect(() => { streamErrorsRef.current = streamErrors; })
 
   useEffect(() => {
     for (const sensorId in eventSources.current) {
@@ -180,7 +183,7 @@ export default function Component({ permissions }: DeviceProps) {
               return { ...prev, [sensor.id]: errorCount }
             })
 
-            const errorCount = streamErrors[sensor.id] || 0
+            const errorCount = streamErrorsRef.current[sensor.id] || 0
             if (errorCount > 10) {
               console.error(`Too many failures for sensor ${sensor.id}, implementing backoff`)
               stream.close()
@@ -214,7 +217,7 @@ export default function Component({ permissions }: DeviceProps) {
         clearTimeout(timeout)
       }
     }
-  }, [sensors, streamErrors])
+  }, [sensors])
 
   useEffect(() => {
     return () => {

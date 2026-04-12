@@ -75,6 +75,10 @@ export default function Alarm({ permissions }: AlarmProps) {
 
   const eventSources = useRef<{ [key: number]: EventSource }>({})
   const reconnectTimeouts = useRef<{ [key: number]: NodeJS.Timeout }>({})
+  const streamErrorsRef = useRef<{ [key: number]: number }>({})
+
+  const groupKeys = deviceGroups?.map(g => g.id).sort((a, b) => a - b).join(',') ?? ''
+  useEffect(() => { streamErrorsRef.current = streamErrors; })
 
   useEffect(() => {
     // Close event sources for removed groups
@@ -124,7 +128,7 @@ export default function Alarm({ permissions }: AlarmProps) {
 
             // EventSource will auto-reconnect, but we can add custom logic
             // For example, if too many failures, we might want to stop trying
-            if ((streamErrors[group.id] || 0) > 10) {
+            if ((streamErrorsRef.current[group.id] || 0) > 10) {
               console.error(`Too many failures for device group ${group.id}, stopping reconnection attempts`)
               stream.close()
               delete eventSources.current[group.id]
@@ -155,7 +159,7 @@ export default function Alarm({ permissions }: AlarmProps) {
         clearTimeout(timeout)
       }
     }
-  }, [deviceGroups, streamErrors])
+  }, [groupKeys])
 
   useEffect(() => {
     const fetchData = async () => {
