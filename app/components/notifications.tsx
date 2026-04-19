@@ -11,9 +11,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { getAllNotifications, getSnapshotUrl } from "@/lib/api"
 import type { AlarmNotification, Permission } from "@/types"
-import { Bell, Loader2 } from "lucide-react"
+import { Bell, Loader2, Maximize2 } from "lucide-react"
 
 type NotificationsProps = {
   permissions: Permission[]
@@ -23,6 +30,7 @@ const PAGE_SIZE = 20
 
 export default function Notifications({ permissions }: NotificationsProps) {
   const [notifications, setNotifications] = useState<AlarmNotification[]>([])
+  const [selectedSnapshot, setSelectedSnapshot] = useState<AlarmNotification | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
@@ -156,13 +164,16 @@ export default function Notifications({ permissions }: NotificationsProps) {
               <CardContent>
                 {notification.message && <p className="text-zinc-300 mb-3">{notification.message}</p>}
                 {notification.snapshot_filename && (
-                  <div className="mb-3">
+                  <div className="mb-3 relative group cursor-pointer" onClick={() => setSelectedSnapshot(notification)}>
                     <img
                       src={getSnapshotUrl(notification.snapshot_filename)}
                       alt="Motion snapshot"
                       className="rounded-md w-full border border-zinc-600"
                       loading="lazy"
                     />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded-md flex items-center justify-center">
+                      <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                   </div>
                 )}
                 <p className="text-zinc-500 text-sm">{formatDateTime(notification.created_at)}</p>
@@ -182,6 +193,24 @@ export default function Notifications({ permissions }: NotificationsProps) {
           )}
         </div>
       )}
+
+      <Dialog open={!!selectedSnapshot} onOpenChange={() => setSelectedSnapshot(null)}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-zinc-800 text-zinc-50">
+          <DialogHeader>
+            <DialogTitle>{selectedSnapshot?.title}</DialogTitle>
+            <DialogDescription>{formatDateTime(selectedSnapshot?.created_at || "")}</DialogDescription>
+          </DialogHeader>
+          {selectedSnapshot?.snapshot_filename && (
+            <div className="flex-grow overflow-hidden flex items-center justify-center">
+              <img
+                src={getSnapshotUrl(selectedSnapshot.snapshot_filename)}
+                alt="Motion snapshot"
+                className="max-w-full max-h-[70vh] object-contain rounded-md"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
         <AlertDialogContent className="bg-zinc-800 text-zinc-50">
