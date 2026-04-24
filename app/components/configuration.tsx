@@ -50,6 +50,9 @@ import {
   getFirebaseStatus,
   setFirebaseCredentials,
   deleteFirebaseCredentials,
+  getIrrigationCoordinates,
+  setIrrigationCoordinates,
+  deleteIrrigationCoordinates,
 } from "@/lib/api"
 import {
   type NtfyCredentials,
@@ -60,6 +63,7 @@ import {
   type GpioServerConfig,
   type Mp3ServerConfig,
   type ValveServerConfig,
+  type IrrigationCoordinatesConfig,
   Permission,
 } from "@/types"
 
@@ -134,6 +138,14 @@ export default function Configuration({ permissions }: ConfigurationProps) {
   const [valveSaving, setValveSaving] = useState(false)
   const [showTzWarning, setShowTzWarning] = useState(false)
 
+  // Irrigation coordinates state
+  const [irrigationCoords, setIrrigationCoords] = useState<IrrigationCoordinatesConfig | null>(null)
+  const [isCoordDialogOpen, setIsCoordDialogOpen] = useState(false)
+  const [newCoordLat, setNewCoordLat] = useState("")
+  const [newCoordLon, setNewCoordLon] = useState("")
+  const [coordError, setCoordError] = useState<string | null>(null)
+  const [coordSaving, setCoordSaving] = useState(false)
+
   const [firebaseStatus, setFirebaseStatus] = useState<FirebaseStatus | null>(null)
   const [firebaseCredentialsInput, setFirebaseCredentialsInput] = useState("")
   const [firebaseLoading, setFirebaseLoading] = useState(false)
@@ -207,6 +219,13 @@ export default function Configuration({ permissions }: ConfigurationProps) {
           setValveServer(vs)
         } catch (error) {
           console.error("Failed to fetch valve server:", error)
+        }
+
+        try {
+          const coords = await getIrrigationCoordinates()
+          setIrrigationCoords(coords)
+        } catch {
+          // non-blocking
         }
 
         try {
@@ -530,6 +549,44 @@ export default function Configuration({ permissions }: ConfigurationProps) {
       setValveServer({ configured: false })
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to delete valve server")
+    }
+  }
+
+  // --- Irrigation coordinates handlers ---
+  const handleSaveCoordinates = async () => {
+    setCoordError(null)
+    const lat = parseFloat(newCoordLat)
+    const lon = parseFloat(newCoordLon)
+    if (isNaN(lat) || isNaN(lon)) {
+      setCoordError("Invalid latitude or longitude")
+      return
+    }
+    if (lat < -90 || lat > 90) {
+      setCoordError("Latitude must be between -90 and 90")
+      return
+    }
+    if (lon < -180 || lon > 180) {
+      setCoordError("Longitude must be between -180 and 180")
+      return
+    }
+    setCoordSaving(true)
+    try {
+      const saved = await setIrrigationCoordinates(lat, lon)
+      setIrrigationCoords(saved)
+      setIsCoordDialogOpen(false)
+    } catch (e: unknown) {
+      setCoordError(e instanceof Error ? e.message : "Failed to save coordinates")
+    } finally {
+      setCoordSaving(false)
+    }
+  }
+
+  const handleDeleteCoordinates = async () => {
+    try {
+      await deleteIrrigationCoordinates()
+      setIrrigationCoords({ configured: false })
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete coordinates")
     }
   }
 
@@ -1143,6 +1200,73 @@ export default function Configuration({ permissions }: ConfigurationProps) {
             </CardFooter>
           )}
         </Card>
+        {/* Irrigation Coordinates Card */}
+        <Card className="bg-zinc-800 border-zinc-700">
+          <CardHeader>
+            <CardTitle className="text-zinc-50">Irrigation Coordinates</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {irrigationCoords?.configured ? (
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium text-zinc-300">Latitude</Label>
+                  <p className="text-sm text-zinc-50 font-mono">{irrigationCoords.latitude}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium text-zinc-300">Longitude</Label>
+                  <p className="text-sm text-zinc-50 font-mono">{irrigationCoords.longitude}</p>
+                </div>
+                <p className="text-xs text-zinc-500">Scheduled irrigation is skipped when rain is detected at this location.</p>
+              </div>
+            ) : (
+              <p className="text-zinc-400 text-sm">No coordinates configured. Scheduled irrigation will always run regardless of weather.</p>
+            )}
+            {coordError && <p className="text-sm text-red-400">{coordError}</p>}
+          </CardContent>
+          {canModifyDevices && (
+            <CardFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600 flex-1"
+                onClick={() => {
+                  setNewCoordLat(irrigationCoords?.latitude?.toString() ?? "")
+                  setNewCoordLon(irrigationCoords?.longitude?.toString() ?? "")
+                  setCoordError(null)
+                  setIsCoordDialogOpen(true)
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {irrigationCoords?.configured ? "Update" : "Set Coordinates"}
+              </Button>
+              {irrigationCoords?.configured && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="bg-zinc-700 text-zinc-50 hover:bg-red-900">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-zinc-800 border-zinc-700">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-zinc-50">Remove Coordinates?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-zinc-400">
+                        Without coordinates, scheduled irrigation will always run regardless of weather.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-zinc-700 text-zinc-50">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-900 hover:bg-red-800"
+                        onClick={handleDeleteCoordinates}
+                      >
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </CardFooter>
+          )}
+        </Card>
       </div>
 
       {/* Audio dialogs */}
@@ -1337,6 +1461,61 @@ export default function Configuration({ permissions }: ConfigurationProps) {
               onClick={handleSaveValveServer}
             >
               {valveSaving ? "Saving..." : showTzWarning ? "Confirm (deletes schedules)" : "Save"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Coordinates Dialog */}
+      <Dialog open={isCoordDialogOpen} onOpenChange={setIsCoordDialogOpen}>
+        <DialogContent className="bg-zinc-800 border-zinc-700">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-50">
+              {irrigationCoords?.configured ? "Update" : "Set"} Irrigation Coordinates
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium text-zinc-300">Latitude</Label>
+              <Input
+                type="number"
+                step="any"
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                placeholder="e.g. 45.53"
+                value={newCoordLat}
+                onChange={(e) => setNewCoordLat(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm font-medium text-zinc-300">Longitude</Label>
+              <Input
+                type="number"
+                step="any"
+                className="bg-zinc-700 text-zinc-50 border-zinc-600"
+                placeholder="e.g. 12.11"
+                value={newCoordLon}
+                onChange={(e) => setNewCoordLon(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-zinc-500">
+              Used to check weather via Open Meteo. If rain is detected, scheduled irrigation is skipped.
+            </p>
+            {coordError && <p className="text-sm text-red-400">{coordError}</p>}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              className="bg-zinc-700 text-zinc-50"
+              onClick={() => setIsCoordDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-zinc-600 text-zinc-50 hover:bg-zinc-500"
+              disabled={coordSaving || !newCoordLat.trim() || !newCoordLon.trim()}
+              onClick={handleSaveCoordinates}
+            >
+              {coordSaving ? "Saving..." : "Save"}
             </Button>
           </div>
         </DialogContent>

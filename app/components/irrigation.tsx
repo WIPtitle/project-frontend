@@ -36,9 +36,6 @@ import {
   deleteDateRange,
   openValveManual,
   closeValveManual,
-  getIrrigationCoordinates,
-  setIrrigationCoordinates,
-  deleteIrrigationCoordinates,
 } from "@/lib/api"
 import type {
   ValveServerConfig,
@@ -48,7 +45,6 @@ import type {
   SetupDateRange,
   ValveStatus,
   ZoneMismatch,
-  IrrigationCoordinatesConfig,
 } from "@/types"
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -1071,197 +1067,6 @@ function SetupsSection({
   )
 }
 
-// ─── CoordinatesSection ─────────────────────────────────────────────────────
-
-function CoordinatesSection({ canModify }: { canModify: boolean }) {
-  const [coords, setCoords] = useState<IrrigationCoordinatesConfig | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [lat, setLat] = useState("")
-  const [lon, setLon] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    getIrrigationCoordinates()
-      .then(setCoords)
-      .catch(() => setCoords(null))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const handleSave = async () => {
-    setError(null)
-    const latitude = parseFloat(lat)
-    const longitude = parseFloat(lon)
-    if (isNaN(latitude) || isNaN(longitude)) {
-      setError("Invalid latitude or longitude")
-      return
-    }
-    if (latitude < -90 || latitude > 90) {
-      setError("Latitude must be between -90 and 90")
-      return
-    }
-    if (longitude < -180 || longitude > 180) {
-      setError("Longitude must be between -180 and 180")
-      return
-    }
-    setSaving(true)
-    try {
-      const saved = await setIrrigationCoordinates(latitude, longitude)
-      setCoords(saved)
-      setEditing(false)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save coordinates")
-    }
-    setSaving(false)
-  }
-
-  const handleDelete = async () => {
-    try {
-      await deleteIrrigationCoordinates()
-      setCoords({ configured: false })
-      setLat("")
-      setLon("")
-    } catch (e: unknown) {
-      console.error("Failed to delete coordinates:", e)
-    }
-  }
-
-  const handleEdit = () => {
-    setLat(coords?.latitude?.toString() ?? "")
-    setLon(coords?.longitude?.toString() ?? "")
-    setError(null)
-    setEditing(true)
-  }
-
-  if (loading) {
-    return <p className="text-zinc-400 text-sm">Loading coordinates...</p>
-  }
-
-  return (
-    <div>
-      <h2 className="text-lg font-semibold text-zinc-100 mb-3">Rain Check Coordinates</h2>
-      <Card className="bg-zinc-800 border-zinc-700">
-        <CardContent className="p-4">
-          {!editing && coords?.configured ? (
-            <div className="space-y-2">
-              <p className="text-sm text-zinc-300">
-                Latitude: <span className="text-zinc-50 font-medium">{coords.latitude}</span>
-              </p>
-              <p className="text-sm text-zinc-300">
-                Longitude: <span className="text-zinc-50 font-medium">{coords.longitude}</span>
-              </p>
-              <p className="text-xs text-zinc-500">
-                Scheduled irrigation will be skipped if rain is detected at this location today.
-              </p>
-              {canModify && (
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                    onClick={handleEdit}
-                  >
-                    Edit
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="bg-red-900 text-zinc-50 hover:bg-red-800"
-                      >
-                        Remove
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-zinc-800 border-zinc-700">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-zinc-50">Remove Coordinates</AlertDialogTitle>
-                        <AlertDialogDescription className="text-zinc-400">
-                          Without coordinates, scheduled irrigation will always run regardless of weather.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600">
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-red-900 hover:bg-red-800 text-zinc-50"
-                          onClick={handleDelete}
-                        >
-                          Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              )}
-            </div>
-          ) : !editing ? (
-            <div className="space-y-2">
-              <p className="text-sm text-zinc-400">
-                No coordinates configured. Scheduled irrigation will always run.
-              </p>
-              {canModify && (
-                <Button
-                  size="sm"
-                  className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
-                  onClick={() => { setError(null); setEditing(true) }}
-                >
-                  Set Coordinates
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm font-medium text-zinc-300">Latitude</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600 mt-1"
-                    placeholder="e.g. 45.53"
-                    value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-zinc-300">Longitude</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    className="bg-zinc-700 text-zinc-50 border-zinc-600 mt-1"
-                    placeholder="e.g. 12.11"
-                    value={lon}
-                    onChange={(e) => setLon(e.target.value)}
-                  />
-                </div>
-              </div>
-              {error && <p className="text-red-400 text-sm">{error}</p>}
-              <div className="flex gap-2">
-                <Button
-                  className="bg-zinc-600 text-zinc-50 hover:bg-zinc-500"
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? "Saving..." : "Save"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="bg-zinc-700 border border-zinc-600 text-zinc-50 hover:bg-zinc-600"
-                  onClick={() => setEditing(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
 // ─── IrrigationDashboard ─────────────────────────────────────────────────────
 
 function IrrigationDashboard({ permissions }: IrrigationProps) {
@@ -1271,7 +1076,6 @@ function IrrigationDashboard({ permissions }: IrrigationProps) {
   return (
     <div className="p-4 space-y-8">
       <ZonesSection canModify={canModify} onZonesLoaded={setZones} />
-      <CoordinatesSection canModify={canModify} />
       <SetupsSection zones={zones} canModify={canModify} />
     </div>
   )
