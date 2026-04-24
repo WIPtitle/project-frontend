@@ -173,3 +173,10 @@ export interface ZoneMismatch {
   missing_in_db?: string[]
   unreachable?: boolean
 }
+
+export interface IrrigationCoordinatesConfig {
+  configured: boolean
+  id?: number
+  latitude?: number
+  longitude?: number
+}

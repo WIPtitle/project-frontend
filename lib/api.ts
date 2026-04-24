@@ -22,7 +22,8 @@ import type {
   SetupZoneSchedule,
   SetupDateRange,
   ValveStatus,
-  ZoneMismatch
+  ZoneMismatch,
+  IrrigationCoordinatesConfig
 } from "@/types"
 
 const getApiBaseUrl = () => {
@@ -1657,4 +1658,56 @@ export async function getZonesMismatch(): Promise<ZoneMismatch> {
   })
   if (!r.ok) throw new Error("Failed to check zone mismatch")
   return r.json()
+}
+
+export const getIrrigationCoordinates = async (): Promise<IrrigationCoordinatesConfig> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/config/coordinates`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const setIrrigationCoordinates = async (latitude: number, longitude: number): Promise<IrrigationCoordinatesConfig> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/config/coordinates`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ latitude, longitude }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const updateIrrigationCoordinates = async (latitude: number, longitude: number): Promise<IrrigationCoordinatesConfig> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/config/coordinates`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ latitude, longitude }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
+  return r.json()
+}
+
+export const deleteIrrigationCoordinates = async (): Promise<void> => {
+  const token = getTokenOrThrow()
+  const r = await fetch(`${IRRIGATION_BASE}/config/coordinates`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(err.detail || "Failed")
+  }
 }
