@@ -1118,6 +1118,7 @@ export const stopListening = async (groupId: number, pin: string): Promise<void>
 export const getAllRecordings = async (params?: {
   offset?: number
   type?: RecordingType
+  camera_ip?: string
 }): Promise<Recording[]> => {
   try {
     let url = `${getApiBaseUrl()}/devices-manager-service/recording`
@@ -1129,6 +1130,10 @@ export const getAllRecordings = async (params?: {
 
     if (params?.type) {
       queryParams.push(`type=${params.type}`)
+    }
+
+    if (params?.camera_ip) {
+      queryParams.push(`camera_ip=${encodeURIComponent(params.camera_ip)}`)
     }
 
     if (queryParams.length > 0) {

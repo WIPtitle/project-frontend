@@ -42,7 +42,6 @@ type RecordingsProps = {
 
 const PAGE_SIZE = 20
 
-const UNKNOWN_CAMERA = "__unknown__"
 
 export default function Recordings({ permissions }: RecordingsProps) {
   const [recordings, setRecordings] = useState<Recording[]>([])
@@ -59,8 +58,8 @@ export default function Recordings({ permissions }: RecordingsProps) {
   // Filter modal state
   const [filterModalOpen, setFilterModalOpen] = useState(false)
   const [tempShowAlarmRecordings, setTempShowAlarmRecordings] = useState(false)
-  const [selectedCameras, setSelectedCameras] = useState<Set<string>>(new Set())
-  const [tempSelectedCameras, setTempSelectedCameras] = useState<Set<string>>(new Set())
+  const [selectedCameraIp, setSelectedCameraIp] = useState<string | null>(null)
+  const [tempSelectedCameraIp, setTempSelectedCameraIp] = useState<string | null>(null)
 
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreCallbackRef = useRef<() => void>(() => {})
@@ -86,10 +85,14 @@ export default function Recordings({ permissions }: RecordingsProps) {
     }
   }, [])
 
-  const fetchRecordings = useCallback(async (type: RecordingType, offset: number) => {
-    console.log(`[Recordings] Fetching ${type} recordings with offset ${offset}`)
+  const fetchRecordings = useCallback(async (type: RecordingType, offset: number, cameraIp: string | null) => {
+    console.log(`[Recordings] Fetching ${type} recordings with offset ${offset}, camera_ip=${cameraIp}`)
     try {
-      const recordings = await getAllRecordings({ offset, type })
+      const params: { offset: number; type: RecordingType; camera_ip?: string } = { offset, type }
+      if (cameraIp) {
+        params.camera_ip = cameraIp
+      }
+      const recordings = await getAllRecordings(params)
       const apiCount = recordings.length
       console.log(`[Recordings] Got ${apiCount} recordings from API`)
       const completedRecordings = recordings
@@ -97,7 +100,6 @@ export default function Recordings({ permissions }: RecordingsProps) {
         .sort((a, b) => b.name.localeCompare(a.name))
 
       console.log(`[Recordings] After filtering completed: ${completedRecordings.length} recordings`)
-      // Return both the filtered recordings AND the original API count for pagination
       return { recordings: completedRecordings, apiCount }
     } catch (error) {
       console.error(`[Recordings] Failed to fetch ${type} recordings:`, error)
@@ -106,37 +108,14 @@ export default function Recordings({ permissions }: RecordingsProps) {
   }, [])
 
   // Get cameras relevant to the current recording type
-  // always_recording=true → NORMAL recordings
-  // always_recording=false → ALARM recordings (motion detection)
   const relevantCameras = useMemo(() => {
     const cameraList = Object.values(cameras).filter((c): c is RTSPCamera => c !== null)
     if (showAlarmRecordings) {
-      // Alarm recordings come from cameras with always_recording=false
       return cameraList.filter((c) => !c.always_recording)
     } else {
-      // Normal recordings come from cameras with always_recording=true
       return cameraList.filter((c) => c.always_recording)
     }
   }, [cameras, showAlarmRecordings])
-
-  // Get sorted list of relevant camera IPs for the filter modal
-  const sortedRelevantCameraIps = useMemo(() => {
-    return relevantCameras.map((c) => c.ip).sort()
-  }, [relevantCameras])
-
-  // Filter recordings based on selected cameras (frontend-only filtering)
-  const filteredRecordings = useMemo(() => {
-    return recordings.filter((recording) => {
-      const cameraIp = recording.camera_ip
-      // Check if camera exists in our cameras map (to determine if it's "unknown")
-      const cameraInfo = cameras[cameraIp]
-      const isUnknownCamera = cameraInfo === undefined || cameraInfo === null
-      if (isUnknownCamera && selectedCameras.has(UNKNOWN_CAMERA)) {
-        return true
-      }
-      return selectedCameras.has(cameraIp)
-    })
-  }, [recordings, selectedCameras, cameras])
 
   // Track if cameras have been loaded
   const camerasLoadedRef = useRef(false)
@@ -156,13 +135,6 @@ export default function Recordings({ permissions }: RecordingsProps) {
           cameraMap[camera.ip] = camera
         })
         setCameras(cameraMap)
-
-        // Initialize selectedCameras with all camera IPs + unknown
-        const allIps = allCameras.map((c) => c.ip)
-        const initialSelection = new Set([...allIps, UNKNOWN_CAMERA])
-        setSelectedCameras(initialSelection)
-        setTempSelectedCameras(initialSelection)
-        console.log("[Recordings] Initialized camera filters:", initialSelection)
       } catch (error) {
         console.error("[Recordings] Failed to load cameras:", error)
       }
@@ -173,28 +145,27 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
   // Load initial data (first page of recordings)
   const loadInitialData = useCallback(async () => {
-    console.log("[Recordings] loadInitialData called, showAlarmRecordings:", showAlarmRecordings)
+    console.log("[Recordings] loadInitialData called, showAlarmRecordings:", showAlarmRecordings, "cameraIp:", selectedCameraIp)
     setInitialLoading(true)
     try {
       const currentType = showAlarmRecordings ? RecordingType.ALARM : RecordingType.NORMAL
 
-      const [result, storage] = await Promise.all([fetchRecordings(currentType, 0), getStorageInfo()])
+      const [result, storage] = await Promise.all([fetchRecordings(currentType, 0, selectedCameraIp), getStorageInfo()])
 
       setRecordings(result.recordings)
       setStorageInfo(storage)
 
-      // Set pagination state - use API count (before filtering) for hasMore check
       setCurrentOffset(PAGE_SIZE)
       const hasMoreData = result.apiCount === PAGE_SIZE
       setHasMore(hasMoreData)
-      console.log(`[Recordings] Initial load complete. ${result.recordings.length} filtered (${result.apiCount} from API), hasMore: ${hasMoreData}`)
+      console.log(`[Recordings] Initial load complete. ${result.recordings.length} recordings (${result.apiCount} from API), hasMore: ${hasMoreData}`)
     } catch (error) {
       console.error("[Recordings] Failed to load initial data:", error)
       setErrorMessage("Failed to fetch recordings and storage information")
     } finally {
       setInitialLoading(false)
     }
-  }, [showAlarmRecordings, fetchRecordings])
+  }, [showAlarmRecordings, selectedCameraIp, fetchRecordings])
 
   // Load more recordings (pagination)
   const loadMoreRecordings = useCallback(async () => {
@@ -207,7 +178,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
     setLoading(true)
     try {
       const currentType = showAlarmRecordings ? RecordingType.ALARM : RecordingType.NORMAL
-      const result = await fetchRecordings(currentType, currentOffset)
+      const result = await fetchRecordings(currentType, currentOffset, selectedCameraIp)
 
       if (result.apiCount === 0) {
         console.log("[Recordings] No more recordings, setting hasMore=false")
@@ -217,7 +188,7 @@ export default function Recordings({ permissions }: RecordingsProps) {
         setCurrentOffset((prev) => prev + PAGE_SIZE)
         const hasMoreData = result.apiCount === PAGE_SIZE
         setHasMore(hasMoreData)
-        console.log(`[Recordings] Loaded ${result.recordings.length} filtered (${result.apiCount} from API), hasMore: ${hasMoreData}`)
+        console.log(`[Recordings] Loaded ${result.recordings.length} recordings (${result.apiCount} from API), hasMore: ${hasMoreData}`)
       }
     } catch (error) {
       console.error("[Recordings] Failed to load more recordings:", error)
@@ -225,15 +196,15 @@ export default function Recordings({ permissions }: RecordingsProps) {
     } finally {
       setLoading(false)
     }
-  }, [loading, hasMore, showAlarmRecordings, currentOffset, fetchRecordings])
+  }, [loading, hasMore, showAlarmRecordings, currentOffset, selectedCameraIp, fetchRecordings])
 
-  // Reset and load data when switching between alarm/normal
+  // Reset and reload when filter changes (type or camera)
   useEffect(() => {
     setRecordings([])
     setCurrentOffset(0)
     setHasMore(true)
     loadInitialData()
-  }, [showAlarmRecordings, loadInitialData])
+  }, [showAlarmRecordings, selectedCameraIp, loadInitialData])
 
   // Keep loadMoreCallbackRef in sync with latest loadMoreRecordings
   useEffect(() => {
@@ -298,43 +269,18 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
   const openFilterModal = () => {
     setTempShowAlarmRecordings(showAlarmRecordings)
-    setTempSelectedCameras(new Set(selectedCameras))
+    setTempSelectedCameraIp(selectedCameraIp)
     setFilterModalOpen(true)
   }
 
   const handleApplyFilters = () => {
-    const typeChanged = tempShowAlarmRecordings !== showAlarmRecordings
-    setSelectedCameras(new Set(tempSelectedCameras))
-
-    if (typeChanged) {
-      // Type changed, need to reload from API
-      setShowAlarmRecordings(tempShowAlarmRecordings)
-    }
-
+    setSelectedCameraIp(tempSelectedCameraIp)
+    setShowAlarmRecordings(tempShowAlarmRecordings)
     setFilterModalOpen(false)
   }
 
-  const handleToggleCameraFilter = (cameraIp: string) => {
-    setTempSelectedCameras((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(cameraIp)) {
-        newSet.delete(cameraIp)
-      } else {
-        newSet.add(cameraIp)
-      }
-      return newSet
-    })
-  }
-
-  const handleSelectAllCameras = () => {
-    // Select all cameras (from all loaded cameras, not just current type)
-    const allIps = Object.keys(cameras)
-    const allCameras = new Set([...allIps, UNKNOWN_CAMERA])
-    setTempSelectedCameras(allCameras)
-  }
-
-  const handleDeselectAllCameras = () => {
-    setTempSelectedCameras(new Set())
+  const handleSelectCamera = (cameraIp: string | null) => {
+    setTempSelectedCameraIp(cameraIp)
   }
 
   const formatBytes = (bytes: number, decimals = 2) => {
@@ -412,26 +358,26 @@ export default function Recordings({ permissions }: RecordingsProps) {
         >
           <Filter className="h-4 w-4 mr-2" />
           Filter
-          {selectedCameras.size < Object.keys(cameras).length + 1 && (
+          {selectedCameraIp && (
             <span className="ml-2 text-xs bg-zinc-500 px-1.5 py-0.5 rounded">
-              {selectedCameras.size}
+              {cameras[selectedCameraIp]?.name || selectedCameraIp}
             </span>
           )}
         </Button>
         <span className="text-zinc-400 text-sm">
           Showing {showAlarmRecordings ? "alarm" : "normal"} recordings
+          {selectedCameraIp && ` — ${cameras[selectedCameraIp]?.name || selectedCameraIp}`}
         </span>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filteredRecordings.length === 0 ? (
+        {recordings.length === 0 ? (
           <p className="text-zinc-400 col-span-full">
-            {recordings.length === 0
-              ? `No ${showAlarmRecordings ? "alarm" : "normal"} recordings found.`
-              : "No recordings match the current filter."}
+            No {showAlarmRecordings ? "alarm" : "normal"} recordings found
+            {selectedCameraIp ? ` for ${cameras[selectedCameraIp]?.name || selectedCameraIp}` : ""}.
           </p>
         ) : (
-          filteredRecordings.map((recording) => (
+          recordings.map((recording) => (
             <Card key={recording.id} className="bg-zinc-800 border-zinc-700 flex flex-col">
               <CardContent className="flex flex-col items-center justify-center pt-6">
                 <FileVideo2 size={48} className="text-zinc-400 mb-2" />
@@ -559,40 +505,39 @@ export default function Recordings({ permissions }: RecordingsProps) {
 
             {/* Camera Filter */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-zinc-300">Cameras</Label>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSelectAllCameras}
-                    className="text-xs text-zinc-400 hover:text-zinc-50 h-6 px-2"
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDeselectAllCameras}
-                    className="text-xs text-zinc-400 hover:text-zinc-50 h-6 px-2"
-                  >
-                    Deselect All
-                  </Button>
-                </div>
-              </div>
+              <Label className="text-zinc-300">Camera</Label>
               <ScrollArea className="h-48 rounded-lg border border-zinc-700 bg-zinc-900">
                 <div className="p-3 space-y-2">
-                  {/* Show cameras based on selected recording type in modal */}
+                  {/* All cameras option */}
+                  <div
+                    className={`flex items-center space-x-3 p-2 rounded cursor-pointer ${tempSelectedCameraIp === null ? "bg-zinc-700" : "hover:bg-zinc-800"}`}
+                    onClick={() => handleSelectCamera(null)}
+                  >
+                    <Checkbox
+                      id="camera-all"
+                      checked={tempSelectedCameraIp === null}
+                      onCheckedChange={() => handleSelectCamera(null)}
+                      className="border-zinc-600 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
+                    />
+                    <Label htmlFor="camera-all" className="text-sm text-zinc-300 cursor-pointer flex-1">
+                      All cameras
+                    </Label>
+                  </div>
+                  {/* Individual cameras based on recording type */}
                   {Object.values(cameras)
                     .filter((c): c is RTSPCamera => c !== null)
                     .filter((c) => tempShowAlarmRecordings ? !c.always_recording : c.always_recording)
                     .sort((a, b) => a.ip.localeCompare(b.ip))
                     .map((camera) => (
-                      <div key={camera.ip} className="flex items-center space-x-3">
+                      <div
+                        key={camera.ip}
+                        className={`flex items-center space-x-3 p-2 rounded cursor-pointer ${tempSelectedCameraIp === camera.ip ? "bg-zinc-700" : "hover:bg-zinc-800"}`}
+                        onClick={() => handleSelectCamera(camera.ip)}
+                      >
                         <Checkbox
                           id={`camera-${camera.ip}`}
-                          checked={tempSelectedCameras.has(camera.ip)}
-                          onCheckedChange={() => handleToggleCameraFilter(camera.ip)}
+                          checked={tempSelectedCameraIp === camera.ip}
+                          onCheckedChange={() => handleSelectCamera(camera.ip)}
                           className="border-zinc-600 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
                         />
                         <Label
@@ -603,21 +548,6 @@ export default function Recordings({ permissions }: RecordingsProps) {
                         </Label>
                       </div>
                     ))}
-                  {/* Unknown Camera option */}
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id="camera-unknown"
-                      checked={tempSelectedCameras.has(UNKNOWN_CAMERA)}
-                      onCheckedChange={() => handleToggleCameraFilter(UNKNOWN_CAMERA)}
-                      className="border-zinc-600 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
-                    />
-                    <Label
-                      htmlFor="camera-unknown"
-                      className="text-sm text-zinc-400 cursor-pointer flex-1 italic"
-                    >
-                      Unknown Camera
-                    </Label>
-                  </div>
                 </div>
               </ScrollArea>
             </div>
