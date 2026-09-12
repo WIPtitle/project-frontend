@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Switch } from "@/components/ui/switch"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -474,16 +473,17 @@ export default function Alarm({ permissions }: AlarmProps) {
                         </div>
                         {selected && (
                           <div className="flex items-center space-x-2 pl-6 mt-1">
-                            <Switch
+                            <Checkbox
                               id={`sensor-coa-${sensor.id}`}
                               checked={selected.check_on_activation}
                               onCheckedChange={(checked) => {
                                 setSelectedSensors((prev) =>
                                   prev.map((s) =>
-                                    s.id === sensor.id ? { ...s, check_on_activation: checked } : s,
+                                    s.id === sensor.id ? { ...s, check_on_activation: checked === true } : s,
                                   ),
                                 )
                               }}
+                              className="border-zinc-500"
                             />
                             <label htmlFor={`sensor-coa-${sensor.id}`} className="text-zinc-400 text-sm">
                               Check on activation
@@ -557,14 +557,7 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <h3 className="mt-2 font-semibold text-zinc-300">Sensors:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
                   {groupSensors[group.id]?.map((sensor) => (
-                    <li key={sensor.id}>
-                      {sensor.name}
-                      <ul className="list-disc pl-5 text-sm">
-                        <li className={sensor.check_on_activation ? "text-green-500" : "text-zinc-400"}>
-                          Check on activation: {sensor.check_on_activation ? "✓ on" : "✗ off"}
-                        </li>
-                      </ul>
-                    </li>
+                    <li key={sensor.id}>{sensor.name}</li>
                   ))}
                 </ul>
                 {groupSensors[group.id]?.length === 0 && <p className="text-zinc-400">No sensors</p>}
