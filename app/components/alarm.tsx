@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +33,16 @@ import {
   startListening,
   stopListening,
 } from "@/lib/api"
-import { type DeviceGroup, type Sensor, type RTSPCamera, Permission, DeviceGroupStatus } from "@/types"
+import {
+  type DeviceGroup,
+  type Sensor,
+  type DeviceGroupSensor,
+  type HighSensor,
+  type RTSPCamera,
+  Permission,
+  DeviceGroupStatus,
+  SensorsHighError,
+} from "@/types"
 
 const statusMapping: Record<DeviceGroupStatus, string> = {
   [DeviceGroupStatus.LISTENING]: "Active",
@@ -61,9 +71,9 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [editingGroup, setEditingGroup] = useState<DeviceGroupInputDto | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [groupSensors, setGroupSensors] = useState<{ [key: number]: Sensor[] }>({})
+  const [groupSensors, setGroupSensors] = useState<{ [key: number]: DeviceGroupSensor[] }>({})
   const [groupCameras, setGroupCameras] = useState<{ [key: number]: RTSPCamera[] }>({})
-  const [selectedSensors, setSelectedSensors] = useState<Sensor[]>([])
+  const [selectedSensors, setSelectedSensors] = useState<DeviceGroupSensor[]>([])
   const [selectedCameraIps, setSelectedCameraIps] = useState<string[]>([])
   const [isActivating, setIsActivating] = useState<{ [key: number]: boolean }>({})
   const [isDeactivating, setIsDeactivating] = useState<{ [key: number]: boolean }>({})
@@ -72,6 +82,7 @@ export default function Alarm({ permissions }: AlarmProps) {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [groupError, setGroupError] = useState<string | null>(null)
   const [streamErrors, setStreamErrors] = useState<{ [key: number]: number }>({})
+  const [blockedSensors, setBlockedSensors] = useState<HighSensor[] | null>(null)
 
   const eventSources = useRef<{ [key: number]: EventSource }>({})
   const reconnectTimeouts = useRef<{ [key: number]: NodeJS.Timeout }>({})
@@ -177,7 +188,7 @@ export default function Alarm({ permissions }: AlarmProps) {
           Promise.all(camerasPromises),
         ])
 
-        const newGroupSensors: { [key: number]: Sensor[] } = {}
+        const newGroupSensors: { [key: number]: DeviceGroupSensor[] } = {}
         const newGroupCameras: { [key: number]: RTSPCamera[] } = {}
 
         groups.forEach((group, index) => {
@@ -276,7 +287,10 @@ export default function Alarm({ permissions }: AlarmProps) {
           )
 
           const [updatedSensors, updatedCameras] = await Promise.all([
-            updateDeviceGroupSensors(existingGroup.id, selectedSensors.map((s) => s.id)),
+            updateDeviceGroupSensors(
+              existingGroup.id,
+              selectedSensors.map((s) => ({ sensor_id: s.id, check_on_activation: s.check_on_activation })),
+            ),
             updateDeviceGroupCameras(existingGroup.id, selectedCameraIps),
           ])
 
@@ -287,7 +301,10 @@ export default function Alarm({ permissions }: AlarmProps) {
           setDeviceGroups((prevGroups) => [...(prevGroups || []), newGroup])
 
           const [newSensors, newCameras] = await Promise.all([
-            updateDeviceGroupSensors(newGroup.id, selectedSensors.map((s) => s.id)),
+            updateDeviceGroupSensors(
+              newGroup.id,
+              selectedSensors.map((s) => ({ sensor_id: s.id, check_on_activation: s.check_on_activation })),
+            ),
             updateDeviceGroupCameras(newGroup.id, selectedCameraIps),
           ])
 
@@ -322,12 +339,16 @@ export default function Alarm({ permissions }: AlarmProps) {
       try {
         await startListening(groupId, pin)
       } catch (error) {
-        setErrorMessage("Failed to activate alarm")
+        if (error instanceof SensorsHighError) {
+          setBlockedSensors(error.sensors)
+        } else {
+          setErrorMessage("Failed to activate alarm")
+        }
       } finally {
         setIsActivating((prev) => ({ ...prev, [groupId]: false }))
       }
     },
-    [deviceGroups, pin],
+    [pin],
   )
 
   const handleDeactivateAlarm = useCallback(
@@ -428,25 +449,50 @@ export default function Alarm({ permissions }: AlarmProps) {
                 {groupError && <p className="text-red-500 text-sm mt-2">{groupError}</p>}
                 <div>
                   <h3 className="mb-2 font-semibold text-zinc-300">Sensors</h3>
-                  {getAvailableSensors(allSensors, editingGroup?.id ?? null).map((sensor) => (
-                    <div key={sensor.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`sensor-${sensor.id}`}
-                        checked={selectedSensors.some((s) => s.id === sensor.id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedSensors((prev) =>
-                            checked
-                              ? [...prev, sensor]
-                              : prev.filter((s) => s.id !== sensor.id),
-                          )
-                        }}
-                        className="border-zinc-500"
-                      />
-                      <label htmlFor={`sensor-${sensor.id}`} className="text-zinc-300">
-                        {sensor.name}
-                      </label>
-                    </div>
-                  ))}
+                  {getAvailableSensors(allSensors, editingGroup?.id ?? null).map((sensor) => {
+                    const selected = selectedSensors.find((s) => s.id === sensor.id)
+                    return (
+                      <div key={sensor.id} className="mb-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`sensor-${sensor.id}`}
+                            checked={!!selected}
+                            onCheckedChange={(checked) => {
+                              setSelectedSensors((prev) => {
+                                if (!checked) return prev.filter((s) => s.id !== sensor.id)
+                                const storedCoa =
+                                  groupSensors[editingGroup?.id ?? -1]?.find((s) => s.id === sensor.id)
+                                    ?.check_on_activation ?? false
+                                return [...prev, { ...sensor, check_on_activation: storedCoa }]
+                              })
+                            }}
+                            className="border-zinc-500"
+                          />
+                          <label htmlFor={`sensor-${sensor.id}`} className="text-zinc-300">
+                            {sensor.name}
+                          </label>
+                        </div>
+                        {selected && (
+                          <div className="flex items-center space-x-2 pl-6 mt-1">
+                            <Switch
+                              id={`sensor-coa-${sensor.id}`}
+                              checked={selected.check_on_activation}
+                              onCheckedChange={(checked) => {
+                                setSelectedSensors((prev) =>
+                                  prev.map((s) =>
+                                    s.id === sensor.id ? { ...s, check_on_activation: checked } : s,
+                                  ),
+                                )
+                              }}
+                            />
+                            <label htmlFor={`sensor-coa-${sensor.id}`} className="text-zinc-400 text-sm">
+                              Check on activation
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                   {getAvailableSensors(allSensors, editingGroup?.id ?? null).length === 0 && (
                     <p className="text-zinc-400">No sensors available</p>
                   )}
@@ -511,7 +557,14 @@ export default function Alarm({ permissions }: AlarmProps) {
                 <h3 className="mt-2 font-semibold text-zinc-300">Sensors:</h3>
                 <ul className="list-disc pl-5 text-zinc-300">
                   {groupSensors[group.id]?.map((sensor) => (
-                    <li key={sensor.id}>{sensor.name}</li>
+                    <li key={sensor.id}>
+                      {sensor.name}
+                      <ul className="list-disc pl-5 text-sm">
+                        <li className={sensor.check_on_activation ? "text-green-500" : "text-zinc-400"}>
+                          Check on activation: {sensor.check_on_activation ? "✓ on" : "✗ off"}
+                        </li>
+                      </ul>
+                    </li>
                   ))}
                 </ul>
                 {groupSensors[group.id]?.length === 0 && <p className="text-zinc-400">No sensors</p>}
@@ -656,6 +709,33 @@ export default function Alarm({ permissions }: AlarmProps) {
           </form>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={!!blockedSensors} onOpenChange={(open) => !open && setBlockedSensors(null)}>
+        <AlertDialogContent className="bg-zinc-800 text-zinc-50">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cannot activate alarm</AlertDialogTitle>
+            <AlertDialogDescription>
+              The following sensors are currently open (HIGH) and are set to be checked on activation.
+              Close them and try again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="list-disc pl-5 text-zinc-200 max-h-60 overflow-y-auto">
+            {blockedSensors?.map((sensor) => (
+              <li key={sensor.id}>
+                {sensor.name}
+                <span className="text-zinc-400 text-sm"> (pin {sensor.gpio_pin_number})</span>
+              </li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => setBlockedSensors(null)}
+              className="bg-zinc-700 text-zinc-50 hover:bg-zinc-600"
+            >
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={!!errorMessage} onOpenChange={() => setErrorMessage(null)}>
         <AlertDialogContent className="bg-zinc-800 text-zinc-50">
           <AlertDialogHeader>

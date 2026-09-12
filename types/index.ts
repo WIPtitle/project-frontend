@@ -45,6 +45,32 @@ export interface Sensor {
   listening: boolean
 }
 
+export interface DeviceGroupSensor extends Sensor {
+  check_on_activation: boolean
+}
+
+export interface DeviceGroupSensorLinkInput {
+  sensor_id: string
+  check_on_activation: boolean
+}
+
+export interface HighSensor {
+  id: string
+  name: string
+  gpio_pin_number: number
+  gpio_server_url: string
+}
+
+export class SensorsHighError extends Error {
+  sensors: HighSensor[]
+  constructor(message: string, sensors: HighSensor[]) {
+    super(message)
+    this.name = "SensorsHighError"
+    this.sensors = sensors
+    Object.setPrototypeOf(this, SensorsHighError.prototype)
+  }
+}
+
 export interface AlarmAudioConfig {
   audio: File | null
 }

@@ -23,8 +23,11 @@ import type {
   SetupDateRange,
   ValveStatus,
   ZoneMismatch,
-  IrrigationCoordinatesConfig
+  IrrigationCoordinatesConfig,
+  DeviceGroupSensor,
+  DeviceGroupSensorLinkInput,
 } from "@/types"
+import { SensorsHighError } from "@/types"
 
 const getApiBaseUrl = () => {
   return "/api"
@@ -503,7 +506,10 @@ export const updateDeviceGroupCameras = async (groupId: number, cameraIps: strin
   }
 }
 
-export const updateDeviceGroupSensors = async (groupId: number, sensorIds: string[]): Promise<Sensor[]> => {
+export const updateDeviceGroupSensors = async (
+  groupId: number,
+  sensorLinks: DeviceGroupSensorLinkInput[],
+): Promise<DeviceGroupSensor[]> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
       method: "PUT",
@@ -511,7 +517,7 @@ export const updateDeviceGroupSensors = async (groupId: number, sensorIds: strin
         Authorization: `Bearer ${getTokenOrThrow()}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(sensorIds),
+      body: JSON.stringify(sensorLinks),
     })
 
     if (!response.ok) {
@@ -524,7 +530,7 @@ export const updateDeviceGroupSensors = async (groupId: number, sensorIds: strin
   }
 }
 
-export const getDeviceGroupSensors = async (groupId: number): Promise<Sensor[]> => {
+export const getDeviceGroupSensors = async (groupId: number): Promise<DeviceGroupSensor[]> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/devices-manager-service/device-group/${groupId}/sensors`, {
       headers: {
@@ -1086,6 +1092,12 @@ export const startListening = async (groupId: number, pin: string): Promise<void
     )
 
     if (!response.ok) {
+      if (response.status === 409) {
+        const data = await response.json().catch(() => null)
+        if (data && Array.isArray(data.sensors)) {
+          throw new SensorsHighError(data.message ?? "Some sensors are open", data.sensors)
+        }
+      }
       throw new Error("Failed to start listening")
     }
   } catch (error) {
